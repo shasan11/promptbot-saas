@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Providers;
+
+use App\Contracts\TenantDatabaseProvisioner;
+use App\Services\Tenancy\TenantDatabaseProvisionerFactory;
+use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->bind(TenantDatabaseProvisioner::class, function ($app) {
+            return $app->make(TenantDatabaseProvisionerFactory::class)->make();
+        });
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        Vite::prefetch(concurrency: 3);
+    }
+}

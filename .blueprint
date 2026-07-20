@@ -1,0 +1,64 @@
+created:
+    - app/Http/Controllers/Admin/PlanController.php
+    - app/Http/Controllers/Admin/FeatureController.php
+    - app/Http/Controllers/Admin/SubscriptionController.php
+    - app/Http/Controllers/Admin/TenantController.php
+    - database/factories/CentralUserFactory.php
+    - database/factories/PlanFactory.php
+    - database/factories/FeatureFactory.php
+    - database/factories/SubscriptionFactory.php
+    - database/factories/TenantFeatureOverrideFactory.php
+    - database/factories/ProvisioningLogFactory.php
+    - database/factories/InstallationSettingFactory.php
+    - database/migrations/2026_07_20_080721_create_central_users_table.php
+    - database/migrations/2026_07_20_080722_create_plans_table.php
+    - database/migrations/2026_07_20_080723_create_features_table.php
+    - database/migrations/2026_07_20_080724_create_subscriptions_table.php
+    - database/migrations/2026_07_20_080725_create_tenant_feature_overrides_table.php
+    - database/migrations/2026_07_20_080726_create_provisioning_logs_table.php
+    - database/migrations/2026_07_20_080727_create_installation_settings_table.php
+    - app/Models/CentralUser.php
+    - app/Models/Plan.php
+    - app/Models/Feature.php
+    - app/Models/Subscription.php
+    - app/Models/TenantFeatureOverride.php
+    - app/Models/ProvisioningLog.php
+    - app/Models/InstallationSetting.php
+    - database/seeders/CentralUserSeeder.php
+    - database/seeders/PlanSeeder.php
+    - database/seeders/FeatureSeeder.php
+    - tests/Feature/Http/Controllers/Admin/PlanControllerTest.php
+    - tests/Feature/Http/Controllers/Admin/FeatureControllerTest.php
+    - tests/Feature/Http/Controllers/Admin/SubscriptionControllerTest.php
+    - tests/Feature/Http/Controllers/Admin/TenantControllerTest.php
+    - app/Http/Requests/Admin/PlanStoreRequest.php
+    - app/Http/Requests/Admin/PlanUpdateRequest.php
+    - app/Http/Requests/Admin/FeatureStoreRequest.php
+    - app/Http/Requests/Admin/FeatureUpdateRequest.php
+    - app/Http/Requests/Admin/SubscriptionUpdateRequest.php
+    - app/Http/Requests/Admin/TenantStoreRequest.php
+    - app/Http/Requests/Admin/TenantUpdateRequest.php
+    - resources/views/plan/index.blade.php
+    - resources/views/plan/create.blade.php
+    - resources/views/plan/show.blade.php
+    - resources/views/plan/edit.blade.php
+    - resources/views/feature/index.blade.php
+    - resources/views/feature/create.blade.php
+    - resources/views/feature/show.blade.php
+    - resources/views/feature/edit.blade.php
+    - resources/views/subscription/index.blade.php
+    - resources/views/subscription/show.blade.php
+    - resources/views/tenant/index.blade.php
+    - resources/views/tenant/create.blade.php
+    - resources/views/tenant/show.blade.php
+    - resources/views/tenant/edit.blade.php
+updated:
+    - routes/web.php
+models:
+    CentralUser: { name: string, email: 'string unique', email_verified_at: 'timestamp nullable', password: string, remember_token: 'rememberToken nullable', role: 'string default:super_admin', is_active: 'boolean default:true', timestamps: timestamps }
+    Plan: { name: string, slug: 'string unique', description: 'text nullable', monthly_price: 'decimal:10,2 default:0', annual_price: 'decimal:10,2 default:0', currency: 'string:3 default:USD', trial_days: 'integer default:0', is_active: 'boolean default:true', sort_order: 'integer default:0', is_recommended: 'boolean default:false', user_limit: 'integer nullable', storage_limit_mb: 'integer nullable', resource_limits: 'json nullable', timestamps: timestamps, softdeletes: softDeletes }
+    Feature: { name: string, code: 'string unique', description: 'text nullable', type: 'string default:boolean', timestamps: timestamps }
+    Subscription: { tenant_id: 'string index', plan_id: 'id foreign', status: 'string default:trial', billing_interval: 'string default:monthly', starts_at: 'timestamp nullable', trial_ends_at: 'timestamp nullable', current_period_starts_at: 'timestamp nullable', current_period_ends_at: 'timestamp nullable', cancelled_at: 'timestamp nullable', grace_ends_at: 'timestamp nullable', external_provider: 'string nullable', external_id: 'string nullable', metadata: 'json nullable', timestamps: timestamps }
+    TenantFeatureOverride: { tenant_id: 'string index', feature_id: 'id foreign', enabled: 'boolean nullable', limit: 'integer nullable', unlimited: 'boolean default:false', metadata: 'json nullable', timestamps: timestamps }
+    ProvisioningLog: { tenant_id: 'string nullable index', step: string, status: string, message: 'text nullable', context: 'json nullable', created_by: 'id nullable foreign:central_users', timestamps: timestamps }
+    InstallationSetting: { key: 'string unique', value: 'text nullable', encrypted: 'boolean default:false', timestamps: timestamps }

@@ -1,0 +1,86 @@
+models:
+  CentralUser:
+    name: string
+    email: string unique
+    email_verified_at: timestamp nullable
+    password: string
+    remember_token: rememberToken nullable
+    role: string default:super_admin
+    is_active: boolean default:true
+    timestamps: true
+
+  Plan:
+    name: string
+    slug: string unique
+    description: text nullable
+    monthly_price: decimal:10,2 default:0
+    annual_price: decimal:10,2 default:0
+    currency: string:3 default:USD
+    trial_days: integer default:0
+    is_active: boolean default:true
+    sort_order: integer default:0
+    is_recommended: boolean default:false
+    user_limit: integer nullable
+    storage_limit_mb: integer nullable
+    resource_limits: json nullable
+    timestamps: true
+    softDeletes: true
+
+  Feature:
+    name: string
+    code: string unique
+    description: text nullable
+    type: string default:boolean
+    timestamps: true
+
+  Subscription:
+    tenant_id: string index
+    plan_id: id foreign
+    status: string default:trial
+    billing_interval: string default:monthly
+    starts_at: timestamp nullable
+    trial_ends_at: timestamp nullable
+    current_period_starts_at: timestamp nullable
+    current_period_ends_at: timestamp nullable
+    cancelled_at: timestamp nullable
+    grace_ends_at: timestamp nullable
+    external_provider: string nullable
+    external_id: string nullable
+    metadata: json nullable
+    timestamps: true
+
+  TenantFeatureOverride:
+    tenant_id: string index
+    feature_id: id foreign
+    enabled: boolean nullable
+    limit: integer nullable
+    unlimited: boolean default:false
+    metadata: json nullable
+    timestamps: true
+
+  ProvisioningLog:
+    tenant_id: string nullable index
+    step: string
+    status: string
+    message: text nullable
+    context: json nullable
+    created_by: id nullable foreign:central_users
+    timestamps: true
+
+  InstallationSetting:
+    key: string unique
+    value: text nullable
+    encrypted: boolean default:false
+    timestamps: true
+
+controllers:
+  Admin/Plan:
+    resource: index,create,store,show,edit,update,destroy
+  Admin/Feature:
+    resource: index,create,store,show,edit,update,destroy
+  Admin/Subscription:
+    resource: index,show,update
+  Admin/Tenant:
+    resource: index,create,store,show,edit,update,destroy
+
+seeders: CentralUser, Plan, Feature
