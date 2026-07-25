@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProvisioningLog extends Model
 {
-    use HasFactory, HasPublicUuid;
+    use HasFactory, HasUuid;
 
     /**
      * The attributes that are mass assignable.
@@ -18,7 +18,6 @@ class ProvisioningLog extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'public_uuid',
         'step',
         'status',
         'message',
@@ -34,15 +33,13 @@ class ProvisioningLog extends Model
     protected function casts(): array
     {
         return [
-            'id' => 'integer',
             'context' => 'array',
-            'created_by' => 'integer',
         ];
     }
 
     public function createdBy(): BelongsTo
     {
-        return $this->belongsTo(CentralUser::class);
+        return $this->belongsTo(CentralUser::class, 'created_by');
     }
 
     public function tenant(): BelongsTo

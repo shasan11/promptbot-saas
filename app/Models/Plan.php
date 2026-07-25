@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Plan extends Model
 {
-    use HasFactory, HasPublicUuid, SoftDeletes;
+    use HasFactory, HasUuid, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -20,7 +20,6 @@ class Plan extends Model
      */
     protected $fillable = [
         'name',
-        'public_uuid',
         'slug',
         'description',
         'monthly_price',
@@ -43,7 +42,6 @@ class Plan extends Model
     protected function casts(): array
     {
         return [
-            'id' => 'integer',
             'monthly_price' => 'decimal:2',
             'annual_price' => 'decimal:2',
             'is_active' => 'boolean',

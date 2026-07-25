@@ -191,7 +191,7 @@ return new class extends Migration
             $table->uuid('website_page_id')->index();
             $table->integer('version')->default(1);
             $table->json('content')->nullable();
-            $table->unsignedBigInteger('created_by')->nullable()->index();
+            $table->uuid('created_by')->nullable()->index();
         });
         $this->create('website_sections', function (Blueprint $table): void {
             $table->uuid('website_page_id')->nullable()->index();
@@ -270,12 +270,12 @@ return new class extends Migration
             $table->string('subject');
             $table->string('status')->default('open')->index();
             $table->string('priority')->default('normal')->index();
-            $table->unsignedBigInteger('assigned_to')->nullable()->index();
+            $table->uuid('assigned_to')->nullable()->index();
             $table->timestamp('sla_due_at')->nullable();
         });
         $this->create('support_messages', function (Blueprint $table): void {
             $table->uuid('support_ticket_id')->index();
-            $table->unsignedBigInteger('author_id')->nullable()->index();
+            $table->uuid('author_id')->nullable()->index();
             $table->boolean('internal')->default(false);
             $table->longText('body')->nullable();
             $table->json('attachments')->nullable();
@@ -311,7 +311,7 @@ return new class extends Migration
             $table->string('status')->default('scheduled')->index();
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
-            $table->unsignedBigInteger('created_by')->nullable()->index();
+            $table->uuid('created_by')->nullable()->index();
         });
     }
 

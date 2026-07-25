@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TenantStoreRequest;
 use App\Http\Requests\Admin\TenantUpdateRequest;
+use App\Jobs\ProvisionTenant;
+use App\Jobs\RunTenantMigrations;
+use App\Jobs\RunTenantSeeders;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Services\Platform\AuditLogService;
+use App\Services\Platform\OperationService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,6 +23,7 @@ class TenantController extends Controller
     public function __construct(
         private readonly TenantProvisioningService $provisioning,
         private readonly AuditLogService $auditLog,
+        private readonly OperationService $operations,
     ) {}
 
     public function index(Request $request): Response
@@ -51,13 +55,17 @@ class TenantController extends Controller
 
     public function store(TenantStoreRequest $request): RedirectResponse
     {
-        $tenant = $this->provisioning->provision($request->validated());
-        $this->auditLog->record('tenant.created', $tenant, [
-            'tenant_id' => $tenant->id,
+        $operation = $this->operations->create('tenant.provision', null, [
+            'reason' => 'Tenant created from superadmin wizard.',
+            'new_values' => $request->safe()->except(['owner_password', 'database_password']),
+        ]);
+        ProvisionTenant::dispatch($operation->id, $request->validated());
+
+        $this->auditLog->record('tenant.provisioning_queued', $operation, [
             'new_values' => $request->safe()->except(['owner_password', 'database_password']),
         ]);
 
-        return redirect()->route('superadmin.tenants.show', $tenant)->with('status', 'Tenant provisioning completed.');
+        return redirect()->route('superadmin.operations.show', $operation)->with('status', 'Tenant provisioning queued.');
     }
 
     public function show(Tenant $tenant): Response
@@ -102,10 +110,18 @@ class TenantController extends Controller
 
     public function retry(Tenant $tenant): RedirectResponse
     {
-        $this->provisioning->retry($tenant);
-        $this->auditLog->record('tenant.provisioning_retried', $tenant, ['tenant_id' => $tenant->id]);
+        $operation = $this->operations->create('tenant.provision.retry', $tenant, ['reason' => request('reason')]);
+        ProvisionTenant::dispatch($operation->id, [
+            'company_name' => $tenant->company_name,
+            'slug' => $tenant->slug,
+            'owner_name' => 'Tenant Owner',
+            'owner_email' => 'owner@'.$tenant->slug.'.invalid',
+            'owner_password' => str()->password(24),
+            'provisioning_mode' => config('saas.db_provisioning_mode', 'manual'),
+        ]);
+        $this->auditLog->record('tenant.provisioning_retried', $tenant, ['tenant_id' => $tenant->id, 'reason' => request('reason')]);
 
-        return back()->with('status', 'Tenant provisioning retried.');
+        return redirect()->route('superadmin.operations.show', $operation)->with('status', 'Tenant provisioning retry queued.');
     }
 
     public function suspend(Tenant $tenant): RedirectResponse
@@ -133,17 +149,19 @@ class TenantController extends Controller
 
     public function migrate(Tenant $tenant): RedirectResponse
     {
-        Artisan::call('tenants:migrate', ['--tenants' => [$tenant->id], '--force' => true]);
-        $this->auditLog->record('tenant.migrated', $tenant, ['tenant_id' => $tenant->id]);
+        $operation = $this->operations->create('tenant.migrate', $tenant, ['reason' => request('reason')]);
+        RunTenantMigrations::dispatch($operation->id, $tenant->id);
+        $this->auditLog->record('tenant.migration_queued', $tenant, ['tenant_id' => $tenant->id, 'reason' => request('reason')]);
 
-        return back()->with('status', 'Tenant migrations ran.');
+        return redirect()->route('superadmin.operations.show', $operation)->with('status', 'Tenant migrations queued.');
     }
 
     public function seed(Tenant $tenant): RedirectResponse
     {
-        Artisan::call('tenants:seed', ['--tenants' => [$tenant->id], '--class' => 'Database\\Seeders\\TenantDatabaseSeeder', '--force' => true]);
-        $this->auditLog->record('tenant.seeded', $tenant, ['tenant_id' => $tenant->id]);
+        $operation = $this->operations->create('tenant.seed', $tenant, ['reason' => request('reason')]);
+        RunTenantSeeders::dispatch($operation->id, $tenant->id);
+        $this->auditLog->record('tenant.seed_queued', $tenant, ['tenant_id' => $tenant->id, 'reason' => request('reason')]);
 
-        return back()->with('status', 'Tenant seeders ran.');
+        return redirect()->route('superadmin.operations.show', $operation)->with('status', 'Tenant seeders queued.');
     }
 }

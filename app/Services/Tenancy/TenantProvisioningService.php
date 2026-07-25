@@ -35,7 +35,7 @@ class TenantProvisioningService
             $tenant = Tenant::firstOrCreate(
                 ['slug' => $slug],
                 [
-                    'id' => $slug,
+                    'id' => (string) Str::uuid(),
                     'company_name' => $data['company_name'],
                     'plan_id' => $data['plan_id'] ?? Plan::query()->where('is_active', true)->orderBy('sort_order')->value('id'),
                     'status' => TenantStatus::Pending,

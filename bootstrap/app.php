@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Middleware\EnforceTenantLimit;
+use App\Http\Middleware\EnsureCentralAdministratorIsActive;
 use App\Http\Middleware\EnsureCentralDomain;
+use App\Http\Middleware\EnsureCentralTwoFactorChallengeIsComplete;
 use App\Http\Middleware\EnsureTenancyIsInitialized;
 use App\Http\Middleware\EnsureTenantIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireCentralPermission;
 use App\Http\Middleware\RequireTenantFeature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -37,6 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'central.domain' => EnsureCentralDomain::class,
+            'central.active' => EnsureCentralAdministratorIsActive::class,
+            'central.2fa' => EnsureCentralTwoFactorChallengeIsComplete::class,
+            'central.permission' => RequireCentralPermission::class,
             'tenant.active' => EnsureTenantIsActive::class,
             'tenant.initialized' => EnsureTenancyIsInitialized::class,
             'tenant.feature' => RequireTenantFeature::class,

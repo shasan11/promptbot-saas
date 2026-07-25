@@ -54,6 +54,22 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if ($user && (! $user->is_active || $user->suspended_at !== null)) {
+            $this->recordLoginAttempt($user, false, 'inactive');
+
+            throw ValidationException::withMessages([
+                'email' => __('This administrator account is not active.'),
+            ]);
+        }
+
+        if ($user?->password_expires_at?->isPast()) {
+            $this->recordLoginAttempt($user, false, 'password_expired');
+
+            throw ValidationException::withMessages([
+                'email' => __('This administrator account requires a password reset before signing in.'),
+            ]);
+        }
+
         if (! Auth::guard('central')->attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
             $this->recordLoginAttempt($user, false, 'invalid_credentials');
@@ -75,6 +91,7 @@ class LoginRequest extends FormRequest
             'last_login_at' => now(),
             'last_login_ip' => $this->ip(),
             'locked_until' => null,
+            'two_factor_required' => $authenticated->two_factor_required || $authenticated->hasRole('Platform Owner'),
         ])->save();
 
         $this->recordLoginAttempt($authenticated, true);

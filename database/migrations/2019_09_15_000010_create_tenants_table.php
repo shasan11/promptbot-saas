@@ -19,7 +19,7 @@ class CreateTenantsTable extends Migration
             $table->string('company_name');
             $table->string('slug')->unique();
             $table->string('status')->default('pending')->index();
-            $table->unsignedBigInteger('plan_id')->nullable()->index();
+            $table->uuid('plan_id')->nullable()->index();
             $table->string('provisioning_step')->nullable();
             $table->text('last_provisioning_error')->nullable();
             $table->timestamp('provisioned_at')->nullable();

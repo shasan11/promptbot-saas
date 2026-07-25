@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Http\Controllers\Admin;
 
-use App\Models\CentralUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,7 +11,7 @@ class PlanControllerTest extends TestCase
 
     public function test_central_admin_can_view_plans(): void
     {
-        $this->actingAs(CentralUser::factory()->create(), 'central')
+        $this->actingAs($this->centralUserWithPermissions('plans.view'), 'central')
             ->get(route('superadmin.plans.index'))
             ->assertOk();
     }

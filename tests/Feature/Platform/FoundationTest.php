@@ -4,7 +4,6 @@ namespace Tests\Feature\Platform;
 
 use App\Models\AuditLog;
 use App\Models\CentralUser;
-use App\Models\PlatformAdminLoginAttempt;
 use App\Models\PlatformPermission;
 use App\Models\PlatformRole;
 use App\Models\PlatformSetting;
@@ -29,18 +28,17 @@ class FoundationTest extends TestCase
         $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $auditLog->id);
     }
 
-    public function test_existing_tenant_records_receive_public_uuid_route_keys(): void
+    public function test_tenant_records_use_uuid_primary_route_keys(): void
     {
         $tenant = Tenant::create([
-            'id' => 'public-route-key',
             'company_name' => 'Public Route Key',
             'slug' => 'public-route-key',
             'status' => 'active',
         ]);
 
-        $this->assertNotSame($tenant->id, $tenant->getRouteKey());
-        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $tenant->public_uuid);
-        $this->assertSame('public_uuid', $tenant->getRouteKeyName());
+        $this->assertSame($tenant->id, $tenant->getRouteKey());
+        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $tenant->id);
+        $this->assertSame('id', $tenant->getRouteKeyName());
     }
 
     public function test_superadmin_login_records_attempt_and_audit_log(): void

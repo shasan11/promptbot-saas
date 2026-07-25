@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
 
         Schema::create('subscriptions', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('tenant_id')->index();
-            $table->foreignId('plan_id')->constrained();
+            $table->foreignUuid('plan_id')->constrained();
             $table->string('status')->default('trial');
             $table->string('billing_interval')->default('monthly');
             $table->timestamp('starts_at')->nullable();

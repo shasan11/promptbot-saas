@@ -8,7 +8,7 @@ class TenantUpdateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('central')?->is_active === true;
+        return $this->user('central')?->can('tenants.update') === true;
     }
 
     public function rules(): array

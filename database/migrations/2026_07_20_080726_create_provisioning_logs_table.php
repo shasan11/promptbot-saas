@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
 
         Schema::create('provisioning_logs', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('tenant_id')->nullable()->index();
             $table->string('step');
             $table->string('status');
             $table->text('message')->nullable();
             $table->json('context')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('central_users')->nullOnDelete();
+            $table->foreignUuid('created_by')->nullable()->constrained('central_users')->nullOnDelete();
             $table->timestamps();
         });
 

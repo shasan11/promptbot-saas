@@ -3,14 +3,14 @@
 namespace App\Models;
 
 use App\Enums\SubscriptionStatus;
-use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subscription extends Model
 {
-    use HasFactory, HasPublicUuid;
+    use HasFactory, HasUuid;
 
     /**
      * The attributes that are mass assignable.
@@ -19,7 +19,6 @@ class Subscription extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'public_uuid',
         'plan_id',
         'status',
         'billing_interval',
@@ -42,8 +41,6 @@ class Subscription extends Model
     protected function casts(): array
     {
         return [
-            'id' => 'integer',
-            'plan_id' => 'integer',
             'status' => SubscriptionStatus::class,
             'starts_at' => 'datetime',
             'trial_ends_at' => 'datetime',

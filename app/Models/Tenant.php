@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Enums\TenantStatus;
-use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
@@ -13,7 +13,6 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    use HasPublicUuid;
     use HasDatabase;
     use HasDomains;
 
@@ -31,6 +30,15 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'tenancy_db_password',
         'data',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Tenant $tenant): void {
+            if (empty($tenant->id)) {
+                $tenant->id = (string) Str::uuid();
+            }
+        });
+    }
 
     public function plan(): BelongsTo
     {
@@ -61,7 +69,6 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     {
         return [
             'id',
-            'public_uuid',
             'company_name',
             'slug',
             'status',

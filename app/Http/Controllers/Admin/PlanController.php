@@ -9,6 +9,7 @@ use App\Models\Feature;
 use App\Models\Plan;
 use App\Services\Platform\AuditLogService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -74,6 +75,7 @@ class PlanController extends Controller
     {
         $plan->features()->sync(collect($features)->mapWithKeys(fn (array $feature) => [
             $feature['id'] => [
+                'id' => (string) Str::uuid(),
                 'enabled' => (bool) ($feature['enabled'] ?? true),
                 'limit' => $feature['limit'] ?? null,
                 'unlimited' => (bool) ($feature['unlimited'] ?? false),

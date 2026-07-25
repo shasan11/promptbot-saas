@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
 
         Schema::create('tenant_feature_overrides', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('tenant_id')->index();
-            $table->foreignId('feature_id')->constrained();
+            $table->foreignUuid('feature_id')->constrained();
             $table->boolean('enabled')->nullable();
             $table->integer('limit')->nullable();
             $table->boolean('unlimited')->default(false);

@@ -85,16 +85,16 @@ export default function SuperadminLayout({ header, children }) {
                             )}
                             {can(auth, 'viewPayments') && (
                                 <>
-                                    <NavLink href={route('superadmin.billing.payments.index')} active={currentRoute?.startsWith('superadmin.billing.payments')}>
+                                    <NavLink href={route('superadmin.billing.resource.index', 'payments')} active={currentRoute === 'superadmin.billing.resource.index' && route().params.resource === 'payments'}>
                                         Payments
                                     </NavLink>
-                                    <NavLink href={route('superadmin.billing.invoices.index')} active={currentRoute?.startsWith('superadmin.billing.invoices')}>
+                                    <NavLink href={route('superadmin.billing.resource.index', 'invoices')} active={currentRoute === 'superadmin.billing.resource.index' && route().params.resource === 'invoices'}>
                                         Invoices
                                     </NavLink>
-                                    <NavLink href={route('superadmin.billing.coupons.index')} active={currentRoute?.startsWith('superadmin.billing.coupons')}>
+                                    <NavLink href={route('superadmin.billing.resource.index', 'coupons')} active={currentRoute === 'superadmin.billing.resource.index' && route().params.resource === 'coupons'}>
                                         Coupons
                                     </NavLink>
-                                    <NavLink href={route('superadmin.billing.gateways.index')} active={currentRoute?.startsWith('superadmin.billing.gateways')}>
+                                    <NavLink href={route('superadmin.billing.resource.index', 'gateways')} active={currentRoute === 'superadmin.billing.resource.index' && route().params.resource === 'gateways'}>
                                         Gateways
                                     </NavLink>
                                 </>
@@ -108,11 +108,11 @@ export default function SuperadminLayout({ header, children }) {
                                 Features
                             </NavLink>
                             <NavLink disabled>Feature Flags</NavLink>
-                            <NavLink href={route('superadmin.platform.usage.index')} active={currentRoute?.startsWith('superadmin.platform.usage')}>
+                            <NavLink href={route('superadmin.platform.resource.index', 'usage')} active={currentRoute === 'superadmin.platform.resource.index' && route().params.resource === 'usage'}>
                                 Usage Metering
                             </NavLink>
                             {can(auth, 'viewIntegrations') && (
-                                <NavLink href={route('superadmin.platform.integrations.index')} active={currentRoute?.startsWith('superadmin.platform.integrations')}>
+                                <NavLink href={route('superadmin.platform.resource.index', 'integrations')} active={currentRoute === 'superadmin.platform.resource.index' && route().params.resource === 'integrations'}>
                                     Integrations and AI
                                 </NavLink>
                             )}
@@ -121,7 +121,7 @@ export default function SuperadminLayout({ header, children }) {
 
                     {can(auth, 'viewWebsite') && (
                         <NavGroup title="Website">
-                            <NavLink href={route('superadmin.website.index')} active={currentRoute?.startsWith('superadmin.website')}>
+                            <NavLink href={route('superadmin.website.resource.index')} active={currentRoute?.startsWith('superadmin.website')}>
                                 Customization
                             </NavLink>
                         </NavGroup>
@@ -130,7 +130,7 @@ export default function SuperadminLayout({ header, children }) {
                     {(can(auth, 'viewCommunications') || can(auth, 'viewSupport')) && (
                         <NavGroup title="Customers">
                             {can(auth, 'viewCommunications') && (
-                                <NavLink href={route('superadmin.communications.index')} active={currentRoute?.startsWith('superadmin.communications')}>
+                                <NavLink href={route('superadmin.communications.resource.index')} active={currentRoute?.startsWith('superadmin.communications')}>
                                     Communications
                                 </NavLink>
                             )}
@@ -145,31 +145,31 @@ export default function SuperadminLayout({ header, children }) {
                     {can(auth, 'viewOperations') && (
                         <NavGroup title="Operations">
                             <NavLink href={route('superadmin.operations.health')} active={currentRoute?.startsWith('superadmin.operations')}>
-                                Health and Queues
+                                Health and Operations
                             </NavLink>
                         </NavGroup>
                     )}
 
                     {can(auth, 'viewSettings') && (
                         <NavGroup title="System">
-                            <NavLink href={route('superadmin.system.administrators.index')} active={currentRoute?.startsWith('superadmin.system.administrators')}>
+                            <NavLink href={route('superadmin.administrators.index')} active={currentRoute?.startsWith('superadmin.administrators')}>
                                 Administrators
                             </NavLink>
-                            <NavLink href={route('superadmin.system.roles.index')} active={currentRoute?.startsWith('superadmin.system.roles')}>
+                            <NavLink href={route('superadmin.roles.index')} active={currentRoute?.startsWith('superadmin.roles')}>
                                 Roles
                             </NavLink>
-                            <NavLink href={route('superadmin.system.settings.index')} active={currentRoute?.startsWith('superadmin.system.settings')}>
+                            <NavLink href={route('superadmin.settings.edit')} active={currentRoute?.startsWith('superadmin.settings')}>
                                 Settings
                             </NavLink>
-                            <NavLink href={route('superadmin.system.security.index')} active={currentRoute?.startsWith('superadmin.system.security')}>
+                            <NavLink href={route('superadmin.security.two-factor')} active={currentRoute?.startsWith('superadmin.security')}>
                                 Security
                             </NavLink>
                             {can(auth, 'viewAuditLogs') && (
                                 <>
-                                    <NavLink href={route('superadmin.system.audit-logs.index')} active={currentRoute?.startsWith('superadmin.system.audit-logs')}>
+                                    <NavLink href={route('superadmin.audit-logs.index')} active={currentRoute?.startsWith('superadmin.audit-logs')}>
                                         Audit Logs
                                     </NavLink>
-                                    <NavLink href={route('superadmin.system.login-attempts.index')} active={currentRoute?.startsWith('superadmin.system.login-attempts')}>
+                                    <NavLink href={route('superadmin.login-attempts.index')} active={currentRoute?.startsWith('superadmin.login-attempts')}>
                                         Login Attempts
                                     </NavLink>
                                 </>

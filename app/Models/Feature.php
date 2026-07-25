@@ -3,14 +3,14 @@
 namespace App\Models;
 
 use App\Enums\FeatureType;
-use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Feature extends Model
 {
-    use HasFactory, HasPublicUuid;
+    use HasFactory, HasUuid;
 
     /**
      * The attributes that are mass assignable.
@@ -19,7 +19,6 @@ class Feature extends Model
      */
     protected $fillable = [
         'name',
-        'public_uuid',
         'code',
         'description',
         'type',
@@ -33,7 +32,6 @@ class Feature extends Model
     protected function casts(): array
     {
         return [
-            'id' => 'integer',
             'type' => FeatureType::class,
         ];
     }

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Http\Controllers\Admin;
 
-use App\Models\CentralUser;
 use App\Http\Requests\Admin\TenantStoreRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
@@ -14,7 +13,7 @@ class TenantControllerTest extends TestCase
 
     public function test_central_admin_can_view_tenants(): void
     {
-        $this->actingAs(CentralUser::factory()->create(), 'central')
+        $this->actingAs($this->centralUserWithPermissions('tenants.view'), 'central')
             ->get(route('superadmin.tenants.index'))
             ->assertOk();
     }
@@ -33,7 +32,7 @@ class TenantControllerTest extends TestCase
             'database_name' => 'tenant_blank_password_company',
             'database_username' => 'root',
             'database_password' => '',
-        ], (new TenantStoreRequest())->rules());
+        ], (new TenantStoreRequest)->rules());
 
         $this->assertFalse($validator->fails(), $validator->errors()->toJson());
     }

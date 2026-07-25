@@ -29,7 +29,7 @@ return new class extends Migration
         Schema::create('platform_model_has_permissions', function (Blueprint $table): void {
             $table->foreignUuid('permission_id')->constrained('platform_permissions')->cascadeOnDelete();
             $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
+            $table->uuid('model_id');
             $table->index(['model_id', 'model_type'], 'platform_model_permissions_model_index');
             $table->primary(['permission_id', 'model_id', 'model_type'], 'platform_model_permissions_primary');
         });
@@ -37,7 +37,7 @@ return new class extends Migration
         Schema::create('platform_model_has_roles', function (Blueprint $table): void {
             $table->foreignUuid('role_id')->constrained('platform_roles')->cascadeOnDelete();
             $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
+            $table->uuid('model_id');
             $table->index(['model_id', 'model_type'], 'platform_model_roles_model_index');
             $table->primary(['role_id', 'model_id', 'model_type'], 'platform_model_roles_primary');
         });

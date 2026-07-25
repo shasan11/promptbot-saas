@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TenantFeatureOverride extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuid;
 
     /**
      * The attributes that are mass assignable.
@@ -32,8 +33,6 @@ class TenantFeatureOverride extends Model
     protected function casts(): array
     {
         return [
-            'id' => 'integer',
-            'feature_id' => 'integer',
             'enabled' => 'boolean',
             'unlimited' => 'boolean',
             'metadata' => 'array',

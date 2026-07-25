@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('platform_admin_login_attempts', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->foreignId('administrator_id')->nullable()->constrained('central_users')->nullOnDelete();
+            $table->foreignUuid('administrator_id')->nullable()->constrained('central_users')->nullOnDelete();
             $table->string('email');
             $table->boolean('successful')->default(false);
             $table->string('ip_address', 45)->nullable();
@@ -34,7 +34,7 @@ return new class extends Migration
 
         Schema::create('audit_logs', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->foreignId('administrator_id')->nullable()->constrained('central_users')->nullOnDelete();
+            $table->foreignUuid('administrator_id')->nullable()->constrained('central_users')->nullOnDelete();
             $table->string('tenant_id')->nullable()->index();
             $table->string('action')->index();
             $table->string('entity_type')->nullable()->index();

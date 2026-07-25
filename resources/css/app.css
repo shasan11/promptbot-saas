@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --pb-primary: #059669;
+    --pb-primary-dark: #047857;
+    --pb-primary-light: #ecfdf5;
+    --pb-navy: #0f172a;
+    --pb-background: #f8fafc;
+}
