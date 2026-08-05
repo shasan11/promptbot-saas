@@ -24,7 +24,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('group')->default('general')->index();
             $table->string('key');
-            $table->json('value')->nullable();
+            $table->text('value')->nullable();
             $table->boolean('encrypted')->default(false);
             $table->boolean('is_sensitive')->default(false);
             $table->timestamps();
