@@ -15,6 +15,7 @@ const money = (value) => Number(value || 0).toLocaleString(undefined, { minimumF
 export default function Index({ payments, tenants = [], filters = {}, stats = {} }) {
     const { auth } = usePage().props;
     const canManage = auth?.permissions?.includes('payments.manage');
+    const currency = stats.currency || 'USD';
     const { data, setData } = useForm({
         search: filters.search || '',
         status: filters.status || '',
@@ -62,9 +63,9 @@ export default function Index({ payments, tenants = [], filters = {}, stats = {}
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard title="Payment records" value={stats.total ?? 0} tone="slate" />
-                <StatCard title="Gross paid" value={money(stats.paid)} tone="emerald" />
+                <StatCard title={`Gross paid (${currency})`} value={money(stats.paid)} tone="emerald" />
                 <StatCard title="Pending" value={stats.pending ?? 0} tone="amber" />
-                <StatCard title="Refunded" value={money(stats.refunded)} tone="rose" />
+                <StatCard title={`Refunded (${currency})`} value={money(stats.refunded)} tone="rose" />
             </div>
 
             <form onSubmit={applyFilters} className="my-5 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:grid-cols-[1fr_180px_180px_220px_auto]">
