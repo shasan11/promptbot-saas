@@ -4,6 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use App\Models\CentralUser;
 use App\Models\PlatformAdminLoginAttempt;
+use App\Services\Platform\SecuritySettings;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -42,7 +43,9 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): void
     {
-        $this->ensureIsNotRateLimited();
+        $security = app(SecuritySettings::class);
+
+        $this->ensureIsNotRateLimited($security);
 
         $user = CentralUser::query()->where('email', $this->string('email'))->first();
 
@@ -54,12 +57,20 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if ($user && ! $user->is_active) {
+            $this->recordLoginAttempt($user, false, 'inactive');
+
+            throw ValidationException::withMessages([
+                'email' => __('This administrator account has been deactivated.'),
+            ]);
+        }
+
         if (! Auth::guard('central')->attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
             $this->recordLoginAttempt($user, false, 'invalid_credentials');
 
-            if (RateLimiter::tooManyAttempts($this->throttleKey(), 5) && $user) {
-                $user->forceFill(['locked_until' => now()->addMinutes(15)])->save();
+            if (RateLimiter::tooManyAttempts($this->throttleKey(), $security->loginAttemptLimit()) && $user) {
+                $user->forceFill(['locked_until' => now()->addMinutes($security->lockoutDurationMinutes())])->save();
             }
 
             throw ValidationException::withMessages([
@@ -85,9 +96,11 @@ class LoginRequest extends FormRequest
      *
      * @throws ValidationException
      */
-    public function ensureIsNotRateLimited(): void
+    public function ensureIsNotRateLimited(?SecuritySettings $security = null): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        $security ??= app(SecuritySettings::class);
+
+        if (! RateLimiter::tooManyAttempts($this->throttleKey(), $security->loginAttemptLimit())) {
             return;
         }
 

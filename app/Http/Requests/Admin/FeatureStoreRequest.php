@@ -8,7 +8,7 @@ class FeatureStoreRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('central')?->is_active === true;
+        return (bool) $this->user('central')?->can('features.manage');
     }
 
     public function rules(): array

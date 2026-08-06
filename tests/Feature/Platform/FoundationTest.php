@@ -4,7 +4,6 @@ namespace Tests\Feature\Platform;
 
 use App\Models\AuditLog;
 use App\Models\CentralUser;
-use App\Models\PlatformAdminLoginAttempt;
 use App\Models\PlatformPermission;
 use App\Models\PlatformRole;
 use App\Models\PlatformSetting;

@@ -32,4 +32,18 @@ class CentralUserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
+    }
+
+    public function locked(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'locked_until' => now()->addMinutes(15),
+        ]);
+    }
 }

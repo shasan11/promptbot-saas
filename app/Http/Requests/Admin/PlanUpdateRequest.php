@@ -4,6 +4,11 @@ namespace App\Http\Requests\Admin;
 
 class PlanUpdateRequest extends PlanStoreRequest
 {
+    public function authorize(): bool
+    {
+        return (bool) $this->user('central')?->can('plans.update');
+    }
+
     public function rules(): array
     {
         $rules = parent::rules();

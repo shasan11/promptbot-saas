@@ -7,18 +7,17 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
+// Central administrator accounts are invite-only: there is intentionally no
+// public registration route. Bootstrap the first administrator via
+// `php artisan db:seed --class=Database\\Seeders\\CentralUserSeeder` (uses
+// CENTRAL_ADMIN_* env vars), then manage further administrators from the
+// Superadmin > Administrators screen.
 Route::middleware('guest')->group(function () {
     Route::redirect('login', '/superadmin/login');
     Route::redirect('forgot-password', '/superadmin/forgot-password');
-
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
 
     Route::get('superadmin/login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');

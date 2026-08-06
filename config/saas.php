@@ -17,4 +17,13 @@ return [
     'locks' => [
         'provisioning_ttl' => (int) env('TENANT_PROVISIONING_LOCK_TTL', 600),
     ],
+
+    'security' => [
+        // Fallback defaults used only when the corresponding `platform_settings`
+        // row (group=security) is missing. The seeded PlatformSetting values are
+        // the source of truth so these can be changed at runtime without a deploy.
+        'login_attempt_limit' => (int) env('CENTRAL_LOGIN_ATTEMPT_LIMIT', 5),
+        'lockout_duration_minutes' => (int) env('CENTRAL_LOCKOUT_MINUTES', 15),
+        'password_expiry_days' => (int) env('CENTRAL_PASSWORD_EXPIRY_DAYS', 90),
+    ],
 ];

@@ -9,6 +9,7 @@ use App\Models\Feature;
 use App\Models\Plan;
 use App\Services\Platform\AuditLogService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,6 +65,10 @@ class PlanController extends Controller
 
     public function destroy(Plan $plan, AuditLogService $auditLog): RedirectResponse
     {
+        if (Gate::denies('delete', $plan)) {
+            return back()->with('error', 'This plan has active or trialing subscribers and cannot be archived. Move them to another plan first.');
+        }
+
         $plan->delete();
         $auditLog->record('plan.archived', $plan, ['severity' => 'warning']);
 

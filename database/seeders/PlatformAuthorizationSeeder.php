@@ -104,5 +104,15 @@ class PlatformAuthorizationSeeder extends Seeder
             ['group' => 'security', 'key' => 'login_attempt_limit'],
             ['id' => (string) Str::uuid(), 'value' => ['value' => 5], 'encrypted' => false, 'is_sensitive' => false]
         );
+
+        PlatformSetting::firstOrCreate(
+            ['group' => 'security', 'key' => 'lockout_duration_minutes'],
+            ['id' => (string) Str::uuid(), 'value' => ['value' => 15], 'encrypted' => false, 'is_sensitive' => false]
+        );
+
+        PlatformSetting::firstOrCreate(
+            ['group' => 'security', 'key' => 'password_expiry_days'],
+            ['id' => (string) Str::uuid(), 'value' => ['value' => 90], 'encrypted' => false, 'is_sensitive' => false]
+        );
     }
 }

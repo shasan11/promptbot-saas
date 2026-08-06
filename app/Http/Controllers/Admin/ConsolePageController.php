@@ -10,7 +10,6 @@ use App\Models\Plan;
 use App\Models\PlatformAdminLoginAttempt;
 use App\Models\PlatformRole;
 use App\Models\PlatformSetting;
-use App\Models\Subscription;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -38,17 +37,6 @@ class ConsolePageController extends Controller
                 ],
             ]
         );
-    }
-
-    public function invoices(): Response
-    {
-        return $this->page('Invoices', 'Generate, review, void, and export tenant invoices.', [
-            ['label' => 'Invoices', 'value' => $this->tableCount('invoices'), 'status' => 'Ready'],
-            ['label' => 'Invoice items', 'value' => $this->tableCount('invoice_items'), 'status' => 'Ready'],
-            ['label' => 'Subscriptions', 'value' => Subscription::query()->count(), 'status' => 'Live'],
-        ], [
-            ['title' => 'Accounting rules', 'description' => 'Financial records should be corrected through voids, reversals, refunds, or credit notes rather than casual deletion.', 'items' => ['PDF generation hook', 'Tax line support', 'Currency display', 'Credit note workflow']],
-        ]);
     }
 
     public function coupons(): Response
@@ -79,18 +67,6 @@ class ConsolePageController extends Controller
             ['label' => 'Usage rows', 'value' => $this->tableCount('usage_metrics'), 'status' => 'Ready'],
         ], [
             ['title' => 'Tracked dimensions', 'description' => 'Usage services are prepared around tenant-safe metric collection.', 'items' => ['Messages', 'AI tokens', 'Voice minutes', 'Storage', 'API requests', 'Automations']],
-        ]);
-    }
-
-    public function website(): Response
-    {
-        return $this->page('Website Customization', 'Manage public website settings, pages, themes, media, SEO, scripts, and redirects.', [
-            ['label' => 'Pages', 'value' => $this->tableCount('website_pages'), 'status' => 'Ready'],
-            ['label' => 'Media', 'value' => $this->tableCount('media'), 'status' => 'Ready'],
-            ['label' => 'Redirects', 'value' => $this->tableCount('website_redirects'), 'status' => 'Ready'],
-        ], [
-            ['title' => 'Publishing flow', 'description' => 'Draft, preview, publish, and restore revision workflows belong here once content tables are enabled.', 'items' => ['Theme settings', 'Navigation builder', 'Footer builder', 'SEO metadata', 'Sitemap and robots output']],
-            ['title' => 'Script safety', 'description' => 'Custom scripts require restricted permission, warnings, audit logs, and no PHP execution.', 'items' => ['Header scripts', 'Footer scripts', 'Consent notes']],
         ]);
     }
 
@@ -198,7 +174,7 @@ class ConsolePageController extends Controller
             ['label' => 'Administrators', 'value' => CentralUser::query()->count(), 'status' => 'Live'],
             ['label' => 'Active', 'value' => CentralUser::query()->where('is_active', true)->count(), 'status' => 'Live'],
         ], [
-            ['title' => 'Access model', 'description' => 'The configured central admin email always receives full superadmin access.', 'items' => [env('CENTRAL_ADMIN_EMAIL', 'admin@example.com').' has wildcard access', 'Platform Owner role syncs all permissions', 'Read-only auditor receives view permissions']],
+            ['title' => 'Access model', 'description' => 'Access is granted entirely through Spatie roles and permissions — there is no email-based or role-string override.', 'items' => ['Platform Owner role syncs all permissions', 'Read-only auditor receives view-only permissions', 'Every Superadmin route enforces its exact permission server-side']],
         ], $admins->all());
     }
 
@@ -218,27 +194,6 @@ class ConsolePageController extends Controller
             ['label' => 'Roles', 'value' => PlatformRole::query()->count(), 'status' => 'Live'],
             ['label' => 'Permissions', 'value' => $this->tableCount('platform_permissions'), 'status' => 'Live'],
         ], [], $roles->all());
-    }
-
-    public function settings(): Response
-    {
-        $settings = PlatformSetting::query()
-            ->orderBy('group')
-            ->orderBy('key')
-            ->get()
-            ->map(fn (PlatformSetting $setting) => [
-                'Group' => $setting->group,
-                'Key' => $setting->key,
-                'Value' => $setting->is_sensitive ? '[masked]' : json_encode($setting->value),
-                'Sensitive' => $setting->is_sensitive ? 'Yes' : 'No',
-            ]);
-
-        return $this->page('Platform Settings', 'Review central platform settings and sensitive configuration flags.', [
-            ['label' => 'Settings', 'value' => PlatformSetting::query()->count(), 'status' => 'Live'],
-            ['label' => 'Sensitive', 'value' => PlatformSetting::query()->where('is_sensitive', true)->count(), 'status' => 'Masked'],
-        ], [
-            ['title' => 'Security posture', 'description' => 'Sensitive values stay encrypted and masked; high-risk updates should require password reconfirmation.', 'items' => ['Masked secrets', 'Audit logging', 'Password reconfirmation']],
-        ], $settings->all());
     }
 
     public function security(): Response

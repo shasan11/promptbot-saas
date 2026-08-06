@@ -98,7 +98,11 @@ export default function Show({ tenant }) {
                         {(tenant.subscriptions || []).length ? (
                             <div className="space-y-3">
                                 {tenant.subscriptions.map((subscription) => (
-                                    <div key={subscription.id} className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                                    <Link
+                                        key={subscription.id}
+                                        href={route('superadmin.subscriptions.show', subscription.public_uuid || subscription.id)}
+                                        className="block rounded-md border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+                                    >
                                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
                                                 <div className="font-semibold text-slate-950">{subscription.plan?.name || 'Unknown plan'}</div>
@@ -106,7 +110,7 @@ export default function Show({ tenant }) {
                                             </div>
                                             <StatusBadge status={subscription.status} />
                                         </div>
-                                    </div>
+                                    </Link>
                                 ))}
                             </div>
                         ) : <EmptyState>No subscriptions yet.</EmptyState>}
@@ -114,15 +118,8 @@ export default function Show({ tenant }) {
                 )}
 
                 {tab === 'usage' && (
-                    <Panel title="Usage" subtitle="Tenant-safe usage placeholder for messages, AI, storage, API requests, voice, and automations.">
-                        <div className="grid gap-3 md:grid-cols-3">
-                            {['Messages', 'AI tokens', 'Storage', 'API requests', 'Voice minutes', 'Automations'].map((metric) => (
-                                <div key={metric} className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                                    <div className="text-sm font-semibold text-slate-700">{metric}</div>
-                                    <div className="mt-2 text-2xl font-bold text-slate-950">0</div>
-                                </div>
-                            ))}
-                        </div>
+                    <Panel title="Usage" subtitle="Per-tenant usage metering (messages, AI tokens, storage, API requests) is not enabled in this build.">
+                        <EmptyState>Usage metering is not tracked yet for this platform.</EmptyState>
                     </Panel>
                 )}
 
@@ -207,19 +204,32 @@ export default function Show({ tenant }) {
                             <button type="button" onClick={() => action('seed')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Run seeders</button>
                             <button type="button" onClick={() => setDangerAction('suspend')} className="rounded-md bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-rose-700">Suspend tenant</button>
                             <button type="button" onClick={() => setDangerAction('activate')} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">Reactivate tenant</button>
+                            <button type="button" onClick={() => setDangerAction('delete')} className="rounded-md border border-rose-300 bg-white px-4 py-2 text-sm font-bold text-rose-700 shadow-sm hover:bg-rose-50">Delete tenant</button>
                         </div>
                     </Panel>
                 )}
             </div>
 
             <DangerActionModal
-                open={Boolean(dangerAction)}
+                open={Boolean(dangerAction) && dangerAction !== 'delete'}
                 title={`${dangerAction === 'activate' ? 'Reactivate' : 'Suspend'} ${tenant.company_name}`}
                 confirmation={tenant.slug}
                 processing={false}
                 onCancel={() => setDangerAction(null)}
                 onConfirm={() => {
                     action(dangerAction, { reason: `${dangerAction} requested from superadmin danger zone` });
+                    setDangerAction(null);
+                }}
+            />
+
+            <DangerActionModal
+                open={dangerAction === 'delete'}
+                title={`Permanently delete ${tenant.company_name}`}
+                confirmation={tenant.slug}
+                processing={false}
+                onCancel={() => setDangerAction(null)}
+                onConfirm={() => {
+                    router.delete(route('superadmin.tenants.destroy', routeKey));
                     setDangerAction(null);
                 }}
             />

@@ -2,6 +2,9 @@
 
 use App\Http\Middleware\EnforceTenantLimit;
 use App\Http\Middleware\EnsureCentralDomain;
+use App\Http\Middleware\EnsureCentralUserIsActive;
+use App\Http\Middleware\EnsureCentralUserPasswordIsValid;
+use App\Http\Middleware\EnsureInstallerIsOpen;
 use App\Http\Middleware\EnsureTenancyIsInitialized;
 use App\Http\Middleware\EnsureTenantIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -12,6 +15,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -37,10 +41,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'central.domain' => EnsureCentralDomain::class,
+            'central.active' => EnsureCentralUserIsActive::class,
+            'central.password' => EnsureCentralUserPasswordIsValid::class,
+            'installer.open' => EnsureInstallerIsOpen::class,
             'tenant.active' => EnsureTenantIsActive::class,
             'tenant.initialized' => EnsureTenancyIsInitialized::class,
             'tenant.feature' => RequireTenantFeature::class,
             'tenant.limit' => EnforceTenantLimit::class,
+            'permission' => PermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -13,9 +13,9 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    use HasPublicUuid;
     use HasDatabase;
     use HasDomains;
+    use HasPublicUuid;
 
     protected $casts = [
         'data' => 'array',
@@ -50,6 +50,11 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function provisioningLogs(): HasMany
     {
         return $this->hasMany(ProvisioningLog::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function isActive(): bool

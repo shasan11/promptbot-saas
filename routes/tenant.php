@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Tenant\Auth\TenantAuthenticatedSessionController;
 use App\Http\Controllers\Tenant\Admin\DashboardController as TenantAdminDashboardController;
 use App\Http\Controllers\Tenant\Admin\SettingController as TenantAdminSettingController;
 use App\Http\Controllers\Tenant\Admin\UserController as TenantAdminUserController;
+use App\Http\Controllers\Tenant\Auth\TenantAuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\Platform\AuditLogService;
+use App\Services\Platform\SecuritySettings;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +34,7 @@ class NewPasswordController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, SecuritySettings $security, AuditLogService $audit): RedirectResponse
     {
         $request->validate([
             'token' => 'required',
@@ -45,13 +47,17 @@ class NewPasswordController extends Controller
         // database. Otherwise we will parse the error and return the response.
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user) use ($request) {
+            function ($user) use ($request, $security, $audit) {
                 $user->forceFill([
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
+                    'password_expires_at' => now()->addDays($security->passwordExpiryDays()),
+                    'locked_until' => null,
                 ])->save();
 
                 event(new PasswordReset($user));
+
+                $audit->record('platform_admin.password_reset', $user);
             }
         );
 

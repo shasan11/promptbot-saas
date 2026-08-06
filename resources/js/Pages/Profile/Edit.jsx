@@ -17,6 +17,12 @@ export default function Edit({ mustVerifyEmail, status }) {
 
             <div className="py-12">
                 <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+                    {status === 'password-expired' && (
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                            Your password has expired. Please set a new password to continue.
+                        </div>
+                    )}
+
                     <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8">
                         <UpdateProfileInformationForm
                             mustVerifyEmail={mustVerifyEmail}

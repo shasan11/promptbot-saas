@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Platform\SubscriptionService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -19,7 +20,10 @@ use Throwable;
 
 class TenantProvisioningService
 {
-    public function __construct(private readonly TenantDatabaseProvisionerFactory $provisioners) {}
+    public function __construct(
+        private readonly TenantDatabaseProvisionerFactory $provisioners,
+        private readonly SubscriptionService $subscriptions,
+    ) {}
 
     public function provision(array $data): Tenant
     {
@@ -129,6 +133,7 @@ class TenantProvisioningService
 
             $this->mark($tenant, TenantStatus::Active, 'active');
             $tenant->forceFill(['provisioned_at' => now(), 'last_provisioning_error' => null])->save();
+            $this->subscriptions->createInitialSubscription($tenant);
 
             return $tenant->refresh();
         } catch (Throwable $exception) {
