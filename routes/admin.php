@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Admin\ConsolePageController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\FeatureController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -23,7 +22,6 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
 
     Route::redirect('billing/plans', '/superadmin/plans')->name('billing.plans.index');
     Route::redirect('billing/subscriptions', '/superadmin/subscriptions')->name('billing.subscriptions.index');
-
     Route::get('billing/payments', [ConsolePageController::class, 'payments'])->name('billing.payments.index')->middleware('permission:payments.view');
 
     Route::prefix('billing/invoices')->name('billing.invoices.')->group(function (): void {
@@ -35,10 +33,11 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         Route::post('/{invoice}/void', [InvoiceController::class, 'void'])->name('void')->middleware('permission:invoices.manage');
     });
 
-    Route::get('billing/coupons', [ConsolePageController::class, 'coupons'])->name('billing.coupons.index')->middleware('permission:coupons.view');
-    Route::get('billing/gateways', [ConsolePageController::class, 'gateways'])->name('billing.gateways.index')->middleware('permission:gateways.manage');
-    Route::get('platform/usage', [ConsolePageController::class, 'usage'])->name('platform.usage.index')->middleware('permission:usage.view');
-    Route::get('platform/integrations', [ConsolePageController::class, 'integrations'])->name('platform.integrations.index')->middleware('permission:integrations.view');
+    Route::get('tickets', [ConsolePageController::class, 'tickets'])->name('tickets.index')->middleware('permission:support.view');
+    Route::redirect('support', '/superadmin/tickets');
+    Route::get('reports', [ConsolePageController::class, 'reports'])->name('reports.index')->middleware('permission:dashboard.view');
+    Route::get('operations/health', [ConsolePageController::class, 'operations'])->name('operations.health')->middleware('permission:operations.view');
+
     Route::prefix('website')->name('website.')->group(function (): void {
         Route::get('/', [WebsiteController::class, 'index'])->name('index')->middleware('permission:website.view');
         Route::put('/settings', [WebsiteController::class, 'updateSettings'])->name('settings.update')->middleware('permission:website.manage');
@@ -59,26 +58,18 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         Route::put('/pages/{page}/sections', [WebsitePageController::class, 'updateSections'])->name('pages.sections')->middleware('permission:website.manage');
         Route::delete('/pages/{page}', [WebsitePageController::class, 'destroy'])->name('pages.destroy')->middleware('permission:website.manage');
     });
-    Route::get('communications', [ConsolePageController::class, 'communications'])->name('communications.index')->middleware('permission:communications.view');
-    Route::get('support', [ConsolePageController::class, 'support'])->name('support.index')->middleware('permission:support.view');
-    Route::get('operations/health', [ConsolePageController::class, 'operations'])->name('operations.health')->middleware('permission:operations.view');
-    Route::get('system/audit-logs', [ConsolePageController::class, 'auditLogs'])->name('system.audit-logs.index')->middleware('permission:audit_logs.view');
-    Route::get('system/login-attempts', [ConsolePageController::class, 'loginAttempts'])->name('system.login-attempts.index')->middleware('permission:login_attempts.view');
-    Route::get('system/administrators', [ConsolePageController::class, 'administrators'])->name('system.administrators.index')->middleware('permission:administrators.view');
-    Route::get('system/roles', [ConsolePageController::class, 'roles'])->name('system.roles.index')->middleware('permission:roles.manage');
+
     Route::get('system/settings', [SettingsController::class, 'edit'])->name('system.settings.index')->middleware('permission:settings.view');
-    Route::put('system/settings/{group}', [SettingsController::class, 'update'])->name('system.settings.update')->middleware('permission:settings.update')->whereIn('group', ['general', 'security']);
-    Route::get('system/security', [ConsolePageController::class, 'security'])->name('system.security.index')->middleware('permission:security.manage');
+    Route::put('system/settings/{group}', [SettingsController::class, 'update'])
+        ->name('system.settings.update')
+        ->middleware('permission:settings.update')
+        ->whereIn('group', ['general', 'email', 'mail', 'payment', 'ai_rag', 'branding']);
 
     Route::resource('plans', PlanController::class)
         ->middlewareFor(['index', 'show'], 'permission:plans.view')
         ->middlewareFor(['create', 'store'], 'permission:plans.create')
         ->middlewareFor(['edit', 'update'], 'permission:plans.update')
         ->middlewareFor('destroy', 'permission:plans.archive');
-
-    Route::resource('features', FeatureController::class)
-        ->middlewareFor(['index', 'show'], 'permission:features.view')
-        ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:features.manage');
 
     Route::resource('subscriptions', SubscriptionController::class)->only(['index', 'show', 'update'])
         ->middlewareFor(['index', 'show'], 'permission:subscriptions.view')
