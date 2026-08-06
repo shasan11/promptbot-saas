@@ -23,7 +23,7 @@ class PaymentUpdateRequest extends FormRequest
             'amount' => ['sometimes', 'required', 'numeric', 'min:0.01'],
             'currency' => ['sometimes', 'required', 'string', 'size:3'],
             'paid_at' => ['sometimes', 'nullable', 'date'],
-            'failure_reason' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'failure_reason' => ['nullable', 'required_if:status,failed', 'string', 'max:2000'],
         ];
     }
 }
