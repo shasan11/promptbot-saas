@@ -48,14 +48,16 @@ class ReportController extends Controller
                 ->orderBy('status')
                 ->get(),
             'invoiceStatuses' => (clone $invoices)
-                ->selectRaw('status, count(*) as total, sum(total) as amount')
-                ->groupBy('status')
+                ->selectRaw('status, currency, count(*) as total, sum(total) as amount')
+                ->groupBy('status', 'currency')
                 ->orderBy('status')
+                ->orderBy('currency')
                 ->get(),
             'paymentProviders' => (clone $payments)
-                ->selectRaw('provider, count(*) as total, sum(amount) as amount, sum(refunded_amount) as refunded')
-                ->groupBy('provider')
+                ->selectRaw('provider, currency, count(*) as total, sum(amount) as amount, sum(refunded_amount) as refunded')
+                ->groupBy('provider', 'currency')
                 ->orderBy('provider')
+                ->orderBy('currency')
                 ->get(),
             'ticketStatuses' => (clone $tickets)
                 ->selectRaw('status, count(*) as total')
