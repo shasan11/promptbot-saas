@@ -70,6 +70,36 @@ function GroupForm({ group }) {
     );
 }
 
+function MailTest() {
+    const { data, setData, post, processing, errors, recentlySuccessful } = useForm({ recipient: '' });
+
+    const submit = (event) => {
+        event.preventDefault();
+        post(route('superadmin.system.settings.test-mail'), { preserveScroll: true });
+    };
+
+    return (
+        <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 className="text-lg font-bold text-slate-950">Test mail delivery</h2>
+                    <p className="mt-1 text-sm text-slate-500">Save Email Identity and Mail Delivery first, then send a real test message.</p>
+                </div>
+                {recentlySuccessful && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Sent</span>}
+            </div>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1">
+                    <input type="email" className={inputClass} placeholder="Recipient email address" value={data.recipient} onChange={(event) => setData('recipient', event.target.value)} />
+                    {errors.recipient && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.recipient}</p>}
+                </div>
+                <button disabled={processing} className="rounded-md bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60">
+                    {processing ? 'Sending...' : 'Send test email'}
+                </button>
+            </div>
+        </form>
+    );
+}
+
 export default function Index({ groups = [] }) {
     const [activeKey, setActiveKey] = useState(groups[0]?.key || 'general');
     const activeGroup = groups.find((group) => group.key === activeKey) || groups[0];
@@ -97,6 +127,8 @@ export default function Index({ groups = [] }) {
                 {activeGroup ? <GroupForm key={activeGroup.key} group={activeGroup} /> : (
                     <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">No settings are configured.</div>
                 )}
+
+                {['email', 'mail'].includes(activeKey) && <MailTest />}
             </div>
         </AuthenticatedLayout>
     );
