@@ -47,6 +47,13 @@ class InvoiceService
         $invoice->update(['status' => 'paid', 'paid_at' => now()]);
     }
 
+    public function reopen(Invoice $invoice): void
+    {
+        if ($invoice->status !== 'void') {
+            $invoice->update(['status' => 'open', 'paid_at' => null]);
+        }
+    }
+
     public function void(Invoice $invoice): void
     {
         $invoice->update(['status' => 'void', 'voided_at' => now()]);
