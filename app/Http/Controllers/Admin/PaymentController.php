@@ -70,7 +70,7 @@ class PaymentController extends Controller
         $data['created_by'] = $request->user('central')?->id;
 
         $payment = Payment::create($data);
-        $this->syncInvoice($payment, $invoices);
+        $this->syncInvoiceSettlement($payment->invoice_id, $invoices);
 
         $auditLog->record('payment.created', $payment, [
             'tenant_id' => $payment->tenant_id,
@@ -94,8 +94,13 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function edit(Payment $payment, PlatformSettingsService $settings): Response
+    public function edit(Payment $payment, PlatformSettingsService $settings): Response|RedirectResponse
     {
+        if ((float) $payment->refunded_amount > 0) {
+            return redirect()->route('superadmin.billing.payments.show', $payment)
+                ->with('error', 'A payment with refunds cannot be edited. Record an adjusting payment instead.');
+        }
+
         return Inertia::render('Admin/Payments/Create', [
             ...$this->formData($settings),
             'payment' => $payment,
@@ -108,18 +113,20 @@ class PaymentController extends Controller
         InvoiceService $invoices,
         AuditLogService $auditLog
     ): RedirectResponse {
-        $data = $this->normalize($request->validated(), $payment);
-        $this->validateRelationships([...$payment->toArray(), ...$data]);
-
-        if (array_key_exists('amount', $data) && (float) $data['amount'] < (float) $payment->refunded_amount) {
-            throw ValidationException::withMessages([
-                'amount' => 'The payment amount cannot be less than the amount already refunded.',
-            ]);
+        if ((float) $payment->refunded_amount > 0) {
+            return back()->with('error', 'A payment with refunds cannot be edited. Record an adjusting payment instead.');
         }
 
+        $oldInvoiceId = $payment->invoice_id;
+        $data = $this->normalize($request->validated(), $payment);
+        $this->validateRelationships([...$payment->toArray(), ...$data]);
         $oldValues = $payment->only(array_keys($data));
         $payment->update($data);
-        $this->syncInvoice($payment->fresh(), $invoices);
+
+        $invoiceIds = array_unique(array_filter([$oldInvoiceId, $payment->fresh()->invoice_id]));
+        foreach ($invoiceIds as $invoiceId) {
+            $this->syncInvoiceSettlement($invoiceId, $invoices);
+        }
 
         $auditLog->record('payment.updated', $payment, [
             'tenant_id' => $payment->tenant_id,
@@ -130,8 +137,12 @@ class PaymentController extends Controller
         return redirect()->route('superadmin.billing.payments.show', $payment)->with('status', 'Payment updated.');
     }
 
-    public function refund(Request $request, Payment $payment, AuditLogService $auditLog): RedirectResponse
-    {
+    public function refund(
+        Request $request,
+        Payment $payment,
+        InvoiceService $invoices,
+        AuditLogService $auditLog
+    ): RedirectResponse {
         abort_unless($request->user('central')?->can('payments.manage'), 403);
 
         $validated = $request->validate([
@@ -179,6 +190,8 @@ class PaymentController extends Controller
 
             return $refund;
         });
+
+        $this->syncInvoiceSettlement($payment->invoice_id, $invoices);
 
         $auditLog->record('payment.refunded', $payment, [
             'tenant_id' => $payment->tenant_id,
@@ -256,16 +269,29 @@ class PaymentController extends Controller
         }
     }
 
-    private function syncInvoice(Payment $payment, InvoiceService $invoices): void
+    private function syncInvoiceSettlement(?string $invoiceId, InvoiceService $invoices): void
     {
-        if ($payment->status !== 'paid' || ! $payment->invoice_id) {
+        if (! $invoiceId) {
             return;
         }
 
-        $invoice = $payment->invoice;
+        $invoice = Invoice::query()->find($invoiceId);
+        if (! $invoice || $invoice->status === 'void') {
+            return;
+        }
 
-        if ($invoice && ! in_array($invoice->status, ['paid', 'void'], true)) {
-            $invoices->markPaid($invoice);
+        $netPaid = Payment::query()
+            ->where('invoice_id', $invoiceId)
+            ->whereIn('status', ['paid', 'partially_refunded', 'refunded'])
+            ->get(['amount', 'refunded_amount'])
+            ->sum(fn (Payment $payment) => (float) $payment->amount - (float) $payment->refunded_amount);
+
+        if ($netPaid + 0.0001 >= (float) $invoice->total) {
+            if ($invoice->status !== 'paid') {
+                $invoices->markPaid($invoice);
+            }
+        } elseif ($invoice->status === 'paid') {
+            $invoices->reopen($invoice);
         }
     }
 }
