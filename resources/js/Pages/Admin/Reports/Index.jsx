@@ -70,19 +70,21 @@ export default function Index({ filters = {}, currency = 'USD', stats = {}, subs
             <div className="mt-6 grid gap-6 xl:grid-cols-2">
                 <Panel title="Subscription status"><DataTable columns={statusColumns} dataSource={subscriptionStatuses} rowKey="status" /></Panel>
                 <Panel title="Ticket status"><DataTable columns={statusColumns} dataSource={ticketStatuses} rowKey="status" /></Panel>
-                <Panel title="Invoice status">
+                <Panel title="Invoice status by currency">
                     <DataTable columns={[
                         ...statusColumns,
-                        { title: 'Amount', dataIndex: 'amount', render: (value) => money(value) },
-                    ]} dataSource={invoiceStatuses} rowKey="status" />
+                        { title: 'Currency', dataIndex: 'currency' },
+                        { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
+                    ]} dataSource={invoiceStatuses} rowKey={(row) => `${row.status}-${row.currency}`} />
                 </Panel>
-                <Panel title="Payments by provider">
+                <Panel title="Payments by provider and currency">
                     <DataTable columns={[
                         { title: 'Provider', dataIndex: 'provider', render: (value) => value.replaceAll('_', ' ') },
+                        { title: 'Currency', dataIndex: 'currency' },
                         { title: 'Records', dataIndex: 'total' },
-                        { title: 'Amount', dataIndex: 'amount', render: (value) => money(value) },
-                        { title: 'Refunded', dataIndex: 'refunded', render: (value) => money(value) },
-                    ]} dataSource={paymentProviders} rowKey="provider" />
+                        { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
+                        { title: 'Refunded', dataIndex: 'refunded', render: (value, row) => `${row.currency} ${money(value)}` },
+                    ]} dataSource={paymentProviders} rowKey={(row) => `${row.provider}-${row.currency}`} />
                 </Panel>
                 <Panel title="Active subscriptions by plan">
                     <DataTable columns={[
