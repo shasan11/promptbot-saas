@@ -4,14 +4,12 @@ namespace App\Services\Platform;
 
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
-/**
- * Manual, admin-issued invoicing. Invoices are immutable once created (no
- * edit endpoint exists) — correcting a mistake means voiding it and issuing
- * a new one, which keeps the financial trail honest.
- */
 class InvoiceService
 {
+    public function __construct(private readonly PlatformSettingsService $settings) {}
+
     public function create(array $data): Invoice
     {
         return DB::transaction(function () use ($data) {
@@ -54,14 +52,13 @@ class InvoiceService
         $invoice->update(['status' => 'void', 'voided_at' => now()]);
     }
 
-    /**
-     * Sequential invoice number. The lock keeps concurrent admin submissions
-     * from colliding; acceptable for a low-volume manual invoicing workflow.
-     */
     private function nextNumber(): string
     {
+        $configured = (string) $this->settings->get('payment', 'invoice_prefix', 'INV');
+        $prefix = Str::upper((string) preg_replace('/[^A-Za-z0-9-]/', '', $configured));
+        $prefix = $prefix !== '' ? $prefix : 'INV';
         $count = Invoice::query()->lockForUpdate()->count();
 
-        return 'INV-'.str_pad((string) ($count + 1), 6, '0', STR_PAD_LEFT);
+        return $prefix.'-'.str_pad((string) ($count + 1), 6, '0', STR_PAD_LEFT);
     }
 }
