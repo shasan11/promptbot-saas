@@ -92,7 +92,7 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
     Route::put('system/settings/{group}', [SettingsController::class, 'update'])
         ->name('system.settings.update')
         ->middleware('permission:settings.update')
-        ->whereIn('group', ['general', 'email', 'mail', 'payment', 'ai_rag', 'branding']);
+        ->whereIn('group', ['general', 'security', 'email', 'mail', 'payment', 'ai_rag', 'branding']);
     Route::post('system/settings/test-mail', [SettingsController::class, 'testMail'])
         ->name('system.settings.test-mail')
         ->middleware('permission:settings.update');
