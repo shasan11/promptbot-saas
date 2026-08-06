@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Services\Platform\AuditLogService;
 use App\Services\Platform\InvoiceService;
+use App\Services\Platform\PlatformSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -32,10 +33,15 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(PlatformSettingsService $settings): Response
     {
         return Inertia::render('Admin/Invoices/Create', [
             'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'defaults' => [
+                'currency' => strtoupper((string) $settings->get('general', 'default_currency', 'USD')),
+                'taxRate' => (float) $settings->get('payment', 'tax_rate', 0),
+                'prefix' => (string) $settings->get('payment', 'invoice_prefix', 'INV'),
+            ],
         ]);
     }
 
@@ -53,7 +59,11 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice): Response
     {
         return Inertia::render('Admin/Invoices/Show', [
-            'invoice' => $invoice->load(['tenant', 'items']),
+            'invoice' => $invoice->load([
+                'tenant',
+                'items',
+                'payments.refunds',
+            ]),
         ]);
     }
 

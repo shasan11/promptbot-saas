@@ -4,11 +4,12 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950';
 
-function Field({ label, error, children, className = '' }) {
+function Field({ label, error, hint, children, className = '' }) {
     return (
         <label className={`block ${className}`}>
             <span className="text-sm font-semibold text-slate-700">{label}</span>
             <div className="mt-2">{children}</div>
+            {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
             {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
         </label>
     );
@@ -26,28 +27,35 @@ function Panel({ title, subtitle, children }) {
     );
 }
 
-const money = (value) => (Number.isFinite(value) ? value.toFixed(2) : '0.00');
+const totalItems = (items) => items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_amount) || 0), 0);
+const taxFor = (items, rate) => Math.round(totalItems(items) * (Number(rate) || 0)) / 100;
+const money = (value) => (Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '0.00');
 
-export default function Create({ tenants = [] }) {
+export default function Create({ tenants = [], defaults = {} }) {
+    const initialItems = [{ description: '', quantity: 1, unit_amount: 0 }];
     const { data, setData, post, processing, errors } = useForm({
         tenant_id: tenants[0]?.id || '',
         status: 'open',
-        currency: 'USD',
+        currency: defaults.currency || 'USD',
         issued_on: new Date().toISOString().slice(0, 10),
         due_on: '',
-        tax_total: 0,
-        items: [{ description: '', quantity: 1, unit_amount: 0 }],
+        tax_rate: defaults.taxRate ?? 0,
+        tax_total: taxFor(initialItems, defaults.taxRate ?? 0),
+        items: initialItems,
     });
 
+    const replaceItems = (items) => setData({ ...data, items, tax_total: taxFor(items, data.tax_rate) });
+
     const updateItem = (index, key, value) => {
-        setData('items', data.items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
+        replaceItems(data.items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
     };
 
-    const addItem = () => setData('items', [...data.items, { description: '', quantity: 1, unit_amount: 0 }]);
-    const removeItem = (index) => setData('items', data.items.filter((_, itemIndex) => itemIndex !== index));
-
-    const subtotal = data.items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_amount) || 0), 0);
+    const addItem = () => replaceItems([...data.items, { description: '', quantity: 1, unit_amount: 0 }]);
+    const removeItem = (index) => replaceItems(data.items.filter((_, itemIndex) => itemIndex !== index));
+    const subtotal = totalItems(data.items);
     const total = subtotal + (Number(data.tax_total) || 0);
+
+    const updateTaxRate = (rate) => setData({ ...data, tax_rate: rate, tax_total: taxFor(data.items, rate) });
 
     const submit = (event) => {
         event.preventDefault();
@@ -59,7 +67,7 @@ export default function Create({ tenants = [] }) {
             header={
                 <PageHeader
                     title="Create Invoice"
-                    subtitle="Bill a tenant manually with one or more line items."
+                    subtitle={`Issue a tenant invoice using the configured ${defaults.prefix || 'INV'} numbering sequence.`}
                     actions={<Link href={route('superadmin.billing.invoices.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back to invoices</Link>}
                 />
             }
@@ -70,6 +78,7 @@ export default function Create({ tenants = [] }) {
                 <Panel title="Invoice details">
                     <Field label="Tenant" error={errors.tenant_id}>
                         <select className={inputClass} value={data.tenant_id} onChange={(event) => setData('tenant_id', event.target.value)}>
+                            <option value="">Select tenant</option>
                             {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
                         </select>
                     </Field>
@@ -88,8 +97,8 @@ export default function Create({ tenants = [] }) {
                     <Field label="Due on" error={errors.due_on}>
                         <input type="date" className={inputClass} value={data.due_on} onChange={(event) => setData('due_on', event.target.value)} />
                     </Field>
-                    <Field label="Tax total" error={errors.tax_total}>
-                        <input type="number" min="0" step="0.01" className={inputClass} value={data.tax_total} onChange={(event) => setData('tax_total', event.target.value)} />
+                    <Field label="Tax rate (%)" error={errors.tax_rate} hint={`Calculated tax: ${data.currency} ${money(data.tax_total)}`}>
+                        <input type="number" min="0" max="100" step="0.01" className={inputClass} value={data.tax_rate} onChange={(event) => updateTaxRate(event.target.value)} />
                     </Field>
                 </Panel>
 
@@ -97,7 +106,7 @@ export default function Create({ tenants = [] }) {
                     <div className="mb-5 flex items-center justify-between">
                         <div>
                             <h2 className="text-base font-bold text-slate-950">Line items</h2>
-                            <p className="mt-1 text-sm text-slate-500">Quantity &times; unit amount is totalled automatically.</p>
+                            <p className="mt-1 text-sm text-slate-500">Quantity, unit totals, configured tax, and grand total are calculated automatically.</p>
                         </div>
                         <button type="button" onClick={addItem} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Add line</button>
                     </div>
@@ -123,7 +132,7 @@ export default function Create({ tenants = [] }) {
 
                     <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
                         <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-semibold text-slate-950">{data.currency} {money(subtotal)}</span></div>
-                        <div className="flex justify-between text-slate-600"><span>Tax</span><span className="font-semibold text-slate-950">{data.currency} {money(Number(data.tax_total) || 0)}</span></div>
+                        <div className="flex justify-between text-slate-600"><span>Tax ({data.tax_rate || 0}%)</span><span className="font-semibold text-slate-950">{data.currency} {money(data.tax_total)}</span></div>
                         <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold text-slate-950">Total</span><span className="font-bold text-slate-950">{data.currency} {money(total)}</span></div>
                     </div>
                 </section>

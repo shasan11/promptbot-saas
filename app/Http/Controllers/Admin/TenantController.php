@@ -8,10 +8,12 @@ use App\Http\Requests\Admin\TenantUpdateRequest;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Services\Platform\AuditLogService;
+use App\Services\Platform\SubscriptionService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,6 +21,7 @@ class TenantController extends Controller
 {
     public function __construct(
         private readonly TenantProvisioningService $provisioning,
+        private readonly SubscriptionService $subscriptions,
         private readonly AuditLogService $auditLog,
     ) {}
 
@@ -26,10 +29,15 @@ class TenantController extends Controller
     {
         $tenants = Tenant::query()
             ->with(['plan', 'domains'])
+            ->withCount(['subscriptions', 'invoices', 'payments', 'supportTickets'])
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')))
-            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request): void {
                 $search = '%'.$request->string('search')->toString().'%';
-                $query->where(fn ($inner) => $inner->where('company_name', 'like', $search)->orWhere('slug', 'like', $search));
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('company_name', 'like', $search)
+                        ->orWhere('slug', 'like', $search)
+                        ->orWhereHas('domains', fn ($domains) => $domains->where('domain', 'like', $search));
+                });
             })
             ->latest()
             ->paginate(20)
@@ -46,6 +54,7 @@ class TenantController extends Controller
         return Inertia::render('Admin/Tenants/Create', [
             'plans' => Plan::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name']),
             'provisioningMode' => config('saas.db_provisioning_mode'),
+            'tenantBaseDomain' => config('saas.tenant_base_domain'),
         ]);
     }
 
@@ -62,31 +71,90 @@ class TenantController extends Controller
 
     public function show(Tenant $tenant): Response
     {
-        return Inertia::render('Admin/Tenants/Show', [
-            'tenant' => $tenant->load(['plan.features', 'domains', 'subscriptions.plan', 'provisioningLogs' => fn ($query) => $query->latest()->limit(50)]),
-        ]);
+        $tenant->load([
+            'plan.features',
+            'domains',
+            'subscriptions.plan',
+            'provisioningLogs' => fn ($query) => $query->latest()->limit(50),
+        ])->loadCount(['invoices', 'payments', 'supportTickets']);
+
+        return Inertia::render('Admin/Tenants/Show', ['tenant' => $tenant]);
     }
 
     public function edit(Tenant $tenant): Response
     {
         return Inertia::render('Admin/Tenants/Create', [
-            'tenant' => $tenant,
+            'tenant' => $tenant->load('domains'),
             'plans' => Plan::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name']),
             'provisioningMode' => config('saas.db_provisioning_mode'),
+            'tenantBaseDomain' => config('saas.tenant_base_domain'),
         ]);
     }
 
     public function update(TenantUpdateRequest $request, Tenant $tenant): RedirectResponse
     {
-        $oldValues = $tenant->only(array_keys($request->validated()));
-        $tenant->update($request->validated());
+        $validated = $request->validated();
+        $subdomain = $validated['subdomain'] ?? null;
+        $planId = array_key_exists('plan_id', $validated) ? $validated['plan_id'] : null;
+        unset($validated['subdomain'], $validated['plan_id']);
+
+        $primaryDomain = $tenant->domains()->where('is_primary', true)->first() ?? $tenant->domains()->first();
+        $oldValues = [
+            ...$tenant->only(array_keys($validated)),
+            'plan_id' => $tenant->plan_id,
+            'subdomain' => $primaryDomain?->domain,
+        ];
+
+        DB::transaction(function () use ($tenant, $validated, $subdomain, $planId, $primaryDomain): void {
+            if ($validated !== []) {
+                $tenant->update($validated);
+            }
+
+            if ($subdomain !== null) {
+                if ($primaryDomain) {
+                    $primaryDomain->update([
+                        'domain' => $subdomain,
+                        'type' => 'subdomain',
+                        'verification_status' => 'verified',
+                        'verified_at' => now(),
+                        'is_primary' => true,
+                    ]);
+                } else {
+                    $tenant->domains()->create([
+                        'domain' => $subdomain,
+                        'type' => 'subdomain',
+                        'verification_status' => 'verified',
+                        'verified_at' => now(),
+                        'is_primary' => true,
+                    ]);
+                }
+            }
+
+            if ($planId !== null && (int) $planId !== (int) $tenant->plan_id) {
+                $subscription = $tenant->subscriptions()->latest()->first();
+
+                if ($subscription) {
+                    $subscription->update(['plan_id' => $planId]);
+                    $this->subscriptions->syncTenantPlan($subscription->fresh());
+                } else {
+                    $tenant->forceFill(['plan_id' => $planId])->save();
+                }
+            }
+        });
+
+        $newValues = [
+            ...$validated,
+            'plan_id' => $planId ?? $tenant->fresh()->plan_id,
+            'subdomain' => $subdomain ?? $primaryDomain?->domain,
+        ];
+
         $this->auditLog->record('tenant.updated', $tenant, [
             'tenant_id' => $tenant->id,
             'old_values' => $oldValues,
-            'new_values' => $request->validated(),
+            'new_values' => $newValues,
         ]);
 
-        return redirect()->route('superadmin.tenants.show', $tenant)->with('status', 'Tenant updated.');
+        return redirect()->route('superadmin.tenants.show', $tenant)->with('status', 'Tenant and subdomain updated.');
     }
 
     public function destroy(Tenant $tenant): RedirectResponse

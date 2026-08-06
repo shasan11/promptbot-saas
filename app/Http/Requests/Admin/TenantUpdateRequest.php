@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class TenantUpdateRequest extends FormRequest
 {
@@ -13,8 +14,12 @@ class TenantUpdateRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenant = $this->route('tenant');
+        $domainId = $tenant?->domains()->where('is_primary', true)->value('id');
+
         return [
             'company_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'subdomain' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('domains', 'domain')->ignore($domainId)],
             'plan_id' => ['sometimes', 'nullable', 'exists:plans,id'],
             'status' => ['sometimes', 'in:pending,provisioning,database_creating,database_created,migrating,seeding,active,suspended,failed,deleting,deleted'],
         ];

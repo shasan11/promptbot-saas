@@ -57,6 +57,16 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return $this->hasMany(Invoice::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === TenantStatus::Active;

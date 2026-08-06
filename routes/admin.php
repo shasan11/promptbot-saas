@@ -1,11 +1,14 @@
 <?php
 
-use App\Http\Controllers\Admin\ConsolePageController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvoiceController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SubscriptionController;
+use App\Http\Controllers\Admin\SupportTicketController;
+use App\Http\Controllers\Admin\SystemHealthController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\WebsiteController;
 use App\Http\Controllers\Admin\WebsitePageController;
@@ -22,7 +25,16 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
 
     Route::redirect('billing/plans', '/superadmin/plans')->name('billing.plans.index');
     Route::redirect('billing/subscriptions', '/superadmin/subscriptions')->name('billing.subscriptions.index');
-    Route::get('billing/payments', [ConsolePageController::class, 'payments'])->name('billing.payments.index')->middleware('permission:payments.view');
+
+    Route::prefix('billing/payments')->name('billing.payments.')->group(function (): void {
+        Route::get('/', [PaymentController::class, 'index'])->name('index')->middleware('permission:payments.view');
+        Route::get('/create', [PaymentController::class, 'create'])->name('create')->middleware('permission:payments.manage');
+        Route::post('/', [PaymentController::class, 'store'])->name('store')->middleware('permission:payments.manage');
+        Route::get('/{payment}/edit', [PaymentController::class, 'edit'])->name('edit')->middleware('permission:payments.manage');
+        Route::put('/{payment}', [PaymentController::class, 'update'])->name('update')->middleware('permission:payments.manage');
+        Route::post('/{payment}/refund', [PaymentController::class, 'refund'])->name('refund')->middleware('permission:payments.manage');
+        Route::get('/{payment}', [PaymentController::class, 'show'])->name('show')->middleware('permission:payments.view');
+    });
 
     Route::prefix('billing/invoices')->name('billing.invoices.')->group(function (): void {
         Route::get('/', [InvoiceController::class, 'index'])->name('index')->middleware('permission:invoices.view');
@@ -33,10 +45,27 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         Route::post('/{invoice}/void', [InvoiceController::class, 'void'])->name('void')->middleware('permission:invoices.manage');
     });
 
-    Route::get('tickets', [ConsolePageController::class, 'tickets'])->name('tickets.index')->middleware('permission:support.view');
+    Route::prefix('tickets')->name('tickets.')->group(function (): void {
+        Route::get('/', [SupportTicketController::class, 'index'])->name('index')->middleware('permission:support.view');
+        Route::get('/create', [SupportTicketController::class, 'create'])->name('create')->middleware('permission:support.manage');
+        Route::post('/', [SupportTicketController::class, 'store'])->name('store')->middleware('permission:support.manage');
+        Route::put('/{ticket}', [SupportTicketController::class, 'update'])->name('update')->middleware('permission:support.manage');
+        Route::post('/{ticket}/messages', [SupportTicketController::class, 'addMessage'])->name('messages.store')->middleware('permission:support.manage');
+        Route::get('/{ticket}', [SupportTicketController::class, 'show'])->name('show')->middleware('permission:support.view');
+    });
     Route::redirect('support', '/superadmin/tickets');
-    Route::get('reports', [ConsolePageController::class, 'reports'])->name('reports.index')->middleware('permission:dashboard.view');
-    Route::get('operations/health', [ConsolePageController::class, 'operations'])->name('operations.health')->middleware('permission:operations.view');
+
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index')->middleware('permission:dashboard.view');
+    Route::get('reports/export', [ReportController::class, 'export'])->name('reports.export')->middleware('permission:dashboard.view');
+
+    Route::prefix('operations')->name('operations.')->group(function (): void {
+        Route::get('/health', [SystemHealthController::class, 'index'])->name('health')->middleware('permission:operations.view');
+        Route::post('/cache/clear', [SystemHealthController::class, 'clearCaches'])->name('cache.clear')->middleware('permission:maintenance.manage');
+        Route::post('/failed-jobs/retry-all', [SystemHealthController::class, 'retryAll'])->name('failed.retry-all')->middleware('permission:maintenance.manage');
+        Route::post('/failed-jobs/flush', [SystemHealthController::class, 'flushFailed'])->name('failed.flush')->middleware('permission:maintenance.manage');
+        Route::post('/failed-jobs/{failedJob}/retry', [SystemHealthController::class, 'retryFailed'])->name('failed.retry')->middleware('permission:maintenance.manage');
+        Route::post('/failed-jobs/{failedJob}/forget', [SystemHealthController::class, 'forgetFailed'])->name('failed.forget')->middleware('permission:maintenance.manage');
+    });
 
     Route::prefix('website')->name('website.')->group(function (): void {
         Route::get('/', [WebsiteController::class, 'index'])->name('index')->middleware('permission:website.view');
@@ -63,7 +92,10 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
     Route::put('system/settings/{group}', [SettingsController::class, 'update'])
         ->name('system.settings.update')
         ->middleware('permission:settings.update')
-        ->whereIn('group', ['general', 'email', 'mail', 'payment', 'ai_rag', 'branding']);
+        ->whereIn('group', ['general', 'security', 'email', 'mail', 'payment', 'ai_rag', 'branding']);
+    Route::post('system/settings/test-mail', [SettingsController::class, 'testMail'])
+        ->name('system.settings.test-mail')
+        ->middleware('permission:settings.update');
 
     Route::resource('plans', PlanController::class)
         ->middlewareFor(['index', 'show'], 'permission:plans.view')
