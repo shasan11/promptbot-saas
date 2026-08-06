@@ -144,7 +144,12 @@ return [
          * disable asset() helper tenancy and explicitly use tenant_asset() calls in places
          * where you want to use tenant-specific assets (product images, avatars, etc).
          */
-        'asset_helper_tenancy' => true,
+        // Disabled: this app's compiled Vite bundle is served via the global
+        // asset()/Vite helpers, and tenancy-rewriting those breaks JS/CSS
+        // loading on every tenant subdomain. No tenant-specific stored
+        // assets (avatars, uploads) currently rely on the asset() rewrite;
+        // use tenant_asset() explicitly if that need arises.
+        'asset_helper_tenancy' => false,
     ],
 
     /**

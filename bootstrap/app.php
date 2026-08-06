@@ -50,6 +50,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.limit' => EnforceTenantLimit::class,
             'permission' => PermissionMiddleware::class,
         ]);
+
+        // An unauthenticated visitor on a tenant subdomain must be sent to
+        // that tenant's own login page, never the central admin login.
+        $middleware->redirectGuestsTo(fn (Request $request) => tenancy()->initialized
+            ? route('tenant.login')
+            : route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TenantCouldNotBeIdentifiedOnDomainException $exception, Request $request) {

@@ -5,6 +5,14 @@ import StatusBadge from '@/Components/Superadmin/StatusBadge';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 
+function tenantUrl(domain) {
+    if (typeof window === 'undefined') return `//${domain}`;
+
+    const port = window.location.port ? `:${window.location.port}` : '';
+
+    return `${window.location.protocol}//${domain}${port}`;
+}
+
 export default function Index({ tenants, filters = {} }) {
     const { data, setData } = useForm({
         search: filters.search || '',
@@ -36,7 +44,18 @@ export default function Index({ tenants, filters = {} }) {
             dataIndex: 'domains',
             render: (domains = []) => domains.length ? (
                 <div className="flex flex-wrap gap-2">
-                    {domains.map((domain) => <span key={domain.id} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{domain.domain}</span>)}
+                    {domains.map((domain) => (
+                        <a
+                            key={domain.id}
+                            href={tenantUrl(domain.domain)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 hover:text-slate-950"
+                        >
+                            {domain.domain}
+                        </a>
+                    ))}
                 </div>
             ) : '-',
         },

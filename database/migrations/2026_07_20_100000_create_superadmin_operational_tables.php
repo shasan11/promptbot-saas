@@ -22,7 +22,6 @@ return new class extends Migration
             'ai_model_configs',
             'integration_definitions',
             'support_messages',
-            'support_tickets',
             'announcements',
             'notification_templates',
             'blog_posts',
@@ -48,7 +47,6 @@ return new class extends Migration
             'invoice_items',
             'invoices',
             'payment_attempts',
-            'payments',
         ] as $table) {
             Schema::dropIfExists($table);
         }
@@ -56,17 +54,6 @@ return new class extends Migration
 
     private function createFinancialTables(): void
     {
-        $this->create('payments', function (Blueprint $table): void {
-            $table->string('tenant_id')->nullable()->index();
-            $table->string('provider')->nullable()->index();
-            $table->string('external_id')->nullable()->index();
-            $table->decimal('amount', 12, 2)->default(0);
-            $table->string('currency', 3)->default('USD');
-            $table->string('status')->default('pending')->index();
-            $table->json('metadata')->nullable();
-            $table->timestamp('paid_at')->nullable();
-        });
-
         $this->create('payment_attempts', function (Blueprint $table): void {
             $table->uuid('payment_id')->nullable()->index();
             $table->string('provider')->nullable()->index();
@@ -264,14 +251,6 @@ return new class extends Migration
             $table->json('targeting')->nullable();
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('expires_at')->nullable();
-        });
-        $this->create('support_tickets', function (Blueprint $table): void {
-            $table->string('tenant_id')->nullable()->index();
-            $table->string('subject');
-            $table->string('status')->default('open')->index();
-            $table->string('priority')->default('normal')->index();
-            $table->unsignedBigInteger('assigned_to')->nullable()->index();
-            $table->timestamp('sla_due_at')->nullable();
         });
         $this->create('support_messages', function (Blueprint $table): void {
             $table->uuid('support_ticket_id')->index();

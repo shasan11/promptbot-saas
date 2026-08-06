@@ -5,6 +5,8 @@ namespace Tests\Feature\Http\Controllers\Admin;
 use App\Models\PlatformSetting;
 use App\Services\Platform\SecuritySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\InteractsWithPlatformPermissions;
 use Tests\TestCase;
 
@@ -70,5 +72,66 @@ class SettingsControllerTest extends TestCase
         $this->actingAs($this->centralAdminWithPermissions(['settings.update']), 'central')
             ->put(route('superadmin.system.settings.update', 'not-a-real-group'), [])
             ->assertNotFound();
+    }
+
+    public function test_default_locale_and_currency_must_be_from_the_allowed_list(): void
+    {
+        $this->actingAs($this->centralAdminWithPermissions(['settings.update']), 'central')
+            ->put(route('superadmin.system.settings.update', 'general'), [
+                'default_locale' => 'not-a-real-locale',
+                'default_currency' => 'ZZZ',
+            ])
+            ->assertSessionHasErrors(['default_locale', 'default_currency']);
+    }
+
+    public function test_admin_can_upload_a_branding_logo(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->centralAdminWithPermissions(['settings.update']), 'central')
+            ->put(route('superadmin.system.settings.update', 'branding'), [
+                'company_name' => 'Acme',
+                'logo_url' => UploadedFile::fake()->image('logo.png', 200, 200)->size(100),
+                'primary_color' => '#0F172A',
+                'secondary_color' => '#4F46E5',
+                'accent_color' => '#22C55E',
+            ])
+            ->assertRedirect();
+
+        $url = data_get(
+            PlatformSetting::query()->where('group', 'branding')->where('key', 'logo_url')->first()?->value,
+            'value'
+        );
+
+        $this->assertNotNull($url);
+        Storage::disk('public')->assertExists(str_replace(Storage::disk('public')->url(''), '', $url));
+    }
+
+    public function test_admin_can_remove_a_branding_logo(): void
+    {
+        Storage::fake('public');
+
+        $path = UploadedFile::fake()->image('logo.png')->store('branding', 'public');
+        PlatformSetting::create([
+            'group' => 'branding',
+            'key' => 'logo_url',
+            'value' => ['value' => Storage::disk('public')->url($path)],
+        ]);
+
+        $this->actingAs($this->centralAdminWithPermissions(['settings.update']), 'central')
+            ->put(route('superadmin.system.settings.update', 'branding'), [
+                'company_name' => 'Acme',
+                'remove_logo_url' => true,
+                'primary_color' => '#0F172A',
+                'secondary_color' => '#4F46E5',
+                'accent_color' => '#22C55E',
+            ])
+            ->assertRedirect();
+
+        $this->assertNull(data_get(
+            PlatformSetting::query()->where('group', 'branding')->where('key', 'logo_url')->first()?->value,
+            'value'
+        ));
+        Storage::disk('public')->assertMissing($path);
     }
 }

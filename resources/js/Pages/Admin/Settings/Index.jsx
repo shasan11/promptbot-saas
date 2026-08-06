@@ -1,11 +1,89 @@
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { ImageOff, Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
 
-const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950 disabled:bg-slate-100 disabled:text-slate-500';
+const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
 
-function FieldControl({ field, value, onChange, disabled }) {
+function ColorField({ value, disabled, onChange }) {
+    const hex = /^#[0-9A-Fa-f]{6}$/.test(value ?? '') ? value : '#000000';
+
+    return (
+        <div className="mt-2 flex items-center gap-3">
+            <input
+                type="color"
+                disabled={disabled}
+                value={hex}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-slate-300 p-1 disabled:cursor-not-allowed"
+                aria-label="Pick color"
+            />
+            <input
+                type="text"
+                disabled={disabled}
+                value={value ?? ''}
+                placeholder="#0F172A"
+                maxLength={7}
+                onChange={(event) => onChange(event.target.value)}
+                className={`${inputClass} font-mono uppercase`}
+            />
+        </div>
+    );
+}
+
+function ImageField({ field, file, removeChecked, disabled, onFile, onRemoveToggle }) {
+    const inputRef = useRef(null);
+    const previewUrl = file ? URL.createObjectURL(file) : (!removeChecked ? field.currentImageUrl : null);
+    const hasCurrentImage = Boolean(field.currentImageUrl);
+
+    return (
+        <div className="mt-2">
+            <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="" className="h-full w-full object-contain" />
+                    ) : (
+                        <ImageOff className="h-5 w-5 text-slate-300" strokeWidth={1.5} />
+                    )}
+                </div>
+                <div className="flex-1">
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        accept={field.accept || 'image/*'}
+                        disabled={disabled}
+                        onChange={(event) => onFile(event.target.files?.[0] || null)}
+                        className="hidden"
+                    />
+                    <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => inputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Upload className="h-3.5 w-3.5" strokeWidth={1.8} />
+                        {file ? file.name : 'Choose image'}
+                    </button>
+                    {hasCurrentImage && (
+                        <label className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-600">
+                            <input
+                                type="checkbox"
+                                disabled={disabled || Boolean(file)}
+                                checked={removeChecked}
+                                onChange={(event) => onRemoveToggle(event.target.checked)}
+                                className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                            />
+                            Remove current image
+                        </label>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FieldControl({ field, value, disabled, onChange }) {
     if (field.type === 'select') {
         return (
             <select disabled={disabled} className={`${inputClass} mt-2`} value={value ?? ''} onChange={(event) => onChange(event.target.value)}>
@@ -18,11 +96,17 @@ function FieldControl({ field, value, onChange, disabled }) {
         return <textarea disabled={disabled} className={`${inputClass} mt-2 min-h-28`} value={value ?? ''} placeholder={field.placeholder || ''} onChange={(event) => onChange(event.target.value)} />;
     }
 
+    if (field.type === 'color') {
+        return <ColorField value={value} disabled={disabled} onChange={onChange} />;
+    }
+
+    const htmlType = ['email', 'url', 'password', 'number'].includes(field.type) ? field.type : 'text';
+
     return (
         <input
             disabled={disabled}
             className={`${inputClass} mt-2`}
-            type={field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'}
+            type={htmlType}
             value={value ?? ''}
             placeholder={field.sensitive && field.configured ? 'Configured — leave blank to keep current value' : field.placeholder || ''}
             autoComplete={field.sensitive ? 'new-password' : undefined}
@@ -32,12 +116,19 @@ function FieldControl({ field, value, onChange, disabled }) {
 }
 
 function GroupForm({ group, canUpdate }) {
-    const initial = Object.fromEntries(group.fields.map((field) => [field.key, field.value ?? '']));
+    const imageKeys = group.fields.filter((field) => field.type === 'image').map((field) => field.key);
+    const initial = Object.fromEntries([
+        ...group.fields.filter((field) => field.type !== 'image').map((field) => [field.key, field.value ?? '']),
+        ...imageKeys.map((key) => [key, null]),
+        ...imageKeys.map((key) => [`remove_${key}`, false]),
+    ]);
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm(initial);
 
     const submit = (event) => {
         event.preventDefault();
         if (!canUpdate) return;
+        // useForm.put() auto-switches to multipart POST + method spoofing
+        // whenever a File is present in `data` (the image fields here).
         put(route('superadmin.system.settings.update', group.key), { preserveScroll: true });
     };
 
@@ -54,11 +145,28 @@ function GroupForm({ group, canUpdate }) {
 
             <div className="grid gap-5 md:grid-cols-2">
                 {group.fields.map((field) => (
-                    <label key={field.key} className={field.type === 'textarea' ? 'block md:col-span-2' : 'block'}>
+                    <label key={field.key} className={field.type === 'textarea' || field.type === 'image' ? 'block md:col-span-2' : 'block'}>
                         <span className="text-sm font-semibold text-slate-700">{field.label}</span>
                         {field.sensitive && field.configured && <span className="ml-2 text-xs font-medium text-emerald-600">Configured</span>}
-                        <FieldControl field={field} value={data[field.key]} disabled={!canUpdate} onChange={(value) => setData(field.key, value)} />
+
+                        {field.type === 'image' ? (
+                            <ImageField
+                                field={field}
+                                file={data[field.key]}
+                                removeChecked={data[`remove_${field.key}`]}
+                                disabled={!canUpdate}
+                                onFile={(file) => {
+                                    setData(field.key, file);
+                                    if (file) setData(`remove_${field.key}`, false);
+                                }}
+                                onRemoveToggle={(checked) => setData(`remove_${field.key}`, checked)}
+                            />
+                        ) : (
+                            <FieldControl field={field} value={data[field.key]} disabled={!canUpdate} onChange={(value) => setData(field.key, value)} />
+                        )}
+
                         {field.sensitive && <p className="mt-1 text-xs text-slate-500">Stored encrypted and never displayed after saving.</p>}
+                        {field.help && <p className="mt-1 text-xs text-slate-500">{field.help}</p>}
                         {errors[field.key] && <p className="mt-1 text-xs font-semibold text-rose-600">{errors[field.key]}</p>}
                     </label>
                 ))}

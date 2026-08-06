@@ -30,11 +30,23 @@ function EmptyState({ children }) {
     return <div className="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">{children}</div>;
 }
 
+// Protocol-relative construction: carries over the current page's scheme and
+// port so this works unmodified for local dev (http + custom port) and
+// production (https, default ports) without hardcoding either.
+function tenantUrl(domain) {
+    if (typeof window === 'undefined') return `//${domain}`;
+
+    const port = window.location.port ? `:${window.location.port}` : '';
+
+    return `${window.location.protocol}//${domain}${port}`;
+}
+
 export default function Show({ tenant }) {
     const routeKey = tenant.public_uuid || tenant.id;
     const [tab, setTab] = useState('overview');
     const [dangerAction, setDangerAction] = useState(null);
     const tabs = ['overview', 'subscription', 'usage', 'features', 'database', 'domains', 'health', 'audit', 'danger'];
+    const primaryDomain = (tenant.domains || []).find((domain) => domain.is_primary) || (tenant.domains || [])[0];
 
     const action = (name, payload = {}) => {
         router.post(route(`superadmin.tenants.${name}`, routeKey), payload, { preserveScroll: true });
@@ -48,6 +60,9 @@ export default function Show({ tenant }) {
                     subtitle="Tenant operations, subscription state, domains, database metadata, health, and danger-zone actions."
                     actions={
                         <div className="flex gap-2">
+                            {primaryDomain && (
+                                <a href={tenantUrl(primaryDomain.domain)} target="_blank" rel="noopener noreferrer" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Visit tenant &rarr;</a>
+                            )}
                             <Link href={route('superadmin.tenants.edit', routeKey)} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Edit tenant</Link>
                             <Link href={route('superadmin.tenants.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back</Link>
                         </div>
@@ -156,8 +171,17 @@ export default function Show({ tenant }) {
                         {(tenant.domains || []).length ? (
                             <div className="grid gap-3 md:grid-cols-2">
                                 {tenant.domains.map((domain) => (
-                                    <div key={domain.id} className="rounded-md border border-slate-200 bg-slate-50 p-4 font-semibold text-slate-950">
-                                        {domain.domain}
+                                    <div key={domain.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
+                                        <div>
+                                            <div className="font-semibold text-slate-950">{domain.domain}</div>
+                                            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                                                {domain.is_primary && <span className="rounded-full bg-slate-200 px-2 py-0.5 font-semibold text-slate-700">Primary</span>}
+                                                {domain.type}
+                                            </div>
+                                        </div>
+                                        <a href={tenantUrl(domain.domain)} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-100">
+                                            Visit &rarr;
+                                        </a>
                                     </div>
                                 ))}
                             </div>

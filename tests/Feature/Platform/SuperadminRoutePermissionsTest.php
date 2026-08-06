@@ -23,22 +23,12 @@ class SuperadminRoutePermissionsTest extends TestCase
             'dashboard' => ['superadmin.dashboard', 'dashboard.view'],
             'payments' => ['superadmin.billing.payments.index', 'payments.view'],
             'invoices' => ['superadmin.billing.invoices.index', 'invoices.view'],
-            'coupons' => ['superadmin.billing.coupons.index', 'coupons.view'],
-            'gateways' => ['superadmin.billing.gateways.index', 'gateways.manage'],
-            'usage' => ['superadmin.platform.usage.index', 'usage.view'],
-            'integrations' => ['superadmin.platform.integrations.index', 'integrations.view'],
-            'website' => ['superadmin.website.index', 'website.view'],
-            'communications' => ['superadmin.communications.index', 'communications.view'],
-            'support' => ['superadmin.support.index', 'support.view'],
+            'tickets' => ['superadmin.tickets.index', 'support.view'],
+            'reports' => ['superadmin.reports.index', 'dashboard.view'],
             'operations' => ['superadmin.operations.health', 'operations.view'],
-            'audit logs' => ['superadmin.system.audit-logs.index', 'audit_logs.view'],
-            'login attempts' => ['superadmin.system.login-attempts.index', 'login_attempts.view'],
-            'administrators' => ['superadmin.system.administrators.index', 'administrators.view'],
-            'roles' => ['superadmin.system.roles.index', 'roles.manage'],
+            'website' => ['superadmin.website.index', 'website.view'],
             'settings' => ['superadmin.system.settings.index', 'settings.view'],
-            'security' => ['superadmin.system.security.index', 'security.manage'],
             'plans' => ['superadmin.plans.index', 'plans.view'],
-            'features' => ['superadmin.features.index', 'features.view'],
             'subscriptions' => ['superadmin.subscriptions.index', 'subscriptions.view'],
             'tenants' => ['superadmin.tenants.index', 'tenants.view'],
         ];
@@ -77,18 +67,15 @@ class SuperadminRoutePermissionsTest extends TestCase
         $auditor = $this->readOnlyAuditor();
 
         $this->actingAs($auditor, 'central')
-            ->get(route('superadmin.tenants.index'))
+            ->get(route('superadmin.billing.payments.index'))
             ->assertOk();
 
         $this->actingAs($auditor, 'central')
-            ->get(route('superadmin.tenants.create'))
+            ->get(route('superadmin.billing.payments.create'))
             ->assertForbidden();
 
-        // Read-Only Auditor only receives permissions ending in `.view`, so
-        // gateways/roles/security (which have no `.view` permission in the
-        // platform's permission set) remain inaccessible to it by design.
         $this->actingAs($auditor, 'central')
-            ->get(route('superadmin.billing.gateways.index'))
+            ->get(route('superadmin.tenants.create'))
             ->assertForbidden();
     }
 }

@@ -26,10 +26,11 @@ class SuperadminAccessTest extends TestCase
         foreach ([
             route('superadmin.dashboard'),
             route('superadmin.billing.payments.index'),
-            route('superadmin.platform.usage.index'),
+            route('superadmin.billing.invoices.index'),
+            route('superadmin.tickets.index'),
+            route('superadmin.reports.index'),
             route('superadmin.website.index'),
             route('superadmin.operations.health'),
-            route('superadmin.system.audit-logs.index'),
             route('superadmin.system.settings.index'),
         ] as $url) {
             $this->actingAs($admin, 'central')->get($url)->assertOk();

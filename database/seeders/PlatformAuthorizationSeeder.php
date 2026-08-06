@@ -103,6 +103,7 @@ class PlatformAuthorizationSeeder extends Seeder
                 'timezone' => config('app.timezone', 'UTC'),
                 'default_locale' => config('app.locale', 'en'),
                 'default_currency' => 'USD',
+                'tenant_base_domain' => config('saas.tenant_base_domain', 'localhost'),
             ],
             'email' => [
                 'from_name' => config('mail.from.name', 'PromptBot'),

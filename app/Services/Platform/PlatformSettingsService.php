@@ -62,6 +62,10 @@ class PlatformSettingsService
             date_default_timezone_set($general['timezone']);
         }
 
+        if (filled($general['tenant_base_domain'] ?? null)) {
+            config(['saas.tenant_base_domain' => strtolower($general['tenant_base_domain'])]);
+        }
+
         if (filled($mail['mailer'] ?? null)) {
             config(['mail.default' => $mail['mailer']]);
         }
