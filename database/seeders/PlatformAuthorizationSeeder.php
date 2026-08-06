@@ -95,24 +95,69 @@ class PlatformAuthorizationSeeder extends Seeder
                 $user->assignRole($owner);
             });
 
-        PlatformSetting::firstOrCreate(
-            ['group' => 'general', 'key' => 'platform_name'],
-            ['id' => (string) Str::uuid(), 'value' => ['value' => 'PromptBot'], 'encrypted' => false, 'is_sensitive' => false]
-        );
+        $defaults = [
+            'general' => [
+                'platform_name' => 'PromptBot',
+                'platform_url' => config('app.url'),
+                'support_email' => env('CENTRAL_ADMIN_EMAIL', 'admin@example.com'),
+                'timezone' => config('app.timezone', 'UTC'),
+                'default_locale' => config('app.locale', 'en'),
+                'default_currency' => 'USD',
+            ],
+            'email' => [
+                'from_name' => config('mail.from.name', 'PromptBot'),
+                'from_address' => config('mail.from.address', 'hello@example.com'),
+            ],
+            'mail' => [
+                'mailer' => config('mail.default', 'log'),
+                'smtp_host' => config('mail.mailers.smtp.host'),
+                'smtp_port' => config('mail.mailers.smtp.port'),
+                'smtp_encryption' => config('mail.mailers.smtp.scheme') ?? config('mail.mailers.smtp.encryption'),
+            ],
+            'payment' => [
+                'default_gateway' => 'manual',
+                'invoice_prefix' => 'INV',
+                'tax_rate' => 0,
+            ],
+            'ai_rag' => [
+                'ai_provider' => env('AI_PROVIDER', 'openai'),
+                'ai_model' => env('AI_MODEL', 'gpt-4.1-mini'),
+                'embedding_model' => env('AI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+                'rag_vector_store' => env('RAG_VECTOR_STORE', 'pgvector'),
+                'rag_top_k' => 5,
+                'rag_chunk_size' => 1000,
+                'rag_chunk_overlap' => 150,
+            ],
+            'branding' => [
+                'company_name' => 'PromptBot',
+                'primary_color' => '#0F172A',
+                'secondary_color' => '#4F46E5',
+                'accent_color' => '#22C55E',
+                'copyright_text' => '© '.date('Y').' PromptBot. All rights reserved.',
+            ],
+            'security' => [
+                'login_attempt_limit' => 5,
+                'lockout_duration_minutes' => 15,
+                'password_expiry_days' => 90,
+            ],
+        ];
 
-        PlatformSetting::firstOrCreate(
-            ['group' => 'security', 'key' => 'login_attempt_limit'],
-            ['id' => (string) Str::uuid(), 'value' => ['value' => 5], 'encrypted' => false, 'is_sensitive' => false]
-        );
+        foreach ($defaults as $group => $settings) {
+            foreach ($settings as $key => $value) {
+                if ($value === null || $value === '') {
+                    continue;
+                }
 
-        PlatformSetting::firstOrCreate(
-            ['group' => 'security', 'key' => 'lockout_duration_minutes'],
-            ['id' => (string) Str::uuid(), 'value' => ['value' => 15], 'encrypted' => false, 'is_sensitive' => false]
-        );
-
-        PlatformSetting::firstOrCreate(
-            ['group' => 'security', 'key' => 'password_expiry_days'],
-            ['id' => (string) Str::uuid(), 'value' => ['value' => 90], 'encrypted' => false, 'is_sensitive' => false]
-        );
+                PlatformSetting::firstOrCreate(
+                    ['group' => $group, 'key' => $key],
+                    [
+                        'id' => (string) Str::uuid(),
+                        'value' => ['value' => $value],
+                        'encrypted' => false,
+                        'is_sensitive' => false,
+                    ]
+                );
+            }
+        }
     }
 }
