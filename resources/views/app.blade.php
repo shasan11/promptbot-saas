@@ -3,8 +3,13 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="{{ config('platform.branding.primary_color', '#0F172A') }}">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'PromptBot') }}</title>
+
+        @if (config('platform.branding.favicon_url'))
+            <link rel="icon" href="{{ config('platform.branding.favicon_url') }}">
+        @endif
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
