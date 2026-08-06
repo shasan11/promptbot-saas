@@ -19,10 +19,13 @@ function Detail({ label, children }) {
 export default function Show({ payment, refundableAmount = 0 }) {
     const { auth } = usePage().props;
     const canManage = auth?.permissions?.includes('payments.manage');
+    const canEdit = canManage && Number(payment.refunded_amount || 0) === 0;
+    const canRefund = canManage && ['paid', 'partially_refunded'].includes(payment.status) && refundableAmount > 0;
     const { data, setData, post, processing, errors, reset } = useForm({ amount: '', reason: '', provider_reference: '' });
 
     const refund = (event) => {
         event.preventDefault();
+        if (!canRefund) return;
         post(route('superadmin.billing.payments.refund', payment.id), {
             preserveScroll: true,
             onSuccess: () => reset(),
@@ -47,7 +50,7 @@ export default function Show({ payment, refundableAmount = 0 }) {
                     actions={
                         <div className="flex gap-2">
                             <Link href={route('superadmin.billing.payments.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back</Link>
-                            {canManage && <Link href={route('superadmin.billing.payments.edit', payment.id)} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Edit</Link>}
+                            {canEdit && <Link href={route('superadmin.billing.payments.edit', payment.id)} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Edit</Link>}
                         </div>
                     }
                 />
@@ -96,20 +99,20 @@ export default function Show({ payment, refundableAmount = 0 }) {
                         <div className="mt-5 space-y-4">
                             <label className="block">
                                 <span className="text-sm font-semibold text-slate-700">Amount</span>
-                                <input disabled={!canManage || refundableAmount <= 0} type="number" min="0.01" max={refundableAmount} step="0.01" className={`${inputClass} mt-2`} value={data.amount} onChange={(event) => setData('amount', event.target.value)} />
+                                <input disabled={!canRefund} type="number" min="0.01" max={refundableAmount} step="0.01" className={`${inputClass} mt-2`} value={data.amount} onChange={(event) => setData('amount', event.target.value)} />
                                 {errors.amount && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.amount}</p>}
                             </label>
                             <label className="block">
                                 <span className="text-sm font-semibold text-slate-700">Reason</span>
-                                <textarea disabled={!canManage || refundableAmount <= 0} className={`${inputClass} mt-2 min-h-24`} value={data.reason} onChange={(event) => setData('reason', event.target.value)} />
+                                <textarea disabled={!canRefund} className={`${inputClass} mt-2 min-h-24`} value={data.reason} onChange={(event) => setData('reason', event.target.value)} />
                                 {errors.reason && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.reason}</p>}
                             </label>
                             <label className="block">
                                 <span className="text-sm font-semibold text-slate-700">Provider reference</span>
-                                <input disabled={!canManage || refundableAmount <= 0} className={`${inputClass} mt-2`} value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} />
+                                <input disabled={!canRefund} className={`${inputClass} mt-2`} value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} />
                             </label>
-                            <button disabled={processing || !canManage || refundableAmount <= 0} className="w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                                {processing ? 'Recording...' : refundableAmount > 0 ? 'Record refund' : 'Fully refunded'}
+                            <button disabled={processing || !canRefund} className="w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                {processing ? 'Recording...' : canRefund ? 'Record refund' : payment.status === 'refunded' ? 'Fully refunded' : 'Refund unavailable'}
                             </button>
                         </div>
                     </form>
