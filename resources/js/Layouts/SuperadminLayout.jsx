@@ -36,32 +36,38 @@ const sections = [
     ]},
 ];
 
-function Brand() {
+function Brand({ platform }) {
+    const primaryColor = platform?.primaryColor || '#0F172A';
+
     return (
         <Link href={route('superadmin.dashboard')} className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><ApplicationLogo className="h-5 w-5 fill-current" /></span>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md text-white" style={{ backgroundColor: primaryColor }}>
+                {platform?.logoUrl ? <img src={platform.logoUrl} alt="" className="h-full w-full object-contain p-1" /> : <ApplicationLogo className="h-5 w-5 fill-current" />}
+            </span>
             <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-slate-950">PromptBot</span>
+                <span className="block truncate text-sm font-semibold text-slate-950">{platform?.name || 'PromptBot'}</span>
                 <span className="block truncate text-[11px] text-slate-500">Superadmin</span>
             </span>
         </Link>
     );
 }
 
-function NavItem({ item, active, onNavigate }) {
+function NavItem({ item, active, onNavigate, accentColor }) {
     const Icon = item.icon;
 
     return (
         <Link href={route(item.route)} onClick={onNavigate} aria-current={active ? 'page' : undefined} className={`flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors ${active ? 'bg-slate-100 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'}`}>
-            <Icon className={`h-4 w-4 ${active ? 'text-indigo-600' : 'text-slate-400'}`} strokeWidth={1.8} />{item.label}
+            <Icon className="h-4 w-4" style={{ color: active ? accentColor : undefined }} strokeWidth={1.8} />{item.label}
         </Link>
     );
 }
 
-function Sidebar({ auth, currentRoute, onNavigate }) {
+function Sidebar({ auth, platform, currentRoute, onNavigate }) {
+    const accentColor = platform?.secondaryColor || '#4F46E5';
+
     return (
         <div className="flex h-full flex-col bg-white">
-            <div className="flex h-14 items-center border-b border-slate-200 px-4"><Brand /></div>
+            <div className="flex h-14 items-center border-b border-slate-200 px-4"><Brand platform={platform} /></div>
             <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Superadmin navigation">
                 {sections.map((section) => {
                     const items = section.items.filter((item) => can(auth, item.permission));
@@ -69,7 +75,7 @@ function Sidebar({ auth, currentRoute, onNavigate }) {
                     return (
                         <div key={section.title} className="mb-4 last:mb-0">
                             <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{section.title}</p>
-                            <div className="space-y-0.5">{items.map((item) => <NavItem key={item.label} item={item} active={matches(currentRoute, item.patterns)} onNavigate={onNavigate} />)}</div>
+                            <div className="space-y-0.5">{items.map((item) => <NavItem key={item.label} item={item} active={matches(currentRoute, item.patterns)} accentColor={accentColor} onNavigate={onNavigate} />)}</div>
                         </div>
                     );
                 })}
@@ -100,20 +106,20 @@ function UserMenu({ user }) {
 }
 
 export default function SuperadminLayout({ header, children }) {
-    const { auth, flash } = usePage().props;
+    const { auth, flash, platform } = usePage().props;
     const [mobileOpen, setMobileOpen] = useState(false);
     const currentRoute = route().current();
     const currentItem = sections.flatMap((section) => section.items).find((item) => matches(currentRoute, item.patterns));
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900">
-            <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-200 lg:block"><Sidebar auth={auth} currentRoute={currentRoute} /></aside>
+            <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-200 lg:block"><Sidebar auth={auth} platform={platform} currentRoute={currentRoute} /></aside>
 
             <div className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden={!mobileOpen}>
                 <button type="button" aria-label="Close navigation" onClick={() => setMobileOpen(false)} className={`absolute inset-0 bg-slate-950/30 transition-opacity ${mobileOpen ? 'opacity-100' : 'opacity-0'}`} />
                 <aside className={`relative h-full w-64 border-r border-slate-200 bg-white shadow-xl transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                     <button type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"><X className="h-4 w-4" /></button>
-                    <Sidebar auth={auth} currentRoute={currentRoute} onNavigate={() => setMobileOpen(false)} />
+                    <Sidebar auth={auth} platform={platform} currentRoute={currentRoute} onNavigate={() => setMobileOpen(false)} />
                 </aside>
             </div>
 
