@@ -42,6 +42,7 @@ class PlatformSettingsService
         $payment = $this->group('payment');
         $aiRag = $this->group('ai_rag');
         $branding = $this->group('branding');
+        $encryption = filled($mail['smtp_encryption'] ?? null) ? $mail['smtp_encryption'] : null;
 
         if (filled($general['platform_name'] ?? null)) {
             config(['app.name' => $general['platform_name']]);
@@ -53,6 +54,7 @@ class PlatformSettingsService
 
         if (filled($general['default_locale'] ?? null)) {
             config(['app.locale' => $general['default_locale']]);
+            app()->setLocale($general['default_locale']);
         }
 
         if (filled($general['timezone'] ?? null)) {
@@ -69,10 +71,14 @@ class PlatformSettingsService
             'mail.mailers.smtp.port' => isset($mail['smtp_port']) ? (int) $mail['smtp_port'] : config('mail.mailers.smtp.port'),
             'mail.mailers.smtp.username' => $mail['smtp_username'] ?? config('mail.mailers.smtp.username'),
             'mail.mailers.smtp.password' => $mail['smtp_password'] ?? config('mail.mailers.smtp.password'),
-            'mail.mailers.smtp.scheme' => $mail['smtp_encryption'] ?? config('mail.mailers.smtp.scheme'),
-            'mail.mailers.smtp.encryption' => $mail['smtp_encryption'] ?? config('mail.mailers.smtp.encryption'),
+            'mail.mailers.smtp.scheme' => $encryption,
+            'mail.mailers.smtp.encryption' => $encryption,
             'mail.from.address' => $email['from_address'] ?? config('mail.from.address'),
             'mail.from.name' => $email['from_name'] ?? config('mail.from.name'),
+            'mail.reply_to.address' => $email['reply_to_address'] ?? null,
+            'mail.reply_to.name' => $email['reply_to_name'] ?? null,
+            'platform.support_email' => $general['support_email'] ?? null,
+            'platform.default_currency' => strtoupper((string) ($general['default_currency'] ?? 'USD')),
             'platform.payment' => $payment,
             'platform.ai_rag' => $aiRag,
             'platform.branding' => $branding,
