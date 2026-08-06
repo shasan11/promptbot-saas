@@ -2,10 +2,9 @@ import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Activity, BadgeDollarSign, Bot, Building2, ChevronDown, CreditCard, FileClock,
-    FileText, Gauge, Gift, Headphones, LayoutDashboard, LogOut, Menu,
-    MessageSquareText, Plug, ReceiptText, Settings, ShieldCheck,
-    SlidersHorizontal, Sparkles, Tags, UserCog, UsersRound, X,
+    Activity, BadgeDollarSign, BarChart3, Building2, ChevronDown, CreditCard,
+    Headphones, LayoutDashboard, LogOut, Menu, ReceiptText, Settings,
+    SlidersHorizontal, Tags, X,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -17,41 +16,23 @@ const sections = [
     { title: 'Overview', items: [
         { label: 'Dashboard', route: 'superadmin.dashboard', patterns: ['superadmin.dashboard'], permission: 'dashboard.view', icon: LayoutDashboard },
     ]},
-    { title: 'Tenants', items: [
-        { label: 'All tenants', route: 'superadmin.tenants.index', patterns: ['superadmin.tenants.*'], permission: 'tenants.view', icon: Building2 },
-        { label: 'Tenant health', permission: 'tenants.view', icon: Activity, disabled: true },
+    { title: 'Tenant Management', items: [
+        { label: 'Tenants & subdomains', route: 'superadmin.tenants.index', patterns: ['superadmin.tenants.*'], permission: 'tenants.view', icon: Building2 },
     ]},
     { title: 'Billing', items: [
         { label: 'Plans', route: 'superadmin.billing.plans.index', patterns: ['superadmin.plans.*', 'superadmin.billing.plans.*'], permission: 'plans.view', icon: Tags },
         { label: 'Subscriptions', route: 'superadmin.billing.subscriptions.index', patterns: ['superadmin.subscriptions.*', 'superadmin.billing.subscriptions.*'], permission: 'subscriptions.view', icon: BadgeDollarSign },
         { label: 'Payments', route: 'superadmin.billing.payments.index', patterns: ['superadmin.billing.payments.*'], permission: 'payments.view', icon: CreditCard },
         { label: 'Invoices', route: 'superadmin.billing.invoices.index', patterns: ['superadmin.billing.invoices.*'], permission: 'invoices.view', icon: ReceiptText },
-        { label: 'Coupons', route: 'superadmin.billing.coupons.index', patterns: ['superadmin.billing.coupons.*'], permission: 'coupons.view', icon: Gift },
-        { label: 'Gateways', route: 'superadmin.billing.gateways.index', patterns: ['superadmin.billing.gateways.*'], permission: 'gateways.manage', icon: Plug },
-    ]},
-    { title: 'Platform', items: [
-        { label: 'Features', route: 'superadmin.features.index', patterns: ['superadmin.features.*'], permission: 'features.view', icon: Sparkles },
-        { label: 'Feature flags', permission: 'features.view', icon: SlidersHorizontal, disabled: true },
-        { label: 'Usage metering', route: 'superadmin.platform.usage.index', patterns: ['superadmin.platform.usage.*'], permission: 'usage.view', icon: Gauge },
-        { label: 'Integrations & AI', route: 'superadmin.platform.integrations.index', patterns: ['superadmin.platform.integrations.*'], permission: 'integrations.view', icon: Bot },
-    ]},
-    { title: 'Website', items: [
-        { label: 'Customization', route: 'superadmin.website.index', patterns: ['superadmin.website.*'], permission: 'website.view', icon: SlidersHorizontal },
-    ]},
-    { title: 'Customers', items: [
-        { label: 'Communications', route: 'superadmin.communications.index', patterns: ['superadmin.communications.*'], permission: 'communications.view', icon: MessageSquareText },
-        { label: 'Support', route: 'superadmin.support.index', patterns: ['superadmin.support.*'], permission: 'support.view', icon: Headphones },
     ]},
     { title: 'Operations', items: [
-        { label: 'Health & queues', route: 'superadmin.operations.health', patterns: ['superadmin.operations.*'], permission: 'operations.view', icon: Activity },
+        { label: 'Tickets', route: 'superadmin.tickets.index', patterns: ['superadmin.tickets.*'], permission: 'support.view', icon: Headphones },
+        { label: 'Reports', route: 'superadmin.reports.index', patterns: ['superadmin.reports.*'], permission: 'dashboard.view', icon: BarChart3 },
+        { label: 'Website customization', route: 'superadmin.website.index', patterns: ['superadmin.website.*'], permission: 'website.view', icon: SlidersHorizontal },
+        { label: 'System health', route: 'superadmin.operations.health', patterns: ['superadmin.operations.*'], permission: 'operations.view', icon: Activity },
     ]},
-    { title: 'System', items: [
-        { label: 'Administrators', route: 'superadmin.system.administrators.index', patterns: ['superadmin.system.administrators.*'], permission: 'administrators.view', icon: UserCog },
-        { label: 'Roles', route: 'superadmin.system.roles.index', patterns: ['superadmin.system.roles.*'], permission: 'roles.manage', icon: UsersRound },
-        { label: 'Settings', route: 'superadmin.system.settings.index', patterns: ['superadmin.system.settings.*'], permission: 'settings.view', icon: Settings },
-        { label: 'Security', route: 'superadmin.system.security.index', patterns: ['superadmin.system.security.*'], permission: 'security.manage', icon: ShieldCheck },
-        { label: 'Audit logs', route: 'superadmin.system.audit-logs.index', patterns: ['superadmin.system.audit-logs.*'], permission: 'audit_logs.view', icon: FileText },
-        { label: 'Login attempts', route: 'superadmin.system.login-attempts.index', patterns: ['superadmin.system.login-attempts.*'], permission: 'login_attempts.view', icon: FileClock },
+    { title: 'Configuration', items: [
+        { label: 'General settings', route: 'superadmin.system.settings.index', patterns: ['superadmin.system.settings.*'], permission: 'settings.view', icon: Settings },
     ]},
 ];
 
@@ -69,7 +50,6 @@ function Brand() {
 
 function NavItem({ item, active, onNavigate }) {
     const Icon = item.icon;
-    if (item.disabled) return <span className="flex h-8 cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 text-sm text-slate-300"><Icon className="h-4 w-4" strokeWidth={1.8} />{item.label}</span>;
 
     return (
         <Link href={route(item.route)} onClick={onNavigate} aria-current={active ? 'page' : undefined} className={`flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors ${active ? 'bg-slate-100 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'}`}>
