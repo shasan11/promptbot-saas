@@ -11,6 +11,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\Platform\AuditLogService;
 use App\Services\Platform\InvoiceService;
+use App\Services\Platform\PlatformSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +21,9 @@ use Inertia\Response;
 
 class PaymentController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, PlatformSettingsService $settings): Response
     {
+        $currency = strtoupper((string) $settings->get('general', 'default_currency', 'USD'));
         $payments = Payment::query()
             ->with(['tenant:id,company_name', 'invoice:id,number', 'subscription.plan:id,name'])
             ->when($request->string('search')->isNotEmpty(), function ($query) use ($request): void {
@@ -44,17 +46,18 @@ class PaymentController extends Controller
             'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
             'filters' => $request->only(['search', 'status', 'provider', 'tenant_id']),
             'stats' => [
+                'currency' => $currency,
                 'total' => Payment::query()->count(),
-                'paid' => Payment::query()->whereIn('status', ['paid', 'partially_refunded', 'refunded'])->sum('amount'),
+                'paid' => Payment::query()->where('currency', $currency)->whereIn('status', ['paid', 'partially_refunded', 'refunded'])->sum('amount'),
                 'pending' => Payment::query()->where('status', 'pending')->count(),
-                'refunded' => Payment::query()->sum('refunded_amount'),
+                'refunded' => Payment::query()->where('currency', $currency)->sum('refunded_amount'),
             ],
         ]);
     }
 
-    public function create(): Response
+    public function create(PlatformSettingsService $settings): Response
     {
-        return Inertia::render('Admin/Payments/Create', $this->formData());
+        return Inertia::render('Admin/Payments/Create', $this->formData($settings));
     }
 
     public function store(
@@ -91,10 +94,10 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function edit(Payment $payment): Response
+    public function edit(Payment $payment, PlatformSettingsService $settings): Response
     {
         return Inertia::render('Admin/Payments/Create', [
-            ...$this->formData(),
+            ...$this->formData($settings),
             'payment' => $payment,
         ]);
     }
@@ -187,12 +190,16 @@ class PaymentController extends Controller
         return back()->with('status', 'Refund recorded.');
     }
 
-    private function formData(): array
+    private function formData(PlatformSettingsService $settings): array
     {
         return [
             'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
             'invoices' => Invoice::query()->with('tenant:id,company_name')->latest('issued_on')->get(['id', 'tenant_id', 'number', 'status', 'total', 'currency']),
             'subscriptions' => Subscription::query()->with(['tenant:id,company_name', 'plan:id,name'])->latest()->get(['id', 'tenant_id', 'plan_id', 'status']),
+            'defaults' => [
+                'provider' => $settings->get('payment', 'default_gateway', 'manual'),
+                'currency' => strtoupper((string) $settings->get('general', 'default_currency', 'USD')),
+            ],
         ];
     }
 
