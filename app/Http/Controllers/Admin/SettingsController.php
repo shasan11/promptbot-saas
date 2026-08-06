@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PlatformSetting;
 use App\Services\Platform\AuditLogService;
+use App\Services\Platform\PlatformSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class SettingsController extends Controller
 {
@@ -146,8 +149,12 @@ class SettingsController extends Controller
         return Inertia::render('Admin/Settings/Index', ['groups' => $groups]);
     }
 
-    public function update(Request $request, string $group): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        string $group,
+        PlatformSettingsService $settings,
+        AuditLogService $auditLog
+    ): RedirectResponse {
         abort_unless(array_key_exists($group, self::GROUPS), 404);
 
         $fields = self::GROUPS[$group]['fields'];
@@ -168,6 +175,10 @@ class SettingsController extends Controller
                 continue;
             }
 
+            if (in_array($key, ['default_currency'], true) && is_string($value)) {
+                $value = strtoupper($value);
+            }
+
             $setting = PlatformSetting::query()->where('group', $group)->where('key', $key)->first();
             $oldValues[$key] = $sensitive && $setting ? '[configured]' : data_get($setting?->value, 'value');
             $newValues[$key] = $sensitive ? '[updated]' : $value;
@@ -183,13 +194,53 @@ class SettingsController extends Controller
             );
         }
 
-        app(AuditLogService::class)->record('platform_settings.updated', null, [
+        $auditLog->record('platform_settings.updated', null, [
             'entity_type' => 'PlatformSetting',
             'entity_id' => $group,
             'old_values' => $oldValues,
             'new_values' => $newValues,
         ]);
 
+        $settings->clear()->apply();
+
         return back()->with('status', self::GROUPS[$group]['title'].' settings updated.');
+    }
+
+    public function testMail(
+        Request $request,
+        PlatformSettingsService $settings,
+        AuditLogService $auditLog
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'recipient' => ['required', 'email', 'max:255'],
+        ]);
+
+        $settings->clear()->apply();
+
+        try {
+            Mail::raw(
+                'This is a test message from '.config('app.name').'. Your mail delivery settings are working.',
+                fn ($message) => $message->to($validated['recipient'])->subject(config('app.name').' mail test')
+            );
+
+            $auditLog->record('platform_settings.mail_test_succeeded', null, [
+                'entity_type' => 'PlatformSetting',
+                'entity_id' => 'mail',
+                'new_values' => ['recipient' => $validated['recipient']],
+            ]);
+
+            return back()->with('status', 'Test email sent to '.$validated['recipient'].'.');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $auditLog->record('platform_settings.mail_test_failed', null, [
+                'entity_type' => 'PlatformSetting',
+                'entity_id' => 'mail',
+                'new_values' => ['recipient' => $validated['recipient']],
+                'severity' => 'warning',
+            ]);
+
+            return back()->with('error', 'Mail test failed. Check the SMTP settings and application logs.');
+        }
     }
 }
