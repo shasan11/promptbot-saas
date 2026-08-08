@@ -7,9 +7,11 @@ use App\Enums\Connections\ConnectionHealth;
 use App\Enums\Connections\ConnectionStatus;
 use App\Enums\Connections\CredentialStatus;
 use App\Enums\Connections\SyncStatus;
+use App\Jobs\Connections\RunConnectionSyncJob;
 use App\Models\Connections\Connection;
 use App\Models\Connections\ConnectionAction;
 use App\Models\Connections\ConnectionCredential;
+use App\Models\Connections\ConnectionIdempotencyKey;
 use App\Models\Connections\ConnectionIntegration;
 use App\Models\Connections\ConnectionLog;
 use App\Models\Connections\CredentialRotation;
@@ -21,6 +23,7 @@ use App\Models\Connections\WebhookEndpoint;
 use App\Services\Connections\ConnectionActionExecutionService;
 use App\Services\Connections\CredentialVault;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use Tests\Concerns\InteractsWithTenancy;
 use Tests\TestCase;
@@ -410,7 +413,7 @@ class ConnectionModuleTest extends TestCase
             $this->assertSame(2, $event->attempts()->count());
             $this->assertTrue($event->attempts()->where('status', 'replay_queued')->exists());
             $this->assertTrue(ConnectionLog::query()->where('event', 'webhook.replayed')->where('connection_id', $event->connection_id)->exists());
-            $this->assertTrue(\App\Models\Connections\ConnectionIdempotencyKey::query()->where('operation', 'webhook.replay')->where('status', 'completed')->exists());
+            $this->assertTrue(ConnectionIdempotencyKey::query()->where('operation', 'webhook.replay')->where('status', 'completed')->exists());
         } finally {
             tenancy()->end();
         }
@@ -467,6 +470,96 @@ class ConnectionModuleTest extends TestCase
             $this->assertSame('received', $event->status);
             $this->assertNull($event->replayed_at);
             $this->assertSame($attemptsBefore, $event->attempts()->count());
+        } finally {
+            tenancy()->end();
+        }
+    }
+
+    public function test_failed_sync_run_can_be_retried_when_failure_is_transient(): void
+    {
+        Queue::fake();
+
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant, ['name' => 'Sync Retry Admin'], 'Tenant Administrator');
+
+        tenancy()->initialize($tenant);
+
+        try {
+            $connection = Connection::query()->where('status', ConnectionStatus::Active->value)->firstOrFail();
+            $dataSource = $connection->dataSources()->first();
+            $syncRun = $connection->syncRuns()->create([
+                'tenant_id' => tenant('id'),
+                'data_source_id' => $dataSource?->id,
+                'sync_type' => 'manual',
+                'status' => SyncStatus::Failed,
+                'started_at' => now()->subMinutes(5),
+                'completed_at' => now()->subMinutes(4),
+                'error_code' => 'HTTP_503',
+                'error_summary' => 'Provider unavailable.',
+                'triggered_by' => $admin->id,
+                'trigger_source' => 'manual',
+            ]);
+            $syncRunId = $syncRun->id;
+        } finally {
+            tenancy()->end();
+        }
+
+        $this->actingAs($admin, 'tenant')
+            ->post("http://{$domain}/connections/sync-jobs/{$syncRunId}/retry")
+            ->assertRedirect();
+
+        Queue::assertPushed(RunConnectionSyncJob::class);
+
+        tenancy()->initialize($tenant);
+
+        try {
+            $syncRun = SyncRun::query()->findOrFail($syncRunId);
+
+            $this->assertSame(SyncStatus::Retrying, $syncRun->status);
+            $this->assertSame(1, $syncRun->retry_count);
+            $this->assertTrue(ConnectionLog::query()->where('event', 'sync.retry_queued')->where('sync_run_id', $syncRun->id)->exists());
+        } finally {
+            tenancy()->end();
+        }
+    }
+
+    public function test_authentication_sync_failure_requires_manual_repair_before_retry(): void
+    {
+        Queue::fake();
+
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant, ['name' => 'Sync Retry Admin'], 'Tenant Administrator');
+
+        tenancy()->initialize($tenant);
+
+        try {
+            $connection = Connection::query()->firstOrFail();
+            $syncRun = $connection->syncRuns()->create([
+                'tenant_id' => tenant('id'),
+                'sync_type' => 'manual',
+                'status' => SyncStatus::Failed,
+                'started_at' => now()->subMinutes(5),
+                'completed_at' => now()->subMinutes(4),
+                'error_code' => 'AUTHENTICATION_REQUIRED',
+                'error_summary' => 'Reconnect before syncing.',
+                'triggered_by' => $admin->id,
+                'trigger_source' => 'manual',
+            ]);
+            $syncRunId = $syncRun->id;
+        } finally {
+            tenancy()->end();
+        }
+
+        $this->actingAs($admin, 'tenant')
+            ->post("http://{$domain}/connections/sync-jobs/{$syncRunId}/retry")
+            ->assertRedirect();
+
+        Queue::assertNothingPushed();
+
+        tenancy()->initialize($tenant);
+
+        try {
+            $this->assertSame(SyncStatus::Failed, SyncRun::query()->findOrFail($syncRunId)->status);
         } finally {
             tenancy()->end();
         }

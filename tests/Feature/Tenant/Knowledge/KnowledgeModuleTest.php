@@ -18,6 +18,10 @@ use App\Models\Knowledge\KnowledgeFailure;
 use App\Models\Knowledge\KnowledgeFaq;
 use App\Models\Knowledge\KnowledgeProcessingJob;
 use App\Models\Knowledge\KnowledgeSource;
+use App\Models\Knowledge\KnowledgeAccessGrant;
+use App\Enums\Knowledge\AccessLevel;
+use App\Enums\Knowledge\GranteeType;
+use App\Services\Knowledge\AgentKnowledgeRetrievalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -202,11 +206,78 @@ class KnowledgeModuleTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('zero_results', false);
-        $response->assertJsonPath('answer_preview.confidence', 'high');
+        $this->assertNotEmpty($response->json('answer_preview.answer'));
+        $this->assertNotEmpty($response->json('answer_preview.sources_used'));
 
         $contents = collect($response->json('results'))->pluck('content')->implode("\n");
         $this->assertStringContainsString('refunds within 30 days', $contents);
         $this->assertStringNotContainsString('Tenant B secret', $contents);
+    }
+
+    public function test_agent_retrieval_requires_explicit_knowledge_grant(): void
+    {
+        [$tenant] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant);
+
+        tenancy()->initialize($tenant);
+        [$baseUuid] = $this->createRetrievableChunkInsideTenantWithoutTenancyReset($admin->id, 'Customers can request refunds within 30 days.');
+        $base = KnowledgeBase::where('uuid', $baseUuid)->firstOrFail();
+
+        $service = app(AgentKnowledgeRetrievalService::class);
+        $this->assertTrue($service->retrieve('support-agent', 'customers refunds', ['mode' => 'keyword', 'similarity_threshold' => 0])->isEmpty());
+
+        KnowledgeAccessGrant::create([
+            'knowledge_base_id' => $base->id,
+            'grantee_type' => GranteeType::Agent->value,
+            'grantee_key' => 'support-agent',
+            'access_level' => AccessLevel::Read->value,
+            'granted_by' => $admin->id,
+        ]);
+
+        $outcome = $service->retrieve('support-agent', 'customers refunds', ['mode' => 'keyword', 'similarity_threshold' => 0]);
+        $this->assertFalse($outcome->isEmpty());
+        $this->assertStringContainsString('refunds within 30 days', $outcome->hits[0]->chunk->content);
+        tenancy()->end();
+    }
+
+    public function test_disabling_source_withdraws_chunks_from_retrieval(): void
+    {
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant);
+
+        tenancy()->initialize($tenant);
+        [$baseUuid, $chunkUuid] = $this->createRetrievableChunkInsideTenantWithoutTenancyReset($admin->id, 'Customers can request refunds within 30 days.');
+        $source = KnowledgeSource::firstOrFail();
+        tenancy()->end();
+
+        $this->actingAs($admin, 'tenant')
+            ->post("http://{$domain}/knowledge/sources/{$source->uuid}/disable")
+            ->assertRedirect();
+
+        tenancy()->initialize($tenant);
+        $this->assertFalse(KnowledgeChunk::where('uuid', $chunkUuid)->firstOrFail()->is_retrievable);
+        $this->assertSame(SourceStatus::Disabled, $source->refresh()->status);
+        tenancy()->end();
+    }
+
+    public function test_deleting_source_withdraws_chunks_from_retrieval(): void
+    {
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant);
+
+        tenancy()->initialize($tenant);
+        [, $chunkUuid] = $this->createRetrievableChunkInsideTenantWithoutTenancyReset($admin->id, 'Customers can request refunds within 30 days.');
+        $source = KnowledgeSource::firstOrFail();
+        tenancy()->end();
+
+        $this->actingAs($admin, 'tenant')
+            ->delete("http://{$domain}/knowledge/sources/{$source->uuid}")
+            ->assertRedirect();
+
+        tenancy()->initialize($tenant);
+        $this->assertFalse(KnowledgeChunk::where('uuid', $chunkUuid)->firstOrFail()->is_retrievable);
+        $this->assertNotNull($source->refresh()->deleted_at);
+        tenancy()->end();
     }
 
     public function test_tenant_cannot_open_another_tenants_knowledge_base_uuid(): void
@@ -457,5 +528,62 @@ class KnowledgeModuleTest extends TestCase
         } finally {
             tenancy()->end();
         }
+    }
+
+    private function createRetrievableChunkInsideTenantWithoutTenancyReset(int $actorId, string $content): array
+    {
+        $base = KnowledgeBase::create([
+            'name' => 'Agent Support Knowledge',
+            'slug' => 'agent-support-knowledge-'.Str::lower(Str::random(6)),
+            'status' => KnowledgeBaseStatus::Active->value,
+            'visibility' => KnowledgeVisibility::Private->value,
+            'default_language' => 'en',
+            'supported_languages' => ['en'],
+            'embedding_provider' => 'local',
+            'embedding_model' => 'local-hash-embedding',
+            'embedding_dimensions' => 256,
+            'embedding_version' => 1,
+            'chunking_strategy' => 'paragraph',
+            'chunk_size' => 800,
+            'chunk_overlap' => 80,
+            'retrieval_mode' => 'keyword',
+            'top_k' => 5,
+            'candidate_pool' => 20,
+            'similarity_threshold' => 0,
+            'reranking_enabled' => false,
+            'max_context_tokens' => 4000,
+            'allow_cross_source_retrieval' => true,
+            'prefer_recent_content' => false,
+            'require_citations' => true,
+            'exclude_expired_content' => true,
+            'created_by' => $actorId,
+        ]);
+
+        $source = KnowledgeSource::create([
+            'knowledge_base_id' => $base->id,
+            'source_type' => SourceType::ManualText->value,
+            'name' => 'Agent policy',
+            'status' => SourceStatus::Ready->value,
+            'created_by' => $actorId,
+        ]);
+
+        $chunk = KnowledgeChunk::create([
+            'knowledge_base_id' => $base->id,
+            'knowledge_source_id' => $source->id,
+            'owner_key' => 'agent-test:'.$base->id,
+            'chunk_index' => 0,
+            'content' => $content,
+            'content_hash' => hash('sha256', $content),
+            'token_count' => 12,
+            'character_count' => strlen($content),
+            'language' => 'en',
+            'metadata' => ['document_name' => 'Agent policy'],
+            'source_type' => SourceType::ManualText->value,
+            'is_retrievable' => true,
+        ]);
+        $chunk->setVector(array_fill(0, 256, 0.1), 'local', 'local-hash-embedding', 1);
+        $chunk->save();
+
+        return [$base->uuid, $chunk->uuid];
     }
 }

@@ -17,6 +17,7 @@ use App\Http\Controllers\Tenant\Admin\Connections\DataSourceController;
 use App\Http\Controllers\Tenant\Admin\Connections\IntegrationCatalogController;
 use App\Http\Controllers\Tenant\Admin\Connections\OperationsController;
 use App\Http\Controllers\Tenant\Admin\Connections\OverviewController as ConnectionsOverviewController;
+use App\Http\Controllers\Tenant\Admin\Connections\SyncRunController;
 use App\Http\Controllers\Tenant\Admin\Connections\WebhookEventController;
 use App\Http\Controllers\Tenant\Admin\DashboardController as TenantAdminDashboardController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\CollectionController as KnowledgeCollectionController;
@@ -140,6 +141,7 @@ Route::middleware([
             Route::post('webhooks/events/{event}/replay', [WebhookEventController::class, 'replay'])->name('webhooks.events.replay');
             Route::get('mcp', [OperationsController::class, 'mcp'])->name('mcp.index');
             Route::get('sync-jobs', [OperationsController::class, 'syncJobs'])->name('sync-jobs.index');
+            Route::post('sync-jobs/{syncRun}/retry', [SyncRunController::class, 'retry'])->name('sync-jobs.retry');
             Route::get('logs', [OperationsController::class, 'logs'])->name('logs.index');
             Route::get('failed', [OperationsController::class, 'failed'])->name('failed.index');
             Route::get('credentials', [OperationsController::class, 'credentials'])->name('credentials.index');

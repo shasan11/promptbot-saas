@@ -8,6 +8,10 @@ class RetryPolicyService
 {
     public function classify(?int $httpStatus = null, ?string $errorCode = null): ConnectionErrorCategory
     {
+        if ($httpStatus === null && $errorCode && preg_match('/^HTTP_(\d{3})$/', $errorCode, $matches)) {
+            $httpStatus = (int) $matches[1];
+        }
+
         if ($httpStatus === 401) {
             return ConnectionErrorCategory::Authentication;
         }
@@ -33,9 +37,16 @@ class RetryPolicyService
         }
 
         return match ($errorCode) {
+            'AUTHENTICATION_REQUIRED', 'AUTHENTICATION', 'TOKEN_EXPIRED' => ConnectionErrorCategory::Authentication,
+            'AUTHORIZATION', 'PERMISSION_DENIED' => ConnectionErrorCategory::Authorization,
+            'RATE_LIMIT', 'RATE_LIMITED', 'QUOTA_TEMPORARILY_EXCEEDED' => ConnectionErrorCategory::RateLimit,
+            'NETWORK_ERROR', 'DNS_FAILURE', 'CONNECTION_RESET' => ConnectionErrorCategory::Network,
+            'TIMEOUT', 'REQUEST_TIMEOUT' => ConnectionErrorCategory::Timeout,
+            'PROVIDER_UNAVAILABLE', 'SERVICE_UNAVAILABLE' => ConnectionErrorCategory::ProviderUnavailable,
             'SQLSTATE', 'DATABASE_ERROR' => ConnectionErrorCategory::DatabaseError,
             'SCHEMA_CHANGED' => ConnectionErrorCategory::SchemaChanged,
             'VALIDATION_ERROR' => ConnectionErrorCategory::ValidationError,
+            'RESOURCE_MISSING', 'NOT_FOUND' => ConnectionErrorCategory::ResourceMissing,
             default => ConnectionErrorCategory::Unknown,
         };
     }

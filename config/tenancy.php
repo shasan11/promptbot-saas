@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Domain;
 use App\Models\Tenant;
-use Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
@@ -37,7 +36,11 @@ return [
      */
     'bootstrappers' => [
         DatabaseTenancyBootstrapper::class,
-        CacheTenancyBootstrapper::class,
+        // The app's default cache store is database-backed, and each tenant
+        // has its own cache table through DatabaseTenancyBootstrapper. Stancl's
+        // cache bootstrapper scopes keys by cache tags, which the database and
+        // file stores do not support, causing tenant requests that touch cache
+        // to fail with "This cache store does not support tagging."
         FilesystemTenancyBootstrapper::class,
         QueueTenancyBootstrapper::class,
         // Stancl\Tenancy\Bootstrappers\RedisTenancyBootstrapper::class, // Note: phpredis is needed

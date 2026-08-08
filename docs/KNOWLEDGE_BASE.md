@@ -71,6 +71,20 @@ Response fields:
 
 This endpoint is for administrator testing. Production agent calls should create a `RetrievalQuery` server-side from the agent's explicit grant scope rather than accepting client-provided base IDs.
 
+## Agent Retrieval Integration
+
+Use `App\Services\Knowledge\AgentKnowledgeRetrievalService` from the future Agents module:
+
+```php
+$outcome = app(AgentKnowledgeRetrievalService::class)->retrieve(
+    agentKey: 'support-agent',
+    question: 'What is the refund period?',
+    options: ['mode' => 'hybrid']
+);
+```
+
+The service resolves scope from `knowledge_access_grants` where `grantee_type = agent`. An agent with no explicit grant retrieves nothing, even from workspace-visible knowledge bases.
+
 ## Queue Workers
 
 Run queue workers for the configured knowledge queues:
