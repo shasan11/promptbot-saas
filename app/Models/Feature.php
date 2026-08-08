@@ -7,10 +7,11 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class Feature extends Model
 {
-    use HasFactory, HasPublicUuid;
+    use CentralConnection, HasFactory, HasPublicUuid;
 
     /**
      * The attributes that are mass assignable.

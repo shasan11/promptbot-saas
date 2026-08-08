@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class Plan extends Model
 {
-    use HasFactory, HasPublicUuid, SoftDeletes;
+    use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.

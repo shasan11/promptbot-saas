@@ -1,39 +1,69 @@
 import PageHeader from '@/Components/Superadmin/PageHeader';
+import Alert from '@/Components/UI/Alert';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import FormField from '@/Components/UI/FormField';
+import Input from '@/Components/UI/Input';
+import Select from '@/Components/UI/Select';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
+import { AlertTriangle, Globe2 } from 'lucide-react';
 
-function Field({ label, error, hint, className = '', children }) {
-    return (
-        <label className={`block ${className}`}>
-            <span className="text-sm font-semibold text-slate-700">{label}</span>
-            <div className="mt-2">{children}</div>
-            {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-            {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
-        </label>
-    );
-}
+const cleanBaseDomain = (domain = '') => domain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/^\./, '')
+    .replace(/\/.*$/, '');
 
-const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950';
+const sanitizeSubdomain = (value = '') => value
+    .trimStart()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .split('.')[0]
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-{2,}/g, '-');
 
-function Section({ title, subtitle, children }) {
-    return (
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6">
-                <h2 className="text-base font-bold text-slate-950">{title}</h2>
-                {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">{children}</div>
-        </section>
-    );
-}
+const cleanSubdomain = (value = '') => sanitizeSubdomain(value)
+    .replace(/^-+|-+$/g, '');
 
-export default function Create({ plans = [], tenant = null, provisioningMode = 'manual', tenantBaseDomain = '' }) {
+const getSubdomainPrefix = (domain = '', baseDomain = '') => {
+    const normalizedDomain = cleanBaseDomain(domain);
+
+    if (!normalizedDomain) {
+        return '';
+    }
+
+    if (baseDomain && normalizedDomain.endsWith(`.${baseDomain}`)) {
+        return normalizedDomain.slice(0, -(baseDomain.length + 1));
+    }
+
+    return normalizedDomain.split('.')[0];
+};
+
+export default function Create({
+    plans = [],
+    tenant = null,
+    provisioningMode = 'manual',
+    tenantBaseDomain = '',
+}) {
     const editing = Boolean(tenant);
-    const primaryDomain = tenant?.domains?.find((domain) => domain.is_primary) || tenant?.domains?.[0];
-    const { data, setData, post, patch, processing, errors } = useForm({
+    const baseDomain = cleanBaseDomain(tenantBaseDomain);
+    const primaryDomain = tenant?.domains?.find((domain) => domain.is_primary)
+        || tenant?.domains?.[0];
+
+    const {
+        data,
+        setData,
+        transform,
+        post,
+        patch,
+        processing,
+        errors,
+    } = useForm({
         company_name: tenant?.company_name || '',
-        slug: tenant?.slug || '',
-        subdomain: primaryDomain?.domain || '',
+        subdomain: getSubdomainPrefix(primaryDomain?.domain, baseDomain),
         owner_name: '',
         owner_email: '',
         owner_password: '',
@@ -46,108 +76,361 @@ export default function Create({ plans = [], tenant = null, provisioningMode = '
         database_password: '',
     });
 
+    const subdomainPrefix = cleanSubdomain(data.subdomain);
+    const completeDomain = subdomainPrefix && baseDomain
+        ? `${subdomainPrefix}.${baseDomain}`
+        : subdomainPrefix;
+
+    const domainError = errors.subdomain || errors.slug;
+    const errorCount = Object.keys(errors).length;
+
     const submit = (event) => {
         event.preventDefault();
-        editing ? patch(route('superadmin.tenants.update', tenant.public_uuid || tenant.id)) : post(route('superadmin.tenants.store'));
-    };
 
-    const generatedDomain = data.slug && tenantBaseDomain ? `${data.slug}.${tenantBaseDomain}` : '';
+        transform((formData) => ({
+            ...formData,
+            // Keep this only while the backend still requires a tenant slug.
+            // It is generated automatically and is no longer shown to the user.
+            slug: editing ? tenant.slug : subdomainPrefix,
+            subdomain: completeDomain,
+        }));
+
+        if (editing) {
+            patch(route('superadmin.tenants.update', tenant.public_uuid || tenant.id));
+            return;
+        }
+
+        post(route('superadmin.tenants.store'));
+    };
 
     return (
         <AuthenticatedLayout
-            header={
+            header={(
                 <PageHeader
-                    title={editing ? 'Edit Tenant' : 'Create Tenant'}
-                    subtitle={editing ? 'Update the tenant identity, primary subdomain, and commercial plan.' : 'Provision the workspace, primary subdomain, owner account, plan, and database connection.'}
-                    actions={
-                        <Link href={route('superadmin.tenants.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                    title={editing ? 'Edit tenant' : 'Provision tenant'}
+                    subtitle={editing
+                        ? 'Update the company, workspace domain, and commercial plan.'
+                        : 'Create a tenant workspace, owner account, plan, and database connection.'}
+                    actions={(
+                        <Button
+                            href={route('superadmin.tenants.index')}
+                            variant="secondary"
+                        >
                             Back to tenants
-                        </Link>
-                    }
+                        </Button>
+                    )}
                 />
-            }
+            )}
         >
-            <Head title={editing ? 'Edit Tenant' : 'Create Tenant'} />
+            <Head title={editing ? 'Edit tenant' : 'Provision tenant'} />
+
+            {!editing && (
+                <Alert
+                    tone="warning"
+                    title="This creates real infrastructure"
+                    className="mb-6"
+                >
+                    Provisioning creates a database and tenant domain. Review the
+                    information carefully before continuing.
+                </Alert>
+            )}
+
+            {errorCount > 0 && (
+                <Alert
+                    tone="danger"
+                    title={`${errorCount} field${errorCount === 1 ? '' : 's'} need attention`}
+                    className="mb-6"
+                >
+                    Check the highlighted fields below before submitting.
+                </Alert>
+            )}
 
             <form onSubmit={submit} className="mx-auto max-w-5xl space-y-6">
-                <Section title="Company and Domain" subtitle="The primary subdomain is used to route users into this tenant workspace.">
-                    <Field label="Company name" error={errors.company_name}>
-                        <input className={inputClass} value={data.company_name} onChange={(event) => setData('company_name', event.target.value)} />
-                    </Field>
-                    <Field label="Tenant slug" error={errors.slug} hint={editing ? 'The tenant slug is immutable after provisioning.' : 'Used as the tenant ID and to generate the default hostname.'}>
-                        <input disabled={editing} className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-500`} value={data.slug} onChange={(event) => setData('slug', event.target.value)} />
-                    </Field>
-                    <Field
-                        label="Primary subdomain"
-                        error={errors.subdomain}
-                        hint={!editing && !data.subdomain ? `Leave blank to generate ${generatedDomain || `slug.${tenantBaseDomain || 'your-domain.com'}`}.` : 'Enter the complete hostname, without http:// or a path.'}
-                        className="md:col-span-2"
-                    >
-                        <input className={inputClass} value={data.subdomain} onChange={(event) => setData('subdomain', event.target.value.toLowerCase().trim())} placeholder={generatedDomain || `workspace.${tenantBaseDomain || 'example.com'}`} />
-                    </Field>
-                </Section>
+                <SectionCard
+                    title="Company and workspace"
+                    description="Choose the company name and the address users will use to open this workspace."
+                >
+                    <div className="grid gap-5 md:grid-cols-2">
+                        <FormField
+                            id="company_name"
+                            label="Company name"
+                            required
+                            error={errors.company_name}
+                            className="md:col-span-2"
+                        >
+                            <Input
+                                id="company_name"
+                                value={data.company_name}
+                                error={!!errors.company_name}
+                                placeholder="Acme Corporation"
+                                onChange={(event) => setData('company_name', event.target.value)}
+                            />
+                        </FormField>
+
+                        <FormField
+                            id="subdomain"
+                            label="Workspace domain"
+                            required
+                            error={domainError}
+                            hint="Use lowercase letters, numbers, and hyphens only."
+                            className="md:col-span-2"
+                        >
+                            <div
+                                className={`flex min-h-11 overflow-hidden rounded-lg border bg-white transition focus-within:ring-2 focus-within:ring-offset-1 ${
+                                    domainError
+                                        ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-200'
+                                        : 'border-slate-300 focus-within:border-indigo-500 focus-within:ring-indigo-200'
+                                }`}
+                            >
+                                <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
+                                    <Globe2 className="h-4 w-4 shrink-0 text-slate-400" />
+                                    <input
+                                        id="subdomain"
+                                        type="text"
+                                        value={data.subdomain}
+                                        maxLength={63}
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                        placeholder="acme"
+                                        className="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
+                                        onChange={(event) => setData(
+                                            'subdomain',
+                                            sanitizeSubdomain(event.target.value),
+                                        )}
+                                    />
+                                </div>
+
+                                {baseDomain && (
+                                    <div className="flex shrink-0 items-center border-l border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-600">
+                                        .{baseDomain}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-3 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div className="rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200">
+                                    <Globe2 className="h-4 w-4 text-indigo-600" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                        Workspace URL
+                                    </p>
+                                    <p className="mt-1 break-all text-sm font-semibold text-slate-900">
+                                        {completeDomain || `workspace.${baseDomain || 'example.com'}`}
+                                    </p>
+                                </div>
+                            </div>
+                        </FormField>
+                    </div>
+                </SectionCard>
 
                 {!editing && (
-                    <Section title="Owner Account" subtitle="The first tenant administrator who signs in from the tenant domain.">
-                        <Field label="Owner name" error={errors.owner_name}>
-                            <input className={inputClass} value={data.owner_name} onChange={(event) => setData('owner_name', event.target.value)} />
-                        </Field>
-                        <Field label="Owner email" error={errors.owner_email}>
-                            <input className={inputClass} type="email" value={data.owner_email} onChange={(event) => setData('owner_email', event.target.value)} />
-                        </Field>
-                        <Field label="Owner password" error={errors.owner_password} className="md:col-span-2" hint="Minimum 10 characters.">
-                            <input className={inputClass} type="password" value={data.owner_password} onChange={(event) => setData('owner_password', event.target.value)} autoComplete="new-password" />
-                        </Field>
-                    </Section>
+                    <SectionCard
+                        title="Owner account"
+                        description="Create the first administrator who will manage this tenant."
+                    >
+                        <div className="grid gap-5 md:grid-cols-2">
+                            <FormField
+                                id="owner_name"
+                                label="Owner name"
+                                required
+                                error={errors.owner_name}
+                            >
+                                <Input
+                                    id="owner_name"
+                                    value={data.owner_name}
+                                    error={!!errors.owner_name}
+                                    placeholder="Full name"
+                                    onChange={(event) => setData('owner_name', event.target.value)}
+                                />
+                            </FormField>
+
+                            <FormField
+                                id="owner_email"
+                                label="Owner email"
+                                required
+                                error={errors.owner_email}
+                            >
+                                <Input
+                                    id="owner_email"
+                                    type="email"
+                                    value={data.owner_email}
+                                    error={!!errors.owner_email}
+                                    placeholder="owner@company.com"
+                                    onChange={(event) => setData('owner_email', event.target.value)}
+                                />
+                            </FormField>
+
+                            <FormField
+                                id="owner_password"
+                                label="Temporary password"
+                                required
+                                error={errors.owner_password}
+                                hint="Minimum 10 characters. Share it securely; it will not be shown again."
+                                className="md:col-span-2"
+                            >
+                                <Input
+                                    id="owner_password"
+                                    type="password"
+                                    value={data.owner_password}
+                                    error={!!errors.owner_password}
+                                    autoComplete="new-password"
+                                    onChange={(event) => setData('owner_password', event.target.value)}
+                                />
+                            </FormField>
+                        </div>
+                    </SectionCard>
                 )}
 
-                <Section title="Plan" subtitle="Attach the tenant and its active subscription to a commercial package.">
-                    <Field label="Plan" error={errors.plan_id} className="md:col-span-2">
-                        <select className={inputClass} value={data.plan_id} onChange={(event) => setData('plan_id', event.target.value)}>
+                <SectionCard
+                    title="Subscription plan"
+                    description="Select the commercial package assigned to this tenant."
+                >
+                    <FormField
+                        id="plan_id"
+                        label="Plan"
+                        required
+                        error={errors.plan_id}
+                        className="md:max-w-sm"
+                    >
+                        <Select
+                            id="plan_id"
+                            value={data.plan_id}
+                            error={!!errors.plan_id}
+                            onChange={(event) => setData('plan_id', event.target.value)}
+                        >
                             <option value="">Select a plan</option>
-                            {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
-                        </select>
-                    </Field>
-                </Section>
+                            {plans.map((plan) => (
+                                <option key={plan.id} value={plan.id}>
+                                    {plan.name}
+                                </option>
+                            ))}
+                        </Select>
+                    </FormField>
+                </SectionCard>
 
                 {!editing && (
-                    <Section title="Database" subtitle="The provisioning service verifies these credentials before creating the tenant workspace.">
-                        <Field label="Provisioning mode" error={errors.provisioning_mode} className="md:col-span-2">
-                            <select className={inputClass} value={data.provisioning_mode} onChange={(event) => setData('provisioning_mode', event.target.value)}>
+                    <SectionCard
+                        title="Database provisioning"
+                        description="Configure how the tenant database should be connected or created."
+                    >
+                        <FormField
+                            id="provisioning_mode"
+                            label="Provisioning mode"
+                            error={errors.provisioning_mode}
+                            className="md:max-w-sm"
+                        >
+                            <Select
+                                id="provisioning_mode"
+                                value={data.provisioning_mode}
+                                error={!!errors.provisioning_mode}
+                                onChange={(event) => setData('provisioning_mode', event.target.value)}
+                            >
                                 <option value="manual">Existing database credentials</option>
                                 <option value="mysql">Create with MySQL administrator</option>
                                 <option value="cpanel">Create through cPanel</option>
-                            </select>
-                        </Field>
+                            </Select>
+                        </FormField>
+
                         {data.provisioning_mode === 'manual' && (
-                            <>
-                                <Field label="Host" error={errors.database_host}>
-                                    <input className={inputClass} value={data.database_host} onChange={(event) => setData('database_host', event.target.value)} />
-                                </Field>
-                                <Field label="Port" error={errors.database_port}>
-                                    <input className={inputClass} type="number" value={data.database_port} onChange={(event) => setData('database_port', event.target.value)} />
-                                </Field>
-                                <Field label="Database name" error={errors.database_name}>
-                                    <input className={inputClass} value={data.database_name} onChange={(event) => setData('database_name', event.target.value)} />
-                                </Field>
-                                <Field label="Database username" error={errors.database_username}>
-                                    <input className={inputClass} value={data.database_username} onChange={(event) => setData('database_username', event.target.value)} />
-                                </Field>
-                                <Field label="Database password" error={errors.database_password} hint="Leave empty only when the database user allows passwordless access." className="md:col-span-2">
-                                    <input className={inputClass} type="password" value={data.database_password} onChange={(event) => setData('database_password', event.target.value)} autoComplete="new-password" />
-                                </Field>
-                            </>
+                            <div className="mt-5 grid gap-5 md:grid-cols-2">
+                                <FormField
+                                    id="database_host"
+                                    label="Host"
+                                    error={errors.database_host}
+                                >
+                                    <Input
+                                        id="database_host"
+                                        value={data.database_host}
+                                        error={!!errors.database_host}
+                                        onChange={(event) => setData('database_host', event.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    id="database_port"
+                                    label="Port"
+                                    error={errors.database_port}
+                                >
+                                    <Input
+                                        id="database_port"
+                                        type="number"
+                                        value={data.database_port}
+                                        error={!!errors.database_port}
+                                        onChange={(event) => setData('database_port', event.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    id="database_name"
+                                    label="Database name"
+                                    error={errors.database_name}
+                                >
+                                    <Input
+                                        id="database_name"
+                                        value={data.database_name}
+                                        error={!!errors.database_name}
+                                        onChange={(event) => setData('database_name', event.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    id="database_username"
+                                    label="Database username"
+                                    error={errors.database_username}
+                                >
+                                    <Input
+                                        id="database_username"
+                                        value={data.database_username}
+                                        error={!!errors.database_username}
+                                        onChange={(event) => setData('database_username', event.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    id="database_password"
+                                    label="Database password"
+                                    error={errors.database_password}
+                                    hint="Leave empty only when the database user allows passwordless access."
+                                    className="md:col-span-2"
+                                >
+                                    <Input
+                                        id="database_password"
+                                        type="password"
+                                        value={data.database_password}
+                                        error={!!errors.database_password}
+                                        autoComplete="new-password"
+                                        onChange={(event) => setData('database_password', event.target.value)}
+                                    />
+                                </FormField>
+                            </div>
                         )}
-                    </Section>
+
+                        {data.provisioning_mode !== 'manual' && (
+                            <p className="mt-4 flex items-start gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                The database will be created automatically using the
+                                platform&apos;s {data.provisioning_mode === 'mysql'
+                                    ? 'MySQL administrator credentials'
+                                    : 'cPanel integration'}.
+                            </p>
+                        )}
+                    </SectionCard>
                 )}
 
-                <div className="flex justify-end gap-3">
-                    <Link href={route('superadmin.tenants.index')} className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                        Cancel
-                    </Link>
-                    <button disabled={processing} className="rounded-md bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-                        {processing ? 'Saving...' : editing ? 'Update tenant' : 'Provision tenant'}
-                    </button>
+                <div className="sticky bottom-0 left-0 right-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
+                    <div className="mx-auto flex max-w-5xl justify-end gap-3">
+                        <Button
+                            href={route('superadmin.tenants.index')}
+                            variant="secondary"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" variant="brand" loading={processing}>
+                            {editing ? 'Save changes' : 'Provision tenant'}
+                        </Button>
+                    </div>
                 </div>
             </form>
         </AuthenticatedLayout>

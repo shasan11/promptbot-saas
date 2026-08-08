@@ -1,49 +1,45 @@
-import PrimaryButton from '@/Components/PrimaryButton';
+import Alert from '@/Components/UI/Alert';
+import Button from '@/Components/UI/Button';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 
 export default function VerifyEmail({ status }) {
+    const { auth } = usePage().props;
     const { post, processing } = useForm({});
 
-    const submit = (e) => {
-        e.preventDefault();
+    const submit = (event) => {
+        event.preventDefault();
 
         post(route('verification.send'));
     };
 
     return (
         <GuestLayout>
-            <Head title="Email Verification" />
+            <Head title="Verify email" />
 
-            <div className="mb-4 text-sm text-gray-600">
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
-            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Verify your email address</h1>
+            <p className="mt-2 text-sm text-slate-500">
+                We sent a verification link to <span className="font-semibold text-slate-700">{auth?.user?.email}</span>. Click the link to
+                activate your account. Didn't get it? We can send another.
+            </p>
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
-                </div>
+                <Alert tone="success" className="mt-5">A new verification link has been sent to your email address.</Alert>
             )}
 
-            <form onSubmit={submit}>
-                <div className="mt-4 flex items-center justify-between">
-                    <PrimaryButton disabled={processing}>
-                        Resend Verification Email
-                    </PrimaryButton>
+            <form onSubmit={submit} className="mt-6 flex items-center justify-between gap-4">
+                <Button type="submit" variant="brand" loading={processing}>
+                    {processing ? 'Sending…' : 'Resend verification email'}
+                </Button>
 
-                    <Link
-                        href={route('logout')}
-                        method="post"
-                        as="button"
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    >
-                        Log Out
-                    </Link>
-                </div>
+                <Link
+                    href={route('logout')}
+                    method="post"
+                    as="button"
+                    className="text-sm font-medium text-slate-500 hover:text-slate-800"
+                >
+                    Log out
+                </Link>
             </form>
         </GuestLayout>
     );

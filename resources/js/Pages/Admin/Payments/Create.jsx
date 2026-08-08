@@ -1,20 +1,15 @@
 import PageHeader from '@/Components/Superadmin/PageHeader';
+import Alert from '@/Components/UI/Alert';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import FormField from '@/Components/UI/FormField';
+import Input from '@/Components/UI/Input';
+import Select from '@/Components/UI/Select';
+import Textarea from '@/Components/UI/Textarea';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
-const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950';
 const providers = ['manual', 'bank_transfer', 'stripe', 'paypal', 'khalti', 'esewa'];
-
-function Field({ label, error, hint, children, className = '' }) {
-    return (
-        <label className={`block ${className}`}>
-            <span className="text-sm font-semibold text-slate-700">{label}</span>
-            <div className="mt-2">{children}</div>
-            {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-            {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
-        </label>
-    );
-}
 
 export default function Create({ payment = null, tenants = [], invoices = [], subscriptions = [], defaults = {} }) {
     const editing = Boolean(payment);
@@ -34,90 +29,109 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
 
     const tenantInvoices = invoices.filter((invoice) => invoice.tenant_id === data.tenant_id || invoice.id === payment?.invoice_id);
     const tenantSubscriptions = subscriptions.filter((subscription) => subscription.tenant_id === data.tenant_id || subscription.id === payment?.subscription_id);
+    const selectedTenant = tenants.find((tenant) => tenant.id === data.tenant_id);
+    const selectedInvoice = tenantInvoices.find((invoice) => invoice.id === data.invoice_id);
+    const currencyMismatch = selectedInvoice && selectedInvoice.currency && selectedInvoice.currency !== data.currency;
 
-    const changeTenant = (tenantId) => {
-        setData({ ...data, tenant_id: tenantId, invoice_id: '', subscription_id: '' });
-    };
+    const changeTenant = (tenantId) => setData({ ...data, tenant_id: tenantId, invoice_id: '', subscription_id: '' });
 
     const submit = (event) => {
         event.preventDefault();
-        editing
-            ? put(route('superadmin.billing.payments.update', payment.id))
-            : post(route('superadmin.billing.payments.store'));
+        editing ? put(route('superadmin.billing.payments.update', payment.id)) : post(route('superadmin.billing.payments.store'));
     };
 
     return (
         <AuthenticatedLayout
-            header={
+            header={(
                 <PageHeader
-                    title={editing ? 'Edit Payment' : 'Record Payment'}
+                    title={editing ? 'Edit payment' : 'Record payment'}
                     subtitle="Link a payment to its tenant, invoice, or subscription and track its settlement state."
-                    actions={<Link href={editing ? route('superadmin.billing.payments.show', payment.id) : route('superadmin.billing.payments.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back</Link>}
+                    actions={<Button href={editing ? route('superadmin.billing.payments.show', payment.id) : route('superadmin.billing.payments.index')} variant="secondary">Back</Button>}
                 />
-            }
+            )}
         >
-            <Head title={editing ? 'Edit Payment' : 'Record Payment'} />
+            <Head title={editing ? 'Edit payment' : 'Record payment'} />
 
             <form onSubmit={submit} className="mx-auto max-w-4xl space-y-6">
-                <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                <SectionCard title="1. Tenant and linkage" description="Select who this payment belongs to, and optionally the invoice or subscription it settles.">
                     <div className="grid gap-5 md:grid-cols-2">
-                        <Field label="Tenant" error={errors.tenant_id}>
-                            <select className={inputClass} value={data.tenant_id} onChange={(event) => changeTenant(event.target.value)}>
+                        <FormField id="tenant_id" label="Tenant" required error={errors.tenant_id}>
+                            <Select id="tenant_id" value={data.tenant_id} error={!!errors.tenant_id} onChange={(event) => changeTenant(event.target.value)}>
                                 <option value="">Select tenant</option>
                                 {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
-                            </select>
-                        </Field>
-                        <Field label="Provider" error={errors.provider}>
-                            <select className={inputClass} value={data.provider} onChange={(event) => setData('provider', event.target.value)}>
+                            </Select>
+                        </FormField>
+                        <FormField id="provider" label="Provider" required error={errors.provider}>
+                            <Select id="provider" value={data.provider} onChange={(event) => setData('provider', event.target.value)}>
                                 {providers.map((provider) => <option key={provider} value={provider}>{provider.replaceAll('_', ' ')}</option>)}
-                            </select>
-                        </Field>
-                        <Field label="Invoice" error={errors.invoice_id} hint="Optional. Only invoices belonging to the selected tenant are shown.">
-                            <select className={inputClass} value={data.invoice_id} onChange={(event) => setData('invoice_id', event.target.value)}>
+                            </Select>
+                        </FormField>
+                        <FormField id="invoice_id" label="Invoice" optional error={errors.invoice_id} hint="Only invoices belonging to the selected tenant are shown.">
+                            <Select id="invoice_id" value={data.invoice_id} onChange={(event) => setData('invoice_id', event.target.value)}>
                                 <option value="">No invoice</option>
                                 {tenantInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · {invoice.currency} {invoice.total} · {invoice.status}</option>)}
-                            </select>
-                        </Field>
-                        <Field label="Subscription" error={errors.subscription_id} hint="Optional. Link recurring or manual subscription payments.">
-                            <select className={inputClass} value={data.subscription_id} onChange={(event) => setData('subscription_id', event.target.value)}>
+                            </Select>
+                        </FormField>
+                        <FormField id="subscription_id" label="Subscription" optional error={errors.subscription_id} hint="Link recurring or manual subscription payments.">
+                            <Select id="subscription_id" value={data.subscription_id} onChange={(event) => setData('subscription_id', event.target.value)}>
                                 <option value="">No subscription</option>
                                 {tenantSubscriptions.map((subscription) => <option key={subscription.id} value={subscription.id}>{subscription.plan?.name || 'Plan'} · {subscription.status}</option>)}
-                            </select>
-                        </Field>
-                        <Field label="Provider reference" error={errors.provider_reference}>
-                            <input className={inputClass} value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} placeholder="Transaction ID, bank reference, or receipt number" />
-                        </Field>
-                        <Field label="Status" error={errors.status}>
-                            <select className={inputClass} value={data.status} onChange={(event) => setData('status', event.target.value)}>
+                            </Select>
+                        </FormField>
+                    </div>
+                </SectionCard>
+
+                <SectionCard title="2. Reference and amount" description="Enter the settlement reference and the amount actually collected.">
+                    <div className="grid gap-5 md:grid-cols-2">
+                        <FormField id="provider_reference" label="Provider reference" optional error={errors.provider_reference}>
+                            <Input id="provider_reference" value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} placeholder="Transaction ID, bank reference, or receipt number" />
+                        </FormField>
+                        <FormField id="status" label="Status" required error={errors.status}>
+                            <Select id="status" value={data.status} onChange={(event) => setData('status', event.target.value)}>
                                 <option value="pending">Pending</option>
                                 <option value="paid">Paid</option>
                                 <option value="failed">Failed</option>
-                            </select>
-                        </Field>
-                        <Field label="Amount" error={errors.amount}>
-                            <input type="number" min="0.01" step="0.01" className={inputClass} value={data.amount} onChange={(event) => setData('amount', event.target.value)} />
-                        </Field>
-                        <Field label="Currency" error={errors.currency}>
-                            <input maxLength={3} className={inputClass} value={data.currency} onChange={(event) => setData('currency', event.target.value.toUpperCase())} />
-                        </Field>
+                            </Select>
+                        </FormField>
+                        <FormField id="amount" label="Amount" required error={errors.amount}>
+                            <Input id="amount" type="number" min="0.01" step="0.01" value={data.amount} error={!!errors.amount} onChange={(event) => setData('amount', event.target.value)} />
+                        </FormField>
+                        <FormField id="currency" label="Currency" required error={errors.currency}>
+                            <Input id="currency" maxLength={3} value={data.currency} error={!!errors.currency} onChange={(event) => setData('currency', event.target.value.toUpperCase())} />
+                        </FormField>
                         {data.status === 'paid' && (
-                            <Field label="Paid at" error={errors.paid_at} className="md:col-span-2">
-                                <input type="datetime-local" className={inputClass} value={data.paid_at} onChange={(event) => setData('paid_at', event.target.value)} />
-                            </Field>
+                            <FormField id="paid_at" label="Paid at" required error={errors.paid_at} className="md:col-span-2">
+                                <Input id="paid_at" type="datetime-local" value={data.paid_at} onChange={(event) => setData('paid_at', event.target.value)} />
+                            </FormField>
                         )}
                         {data.status === 'failed' && (
-                            <Field label="Failure reason" error={errors.failure_reason} className="md:col-span-2">
-                                <textarea className={`${inputClass} min-h-28`} value={data.failure_reason} onChange={(event) => setData('failure_reason', event.target.value)} />
-                            </Field>
+                            <FormField id="failure_reason" label="Failure reason" required error={errors.failure_reason} className="md:col-span-2">
+                                <Textarea id="failure_reason" value={data.failure_reason} onChange={(event) => setData('failure_reason', event.target.value)} />
+                            </FormField>
                         )}
                     </div>
-                </section>
 
-                <div className="flex justify-end gap-3">
-                    <Link href={editing ? route('superadmin.billing.payments.show', payment.id) : route('superadmin.billing.payments.index')} className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</Link>
-                    <button disabled={processing} className="rounded-md bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-                        {processing ? 'Saving...' : editing ? 'Update payment' : 'Record payment'}
-                    </button>
+                    {currencyMismatch && (
+                        <Alert tone="warning" title="Currency mismatch" className="mt-5">
+                            This payment is in {data.currency}, but invoice {selectedInvoice.number} is in {selectedInvoice.currency}. Settlement calculations assume matching currencies.
+                        </Alert>
+                    )}
+                </SectionCard>
+
+                <SectionCard title="3. Review" description="Confirm the record before saving.">
+                    <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                        <div><dt className="text-slate-500">Tenant</dt><dd className="font-medium text-slate-900">{selectedTenant?.company_name || '—'}</dd></div>
+                        <div><dt className="text-slate-500">Amount</dt><dd className="font-mono font-medium text-slate-900">{data.currency} {Number(data.amount || 0).toFixed(2)}</dd></div>
+                        <div><dt className="text-slate-500">Provider</dt><dd className="font-medium capitalize text-slate-900">{data.provider.replaceAll('_', ' ')}</dd></div>
+                        <div><dt className="text-slate-500">Status</dt><dd className="font-medium capitalize text-slate-900">{data.status}</dd></div>
+                    </dl>
+                </SectionCard>
+
+                <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
+                    <div className="flex justify-end gap-3">
+                        <Button href={editing ? route('superadmin.billing.payments.show', payment.id) : route('superadmin.billing.payments.index')} variant="secondary">Cancel</Button>
+                        <Button type="submit" variant="brand" loading={processing}>{editing ? 'Update payment' : 'Record payment'}</Button>
+                    </div>
                 </div>
             </form>
         </AuthenticatedLayout>

@@ -6,7 +6,6 @@ use App\Models\WebsiteFooterLink;
 use App\Models\WebsiteNavigationItem;
 use App\Models\WebsitePage;
 use App\Models\WebsiteSetting;
-use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -34,9 +33,6 @@ class PublicWebsiteController extends Controller
 
             return Inertia::render('Welcome', [
                 'canLogin' => Route::has('login'),
-                'canRegister' => Route::has('register'),
-                'laravelVersion' => Application::VERSION,
-                'phpVersion' => PHP_VERSION,
             ]);
         }
 

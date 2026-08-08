@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FeatureController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PlanController;
@@ -102,6 +103,10 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         ->middlewareFor(['create', 'store'], 'permission:plans.create')
         ->middlewareFor(['edit', 'update'], 'permission:plans.update')
         ->middlewareFor('destroy', 'permission:plans.archive');
+
+    Route::resource('features', FeatureController::class)
+        ->middlewareFor(['index', 'show'], 'permission:features.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:features.manage');
 
     Route::resource('subscriptions', SubscriptionController::class)->only(['index', 'show', 'update'])
         ->middlewareFor(['index', 'show'], 'permission:subscriptions.view')

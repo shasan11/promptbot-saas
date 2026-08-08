@@ -2,11 +2,11 @@
 
 namespace App\Services\Tenancy;
 
+use App\Enums\Tenant\UserStatus;
 use App\Enums\TenantStatus;
 use App\Exceptions\TenancyProvisioningException;
 use App\Models\Plan;
 use App\Models\ProvisioningLog;
-use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
@@ -158,12 +158,17 @@ class TenantProvisioningService
         tenancy()->initialize($tenant);
 
         try {
-            $role = Role::firstOrCreate(['name' => 'tenant_owner'], ['label' => 'Tenant Owner']);
             $owner = User::firstOrCreate(
                 ['email' => $data['owner_email']],
-                ['name' => $data['owner_name'], 'password' => Hash::make($data['owner_password'])]
+                [
+                    'name' => $data['owner_name'],
+                    'password' => Hash::make($data['owner_password']),
+                    'status' => UserStatus::Active,
+                    'email_verified_at' => now(),
+                    'password_changed_at' => now(),
+                ]
             );
-            $owner->roles()->syncWithoutDetaching([$role->id]);
+            $owner->assignRole('Tenant Owner');
             Setting::firstOrCreate(['key' => 'company.name'], ['value' => ['value' => $tenant->company_name]]);
         } finally {
             tenancy()->end();

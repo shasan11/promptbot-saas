@@ -17,6 +17,17 @@ class InitializeTenantContext
             return;
         }
 
+        // With QUEUE_CONNECTION=sync, jobs run inline within whatever request
+        // dispatched them — which, for a job dispatched from a tenant-scoped
+        // controller, is itself already running inside an initialized tenancy.
+        // Only initialize/end here if this job is the one establishing it, so
+        // a synchronously-run job never tears down the caller's tenancy.
+        if (tenancy()->initialized && tenant('id') === $this->tenantId) {
+            $next($job);
+
+            return;
+        }
+
         $tenant = Tenant::find($this->tenantId);
 
         if (! $tenant || $tenant->status === TenantStatus::Deleted || $tenant->status === TenantStatus::Suspended) {

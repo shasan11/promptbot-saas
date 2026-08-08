@@ -2,36 +2,50 @@ import DataTable from '@/Components/Superadmin/DataTable';
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import StatCard from '@/Components/Superadmin/StatCard';
 import StatusBadge from '@/Components/Superadmin/StatusBadge';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import DropdownMenu from '@/Components/UI/DropdownMenu';
+import EmptyState from '@/Components/UI/EmptyState';
+import Input from '@/Components/UI/Input';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { Download, Inbox } from 'lucide-react';
 
-const inputClass = 'rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm focus:border-slate-950 focus:ring-slate-950';
 const money = (value) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function ExportLink({ type, filters }) {
-    return (
-        <a href={route('superadmin.reports.export', { type, ...filters })} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold capitalize text-slate-700 shadow-sm hover:bg-slate-50">
-            Export {type}
-        </a>
-    );
-}
+const presets = [
+    { label: '7 days', days: 7 },
+    { label: '30 days', days: 30 },
+    { label: 'Quarter', days: 90 },
+];
 
-function Panel({ title, children }) {
+function BarList({ rows, labelKey, valueKey, renderLabel, tone = 'brand' }) {
+    const max = Math.max(1, ...rows.map((row) => Number(row[valueKey]) || 0));
+    if (!rows.length) return <EmptyState icon={Inbox} title="No data for this range" />;
+
     return (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-bold text-slate-950">{title}</h2>
-            <div className="mt-4">{children}</div>
-        </section>
+        <div className="space-y-3">
+            {rows.map((row, index) => {
+                const value = Number(row[valueKey]) || 0;
+                return (
+                    <div key={index}>
+                        <div className="mb-1 flex items-center justify-between text-xs">
+                            <span className="font-medium text-slate-700">{renderLabel ? renderLabel(row) : row[labelKey]}</span>
+                            <span className="font-mono text-slate-500">{value}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                            <div className={`h-2 rounded-full ${tone === 'brand' ? 'bg-brand-500' : 'bg-navy-700'}`} style={{ width: `${Math.max(4, (value / max) * 100)}%` }} />
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 
 export default function Index({ filters = {}, currency = 'USD', stats = {}, subscriptionStatuses = [], invoiceStatuses = [], paymentProviders = [], ticketStatuses = [], planMix = [], recentPayments = [], recentTickets = [] }) {
-    const { data, setData } = useForm({ from: filters.from || '', to: filters.to || '' });
-
-    const apply = (event) => {
-        event.preventDefault();
-        router.get(route('superadmin.reports.index'), data, { preserveState: true, preserveScroll: true });
-    };
+    const applyRange = (params) => router.get(route('superadmin.reports.index'), params, { preserveState: true, preserveScroll: true });
+    const applyPreset = (days) => applyRange({ from: new Date(Date.now() - days * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
 
     const statusColumns = [
         { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
@@ -39,22 +53,42 @@ export default function Index({ filters = {}, currency = 'USD', stats = {}, subs
     ];
 
     return (
-        <AuthenticatedLayout header={<PageHeader title="Reports" subtitle="Operational and financial reporting with date filters and CSV exports." />}>
+        <AuthenticatedLayout
+            header={(
+                <PageHeader
+                    title="Reports"
+                    subtitle="Operational and financial reporting with date filters and CSV exports."
+                    actions={(
+                        <DropdownMenu
+                            trigger={<span className="inline-flex items-center gap-2 rounded-md bg-navy-800 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:bg-navy-900"><Download className="h-4 w-4" /> Export</span>}
+                            items={['tenants', 'subscriptions', 'invoices', 'payments', 'tickets'].map((type) => ({
+                                label: `Export ${type}`,
+                                onClick: () => { window.location.href = route('superadmin.reports.export', { type, ...filters }); },
+                            }))}
+                        />
+                    )}
+                />
+            )}
+        >
             <Head title="Reports" />
 
-            <form onSubmit={apply} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <label>
-                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">From</span>
-                    <input type="date" className={`${inputClass} mt-1`} value={data.from} onChange={(event) => setData('from', event.target.value)} />
-                </label>
-                <label>
-                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">To</span>
-                    <input type="date" className={`${inputClass} mt-1`} value={data.to} onChange={(event) => setData('to', event.target.value)} />
-                </label>
-                <button className="rounded-md bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Apply range</button>
-            </form>
+            <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+                <div className="flex gap-1.5">
+                    {presets.map((preset) => <Button key={preset.days} variant="secondary" size="sm" onClick={() => applyPreset(preset.days)}>{preset.label}</Button>)}
+                </div>
+                <div className="ml-auto flex flex-wrap items-end gap-3">
+                    <label>
+                        <span className="block text-xs font-medium text-slate-500">From</span>
+                        <Input type="date" className="mt-1" value={filters.from} onChange={(event) => applyRange({ ...filters, from: event.target.value })} />
+                    </label>
+                    <label>
+                        <span className="block text-xs font-medium text-slate-500">To</span>
+                        <Input type="date" className="mt-1" value={filters.to} onChange={(event) => applyRange({ ...filters, to: event.target.value })} />
+                    </label>
+                </div>
+            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
                 <StatCard title="New tenants" value={stats.newTenants ?? 0} tone="blue" />
                 <StatCard title="Active subscriptions" value={stats.activeSubscriptions ?? 0} tone="slate" />
                 <StatCard title={`Invoiced (${currency})`} value={money(stats.invoiced)} tone="amber" />
@@ -63,57 +97,77 @@ export default function Index({ filters = {}, currency = 'USD', stats = {}, subs
                 <StatCard title="Open tickets" value={stats.openTickets ?? 0} tone="slate" />
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-                {['tenants', 'subscriptions', 'invoices', 'payments', 'tickets'].map((type) => <ExportLink key={type} type={type} filters={filters} />)}
+            <div className="mt-6 grid gap-6 xl:grid-cols-2">
+                <SectionCard title="Subscription status">
+                    <BarList rows={subscriptionStatuses} labelKey="status" valueKey="total" renderLabel={(row) => <StatusBadge status={row.status} />} />
+                    <div className="mt-4 border-t border-slate-100 pt-4"><DataTable columns={statusColumns} dataSource={subscriptionStatuses} rowKey="status" /></div>
+                </SectionCard>
+
+                <SectionCard title="Ticket status">
+                    <BarList rows={ticketStatuses} labelKey="status" valueKey="total" renderLabel={(row) => <StatusBadge status={row.status} />} tone="navy" />
+                    <div className="mt-4 border-t border-slate-100 pt-4"><DataTable columns={statusColumns} dataSource={ticketStatuses} rowKey="status" /></div>
+                </SectionCard>
+
+                <SectionCard title="Plan mix" description="Active, trialing, and manually managed subscriptions per plan.">
+                    <BarList rows={planMix} labelKey="name" valueKey="subscriptions_count" />
+                </SectionCard>
+
+                <SectionCard title="Payments by provider">
+                    <DataTable
+                        columns={[
+                            { title: 'Provider', dataIndex: 'provider', render: (value) => value.replaceAll('_', ' ') },
+                            { title: 'Currency', dataIndex: 'currency' },
+                            { title: 'Records', dataIndex: 'total' },
+                            { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
+                            { title: 'Refunded', dataIndex: 'refunded', render: (value, row) => `${row.currency} ${money(value)}` },
+                        ]}
+                        dataSource={paymentProviders}
+                        rowKey={(row) => `${row.provider}-${row.currency}`}
+                        emptyText="No payments in this range."
+                    />
+                </SectionCard>
+
+                <SectionCard title="Invoice status by currency" className="xl:col-span-2">
+                    <DataTable
+                        columns={[
+                            ...statusColumns,
+                            { title: 'Currency', dataIndex: 'currency' },
+                            { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
+                        ]}
+                        dataSource={invoiceStatuses}
+                        rowKey={(row) => `${row.status}-${row.currency}`}
+                        emptyText="No invoices in this range."
+                    />
+                </SectionCard>
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-2">
-                <Panel title="Subscription status"><DataTable columns={statusColumns} dataSource={subscriptionStatuses} rowKey="status" /></Panel>
-                <Panel title="Ticket status"><DataTable columns={statusColumns} dataSource={ticketStatuses} rowKey="status" /></Panel>
-                <Panel title="Invoice status by currency">
-                    <DataTable columns={[
-                        ...statusColumns,
-                        { title: 'Currency', dataIndex: 'currency' },
-                        { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
-                    ]} dataSource={invoiceStatuses} rowKey={(row) => `${row.status}-${row.currency}`} />
-                </Panel>
-                <Panel title="Payments by provider and currency">
-                    <DataTable columns={[
-                        { title: 'Provider', dataIndex: 'provider', render: (value) => value.replaceAll('_', ' ') },
-                        { title: 'Currency', dataIndex: 'currency' },
-                        { title: 'Records', dataIndex: 'total' },
-                        { title: 'Amount', dataIndex: 'amount', render: (value, row) => `${row.currency} ${money(value)}` },
-                        { title: 'Refunded', dataIndex: 'refunded', render: (value, row) => `${row.currency} ${money(value)}` },
-                    ]} dataSource={paymentProviders} rowKey={(row) => `${row.provider}-${row.currency}`} />
-                </Panel>
-                <Panel title="Active subscriptions by plan">
-                    <DataTable columns={[
-                        { title: 'Plan', dataIndex: 'name' },
-                        { title: 'Subscriptions', dataIndex: 'subscriptions_count' },
-                        { title: 'Currency', dataIndex: 'currency' },
-                    ]} dataSource={planMix} rowKey="id" />
-                </Panel>
-                <Panel title="Recent payments">
-                    <DataTable columns={[
-                        { title: 'Tenant', dataIndex: ['tenant', 'company_name'], render: (value) => value || '-' },
-                        { title: 'Invoice', dataIndex: ['invoice', 'number'], render: (value) => value || '-' },
-                        { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
-                        { title: 'Amount', dataIndex: 'amount', render: (value, payment) => `${payment.currency} ${money(value)}` },
-                    ]} dataSource={recentPayments} rowKey="id" />
-                </Panel>
-            </div>
-
-            <div className="mt-6">
-                <Panel title="Recent tickets">
-                    <DataTable columns={[
-                        { title: 'Number', dataIndex: 'number' },
-                        { title: 'Tenant', dataIndex: ['tenant', 'company_name'], render: (value) => value || '-' },
-                        { title: 'Subject', dataIndex: 'subject' },
-                        { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
-                        { title: 'Priority', dataIndex: 'priority', render: (value) => <StatusBadge status={value} /> },
-                        { title: 'Assigned', dataIndex: ['assignee', 'name'], render: (value) => value || 'Unassigned' },
-                    ]} dataSource={recentTickets} rowKey="id" />
-                </Panel>
+                <SectionCard title="Recent payments">
+                    <DataTable
+                        columns={[
+                            { title: 'Tenant', dataIndex: ['tenant', 'company_name'], render: (value) => value || '—' },
+                            { title: 'Invoice', dataIndex: ['invoice', 'number'], render: (value) => value || '—' },
+                            { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
+                            { title: 'Amount', dataIndex: 'amount', render: (value, payment) => `${payment.currency} ${money(value)}` },
+                        ]}
+                        dataSource={recentPayments}
+                        rowKey="id"
+                        emptyText="No recent payments."
+                    />
+                </SectionCard>
+                <SectionCard title="Recent tickets">
+                    <DataTable
+                        columns={[
+                            { title: 'Number', dataIndex: 'number' },
+                            { title: 'Tenant', dataIndex: ['tenant', 'company_name'], render: (value) => value || '—' },
+                            { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
+                            { title: 'Assigned', dataIndex: ['assignee', 'name'], render: (value) => value || 'Unassigned' },
+                        ]}
+                        dataSource={recentTickets}
+                        rowKey="id"
+                        emptyText="No recent tickets."
+                    />
+                </SectionCard>
             </div>
         </AuthenticatedLayout>
     );

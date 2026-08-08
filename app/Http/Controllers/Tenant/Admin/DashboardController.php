@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Tenant\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\Setting;
+use App\Models\TenantPermission;
+use App\Models\TenantRole;
 use App\Models\User;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,8 +21,8 @@ class DashboardController extends Controller
             ],
             'stats' => [
                 'users' => User::query()->count(),
-                'roles' => Role::query()->count(),
-                'permissions' => Permission::query()->count(),
+                'roles' => TenantRole::query()->count(),
+                'permissions' => TenantPermission::query()->count(),
                 'settings' => Setting::query()->count(),
             ],
             'recentUsers' => User::query()

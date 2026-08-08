@@ -1,19 +1,18 @@
 import DataTable from '@/Components/Superadmin/DataTable';
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import StatusBadge from '@/Components/Superadmin/StatusBadge';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
+import DangerConfirmDialog from '@/Components/UI/DangerConfirmDialog';
+import DescriptionList from '@/Components/UI/DescriptionList';
+import EmptyState from '@/Components/UI/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { CreditCard, Inbox } from 'lucide-react';
+import { useState } from 'react';
 
 const money = (value) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function Detail({ label, value, children }) {
-    return (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</div>
-            <div className="mt-2 text-sm font-semibold text-slate-950">{children || value || '-'}</div>
-        </div>
-    );
-}
 
 export default function Show({ invoice }) {
     const { auth } = usePage().props;
@@ -23,69 +22,60 @@ export default function Show({ invoice }) {
     const canChangeStatus = canManage && invoice.status !== 'paid' && invoice.status !== 'void';
     const canRecordPayment = auth?.permissions?.includes('payments.manage') && invoice.status !== 'void';
     const netPaid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0) - Number(payment.refunded_amount || 0), 0);
-
-    const markPaid = () => {
-        if (window.confirm(`Mark invoice ${invoice.number} as paid without recording a payment?`)) {
-            router.post(route('superadmin.billing.invoices.mark-paid', invoice.id), {}, { preserveScroll: true });
-        }
-    };
-
-    const voidInvoice = () => {
-        if (window.confirm(`Void invoice ${invoice.number}? This cannot be undone.`)) {
-            router.post(route('superadmin.billing.invoices.void', invoice.id), {}, { preserveScroll: true });
-        }
-    };
+    const balance = Math.max(0, Number(invoice.total) - netPaid);
+    const [markPaidOpen, setMarkPaidOpen] = useState(false);
+    const [voidOpen, setVoidOpen] = useState(false);
 
     const paymentColumns = [
         {
             title: 'Reference',
             dataIndex: 'provider_reference',
-            render: (value, payment) => <Link href={route('superadmin.billing.payments.show', payment.id)} className="font-mono text-sm font-semibold text-blue-700 hover:text-blue-800">{value || payment.id.slice(0, 8)}</Link>,
+            render: (value, payment) => <Link href={route('superadmin.billing.payments.show', payment.id)} className="font-mono text-sm font-semibold text-navy-800 hover:text-brand-700">{value || payment.id.slice(0, 8)}</Link>,
         },
         { title: 'Provider', dataIndex: 'provider', render: (value) => value.replaceAll('_', ' ') },
         { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
         { title: 'Amount', dataIndex: 'amount', render: (value, payment) => `${payment.currency} ${money(value)}` },
         { title: 'Refunded', dataIndex: 'refunded_amount', render: (value, payment) => `${payment.currency} ${money(value)}` },
-        { title: 'Paid at', dataIndex: 'paid_at', render: (value) => value ? new Date(value).toLocaleString() : '-' },
+        { title: 'Paid at', dataIndex: 'paid_at', render: (value) => value ? new Date(value).toLocaleString() : '—' },
     ];
 
     return (
         <AuthenticatedLayout
-            header={
+            header={(
                 <PageHeader
                     title={`Invoice ${invoice.number}`}
                     subtitle={invoice.tenant?.company_name || 'Unknown tenant'}
-                    actions={
+                    actions={(
                         <div className="flex flex-wrap gap-2">
-                            {canRecordPayment && <Link href={route('superadmin.billing.payments.create')} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Record payment</Link>}
+                            {canRecordPayment && <Button href={route('superadmin.billing.payments.create')} variant="brand" icon={CreditCard}>Record payment</Button>}
                             {canChangeStatus && (
                                 <>
-                                    <button type="button" onClick={markPaid} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">Mark as paid</button>
-                                    <button type="button" onClick={voidInvoice} className="rounded-md border border-rose-300 bg-white px-4 py-2 text-sm font-bold text-rose-700 shadow-sm hover:bg-rose-50">Void</button>
+                                    <Button variant="secondary" onClick={() => setMarkPaidOpen(true)}>Mark as paid</Button>
+                                    <Button variant="danger" onClick={() => setVoidOpen(true)}>Void</Button>
                                 </>
                             )}
-                            <Link href={route('superadmin.billing.invoices.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back</Link>
+                            <Button href={route('superadmin.billing.invoices.index')} variant="ghost">Back</Button>
                         </div>
-                    }
+                    )}
                 />
-            }
+            )}
         >
             <Head title={`Invoice ${invoice.number}`} />
 
-            <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-                    <Detail label="Status"><StatusBadge status={invoice.status} /></Detail>
-                    <Detail label="Issued" value={invoice.issued_on} />
-                    <Detail label="Due" value={invoice.due_on} />
-                    <Detail label="Paid at" value={invoice.paid_at} />
-                    <Detail label="Net linked payments" value={`${invoice.currency} ${money(netPaid)}`} />
-                    <Detail label="Balance" value={`${invoice.currency} ${money(Math.max(0, Number(invoice.total) - netPaid))}`} />
+            <div className={`overflow-hidden rounded-lg border shadow-soft ${invoice.status === 'void' ? 'border-slate-300 bg-slate-50 opacity-75' : 'border-slate-200 bg-white'} print:shadow-none`}>
+                <div className="border-b border-slate-100 px-6 py-5">
+                    <DescriptionList
+                        columns={4}
+                        items={[
+                            { label: 'Status', value: <StatusBadge status={invoice.status} /> },
+                            { label: 'Issued', value: invoice.issued_on },
+                            { label: 'Due', value: invoice.due_on || '—' },
+                            { label: 'Paid at', value: invoice.paid_at || '—' },
+                        ]}
+                    />
                 </div>
 
-                <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-4">
-                        <h2 className="text-base font-bold text-slate-950">Line items</h2>
-                    </div>
+                <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
                             <tr>
@@ -100,29 +90,49 @@ export default function Show({ invoice }) {
                                 <tr key={item.id}>
                                     <td className="px-6 py-4 text-slate-700">{item.description}</td>
                                     <td className="px-6 py-4 text-right text-slate-700">{item.quantity}</td>
-                                    <td className="px-6 py-4 text-right text-slate-700">{invoice.currency} {money(item.unit_amount)}</td>
-                                    <td className="px-6 py-4 text-right font-semibold text-slate-950">{invoice.currency} {money(item.total)}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-slate-700">{invoice.currency} {money(item.unit_amount)}</td>
+                                    <td className="px-6 py-4 text-right font-mono font-semibold text-slate-900">{invoice.currency} {money(item.total)}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="ml-auto max-w-xs space-y-2 px-6 py-5 text-sm">
-                        <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-semibold text-slate-950">{invoice.currency} {money(invoice.subtotal)}</span></div>
-                        <div className="flex justify-between text-slate-600"><span>Tax</span><span className="font-semibold text-slate-950">{invoice.currency} {money(invoice.tax_total)}</span></div>
-                        <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold text-slate-950">Total</span><span className="font-bold text-slate-950">{invoice.currency} {money(invoice.total)}</span></div>
-                    </div>
-                </section>
+                </div>
 
-                <section>
-                    <div className="mb-3 flex items-center justify-between">
-                        <div>
-                            <h2 className="text-base font-bold text-slate-950">Payment history</h2>
-                            <p className="mt-1 text-sm text-slate-500">Settlement status uses the net amount after all completed refunds.</p>
-                        </div>
-                    </div>
-                    <DataTable columns={paymentColumns} dataSource={payments} rowKey="id" />
-                </section>
+                <div className="ml-auto max-w-xs space-y-2 px-6 py-5 text-sm">
+                    <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-mono font-semibold text-slate-900">{invoice.currency} {money(invoice.subtotal)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>Tax</span><span className="font-mono font-semibold text-slate-900">{invoice.currency} {money(invoice.tax_total)}</span></div>
+                    <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold text-slate-900">Total</span><span className="font-mono font-bold text-slate-900">{invoice.currency} {money(invoice.total)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>Net paid</span><span className="font-mono font-semibold text-brand-700">{invoice.currency} {money(netPaid)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>Remaining balance</span><span className="font-mono font-semibold text-slate-900">{invoice.currency} {money(balance)}</span></div>
+                </div>
             </div>
+
+            <div className="mt-6">
+                <SectionCard title="Payment history" description="Settlement status uses the net amount after all completed refunds.">
+                    {payments.length ? <DataTable columns={paymentColumns} dataSource={payments} rowKey="id" /> : <EmptyState icon={Inbox} title="No payments recorded yet" />}
+                </SectionCard>
+            </div>
+
+            <ConfirmDialog
+                open={markPaidOpen}
+                title={`Mark invoice ${invoice.number} as paid?`}
+                confirmLabel="Mark as paid"
+                onCancel={() => setMarkPaidOpen(false)}
+                onConfirm={() => { router.post(route('superadmin.billing.invoices.mark-paid', invoice.id), {}, { preserveScroll: true }); setMarkPaidOpen(false); }}
+            >
+                This marks the invoice paid without recording an actual payment. Use "Record payment" instead if money was received through a provider.
+            </ConfirmDialog>
+
+            <DangerConfirmDialog
+                open={voidOpen}
+                title={`Void invoice ${invoice.number}`}
+                consequence="Voiding removes this invoice from collections and outstanding balances. It will no longer be payable."
+                affected={invoice.number}
+                reversible={false}
+                confirmLabel="Void invoice"
+                onCancel={() => setVoidOpen(false)}
+                onConfirm={() => { router.post(route('superadmin.billing.invoices.void', invoice.id), {}, { preserveScroll: true }); setVoidOpen(false); }}
+            />
         </AuthenticatedLayout>
     );
 }

@@ -1,20 +1,21 @@
 import DataTable from '@/Components/Superadmin/DataTable';
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import StatusBadge from '@/Components/Superadmin/StatusBadge';
+import Alert from '@/Components/UI/Alert';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
+import DescriptionList from '@/Components/UI/DescriptionList';
+import EmptyState from '@/Components/UI/EmptyState';
+import FormField from '@/Components/UI/FormField';
+import Input from '@/Components/UI/Input';
+import Textarea from '@/Components/UI/Textarea';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Inbox } from 'lucide-react';
+import { useState } from 'react';
 
-const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2.5 text-sm shadow-sm focus:border-slate-950 focus:ring-slate-950';
 const money = (value) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function Detail({ label, children }) {
-    return (
-        <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-            <dd className="mt-1 text-sm font-semibold text-slate-800">{children || '-'}</dd>
-        </div>
-    );
-}
 
 export default function Show({ payment, refundableAmount = 0 }) {
     const { auth } = usePage().props;
@@ -22,102 +23,116 @@ export default function Show({ payment, refundableAmount = 0 }) {
     const canEdit = canManage && Number(payment.refunded_amount || 0) === 0;
     const canRefund = canManage && ['paid', 'partially_refunded'].includes(payment.status) && refundableAmount > 0;
     const { data, setData, post, processing, errors, reset } = useForm({ amount: '', reason: '', provider_reference: '' });
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const remainingAfterRefund = Math.max(0, refundableAmount - Number(data.amount || 0));
 
-    const refund = (event) => {
+    const openConfirm = (event) => {
         event.preventDefault();
         if (!canRefund) return;
+        setConfirmOpen(true);
+    };
+
+    const submitRefund = () => {
         post(route('superadmin.billing.payments.refund', payment.id), {
             preserveScroll: true,
             onSuccess: () => reset(),
         });
+        setConfirmOpen(false);
     };
 
     const refundColumns = [
         { title: 'Amount', dataIndex: 'amount', render: (value) => `${payment.currency} ${money(value)}` },
         { title: 'Status', dataIndex: 'status', render: (value) => <StatusBadge status={value} /> },
         { title: 'Reason', dataIndex: 'reason' },
-        { title: 'Reference', dataIndex: 'provider_reference', render: (value) => value || '-' },
+        { title: 'Reference', dataIndex: 'provider_reference', render: (value) => value || '—' },
         { title: 'Processed by', dataIndex: ['creator', 'name'], render: (value) => value || 'System' },
-        { title: 'Processed', dataIndex: 'processed_at', render: (value) => value ? new Date(value).toLocaleString() : '-' },
+        { title: 'Processed', dataIndex: 'processed_at', render: (value) => value ? new Date(value).toLocaleString() : '—' },
     ];
 
     return (
         <AuthenticatedLayout
-            header={
+            header={(
                 <PageHeader
-                    title="Payment Details"
+                    title="Payment details"
                     subtitle={payment.provider_reference || payment.id}
-                    actions={
+                    actions={(
                         <div className="flex gap-2">
-                            <Link href={route('superadmin.billing.payments.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Back</Link>
-                            {canEdit && <Link href={route('superadmin.billing.payments.edit', payment.id)} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Edit</Link>}
+                            <Button href={route('superadmin.billing.payments.index')} variant="secondary">Back</Button>
+                            {canEdit && <Button href={route('superadmin.billing.payments.edit', payment.id)} variant="brand">Edit</Button>}
                         </div>
-                    }
+                    )}
                 />
-            }
+            )}
         >
-            <Head title="Payment Details" />
+            <Head title="Payment details" />
 
             <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
                 <div className="space-y-6">
-                    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                    <SectionCard>
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <div>
                                 <p className="text-sm font-semibold capitalize text-slate-500">{payment.provider.replaceAll('_', ' ')}</p>
-                                <p className="mt-1 text-3xl font-bold text-slate-950">{payment.currency} {money(payment.amount)}</p>
+                                <p className="mt-1 font-mono text-3xl font-bold text-slate-900">{payment.currency} {money(payment.amount)}</p>
                             </div>
                             <StatusBadge status={payment.status} />
                         </div>
-                        <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                            <Detail label="Tenant">
-                                {payment.tenant ? <Link href={route('superadmin.tenants.show', payment.tenant.public_uuid || payment.tenant.id)} className="text-blue-700 hover:text-blue-800">{payment.tenant.company_name}</Link> : '-'}
-                            </Detail>
-                            <Detail label="Invoice">
-                                {payment.invoice ? <Link href={route('superadmin.billing.invoices.show', payment.invoice.id)} className="text-blue-700 hover:text-blue-800">{payment.invoice.number}</Link> : '-'}
-                            </Detail>
-                            <Detail label="Subscription">{payment.subscription?.plan?.name || '-'}</Detail>
-                            <Detail label="Provider reference">{payment.provider_reference}</Detail>
-                            <Detail label="Paid at">{payment.paid_at ? new Date(payment.paid_at).toLocaleString() : '-'}</Detail>
-                            <Detail label="Recorded by">{payment.creator?.name || 'System'}</Detail>
-                            <Detail label="Refunded">{payment.currency} {money(payment.refunded_amount)}</Detail>
-                            <Detail label="Refundable">{payment.currency} {money(refundableAmount)}</Detail>
-                            <Detail label="Created">{payment.created_at ? new Date(payment.created_at).toLocaleString() : '-'}</Detail>
-                        </dl>
-                        {payment.failure_reason && <div className="mt-6 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><strong>Failure reason:</strong> {payment.failure_reason}</div>}
-                    </section>
+                        <DescriptionList
+                            columns={3}
+                            items={[
+                                { label: 'Tenant', value: payment.tenant ? <Link href={route('superadmin.tenants.show', payment.tenant.public_uuid || payment.tenant.id)} className="text-navy-800 hover:text-brand-700">{payment.tenant.company_name}</Link> : null },
+                                { label: 'Invoice', value: payment.invoice ? <Link href={route('superadmin.billing.invoices.show', payment.invoice.id)} className="text-navy-800 hover:text-brand-700">{payment.invoice.number}</Link> : null },
+                                { label: 'Subscription', value: payment.subscription?.plan?.name },
+                                { label: 'Provider reference', value: payment.provider_reference },
+                                { label: 'Paid at', value: payment.paid_at ? new Date(payment.paid_at).toLocaleString() : null },
+                                { label: 'Recorded by', value: payment.creator?.name || 'System' },
+                                { label: 'Refunded', value: `${payment.currency} ${money(payment.refunded_amount)}` },
+                                { label: 'Refundable', value: `${payment.currency} ${money(refundableAmount)}` },
+                                { label: 'Created', value: payment.created_at ? new Date(payment.created_at).toLocaleString() : null },
+                            ]}
+                        />
+                        {payment.failure_reason && <Alert tone="danger" title="Failure reason" className="mt-6">{payment.failure_reason}</Alert>}
+                    </SectionCard>
 
-                    <section>
-                        <h2 className="mb-3 text-base font-bold text-slate-950">Refund history</h2>
-                        <DataTable columns={refundColumns} dataSource={payment.refunds || []} rowKey="id" />
-                    </section>
+                    <SectionCard title="Refund history">
+                        {(payment.refunds || []).length ? <DataTable columns={refundColumns} dataSource={payment.refunds} rowKey="id" /> : <EmptyState icon={Inbox} title="No refunds recorded" />}
+                    </SectionCard>
                 </div>
 
                 <aside>
-                    <form onSubmit={refund} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-base font-bold text-slate-950">Record refund</h2>
-                        <p className="mt-1 text-sm text-slate-500">Available: {payment.currency} {money(refundableAmount)}</p>
+                    <form onSubmit={openConfirm} className="rounded-lg border border-amber-200 bg-amber-50/30 p-5 shadow-soft">
+                        <h2 className="text-sm font-semibold text-amber-800">Record refund</h2>
+                        <p className="mt-1 text-xs text-amber-700/80">Available to refund: {payment.currency} {money(refundableAmount)}</p>
                         <div className="mt-5 space-y-4">
-                            <label className="block">
-                                <span className="text-sm font-semibold text-slate-700">Amount</span>
-                                <input disabled={!canRefund} type="number" min="0.01" max={refundableAmount} step="0.01" className={`${inputClass} mt-2`} value={data.amount} onChange={(event) => setData('amount', event.target.value)} />
-                                {errors.amount && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.amount}</p>}
-                            </label>
-                            <label className="block">
-                                <span className="text-sm font-semibold text-slate-700">Reason</span>
-                                <textarea disabled={!canRefund} className={`${inputClass} mt-2 min-h-24`} value={data.reason} onChange={(event) => setData('reason', event.target.value)} />
-                                {errors.reason && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.reason}</p>}
-                            </label>
-                            <label className="block">
-                                <span className="text-sm font-semibold text-slate-700">Provider reference</span>
-                                <input disabled={!canRefund} className={`${inputClass} mt-2`} value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} />
-                            </label>
-                            <button disabled={processing || !canRefund} className="w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                                {processing ? 'Recording...' : canRefund ? 'Record refund' : payment.status === 'refunded' ? 'Fully refunded' : 'Refund unavailable'}
-                            </button>
+                            <FormField id="refund_amount" label="Amount" required error={errors.amount}>
+                                <Input id="refund_amount" disabled={!canRefund} type="number" min="0.01" max={refundableAmount} step="0.01" value={data.amount} error={!!errors.amount} onChange={(event) => setData('amount', event.target.value)} />
+                            </FormField>
+                            <FormField id="refund_reason" label="Reason" required error={errors.reason} hint="Recorded for the audit trail.">
+                                <Textarea id="refund_reason" disabled={!canRefund} value={data.reason} error={!!errors.reason} onChange={(event) => setData('reason', event.target.value)} />
+                            </FormField>
+                            <FormField id="refund_reference" label="Provider reference" optional>
+                                <Input id="refund_reference" disabled={!canRefund} value={data.provider_reference} onChange={(event) => setData('provider_reference', event.target.value)} />
+                            </FormField>
+                            <Button type="submit" variant="danger" disabled={!canRefund} loading={processing} className="w-full">
+                                {canRefund ? 'Record refund' : payment.status === 'refunded' ? 'Fully refunded' : 'Refund unavailable'}
+                            </Button>
                         </div>
                     </form>
                 </aside>
             </div>
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Confirm refund"
+                variant="danger"
+                confirmLabel="Record refund"
+                processing={processing}
+                onCancel={() => setConfirmOpen(false)}
+                onConfirm={submitRefund}
+            >
+                <p>You're about to refund <strong>{payment.currency} {money(data.amount || 0)}</strong> on this payment.</p>
+                <p className="mt-2">Remaining refundable balance after this refund: <strong>{payment.currency} {money(remainingAfterRefund)}</strong>.</p>
+                <p className="mt-2 text-rose-700">This action cannot be undone.</p>
+            </ConfirmDialog>
         </AuthenticatedLayout>
     );
 }

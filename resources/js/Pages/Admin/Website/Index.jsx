@@ -1,76 +1,79 @@
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import StatusBadge from '@/Components/Superadmin/StatusBadge';
+import Button from '@/Components/UI/Button';
+import { SectionCard } from '@/Components/UI/Card';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
+import EmptyState from '@/Components/UI/EmptyState';
+import FormField from '@/Components/UI/FormField';
+import Input from '@/Components/UI/Input';
+import Tabs from '@/Components/UI/Tabs';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ExternalLink, FileText, Plus } from 'lucide-react';
 import { useState } from 'react';
 
-const inputClass = 'w-full rounded-md border-slate-300 px-3 py-2 text-sm shadow-sm transition focus:border-slate-950 focus:ring-slate-950';
-
-function Panel({ title, subtitle, children, actions }) {
-    return (
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                    <h2 className="text-base font-bold text-slate-950">{title}</h2>
-                    {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
-                </div>
-                {actions}
-            </div>
-            {children}
-        </section>
-    );
-}
-
 function PagesTab({ pages }) {
-    const destroy = (page) => {
-        if (window.confirm(`Delete the page "${page.title}"? This cannot be undone.`)) {
-            router.delete(route('superadmin.website.pages.destroy', page.id));
-        }
-    };
+    const [deleting, setDeleting] = useState(null);
 
     return (
-        <Panel
+        <SectionCard
             title="Pages"
-            subtitle={'The page with slug "home" renders at your site\'s root URL.'}
-            actions={<Link href={route('superadmin.website.pages.create')} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Create page</Link>}
+            description={'The page with slug "home" renders at your site\'s root URL.'}
+            actions={<Button href={route('superadmin.website.pages.create')} variant="brand" icon={Plus}>Create page</Button>}
         >
             {pages.length ? (
                 <div className="divide-y divide-slate-100">
                     {pages.map((page) => (
                         <div key={page.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                             <div>
-                                <div className="font-semibold text-slate-950">{page.title}</div>
-                                <div className="mt-0.5 font-mono text-xs text-slate-500">/{page.slug === 'home' ? '' : page.slug} &middot; {page.sections_count} section{page.sections_count === 1 ? '' : 's'}</div>
+                                <div className="font-semibold text-slate-900">{page.title}</div>
+                                <div className="mt-0.5 font-mono text-xs text-slate-500">/{page.slug === 'home' ? '' : page.slug} · {page.sections_count} section{page.sections_count === 1 ? '' : 's'}</div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <StatusBadge status={page.status} />
-                                <Link href={route('superadmin.website.pages.edit', page.id)} className="text-sm font-semibold text-slate-600 hover:text-slate-950">Edit</Link>
-                                <button type="button" onClick={() => destroy(page)} className="text-sm font-semibold text-rose-600 hover:text-rose-800">Delete</button>
+                                {page.status === 'published' && (
+                                    <a href={`/${page.slug === 'home' ? '' : page.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm font-medium text-navy-800 hover:text-brand-700">
+                                        Preview <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                )}
+                                <Button href={route('superadmin.website.pages.edit', page.id)} variant="ghost" size="sm">Edit</Button>
+                                <Button variant="ghost" size="sm" onClick={() => setDeleting(page)}>Delete</Button>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">No pages yet. Create a page with slug "home" to populate your site's homepage.</div>
+                <EmptyState icon={FileText} title="No pages yet" description={'Create a page with slug "home" to populate your site\'s homepage.'} action={<Button href={route('superadmin.website.pages.create')} variant="brand" icon={Plus}>Create page</Button>} />
             )}
-        </Panel>
+
+            <ConfirmDialog
+                open={!!deleting}
+                title={`Delete "${deleting?.title}"?`}
+                variant="danger"
+                confirmLabel="Delete page"
+                onCancel={() => setDeleting(null)}
+                onConfirm={() => { router.delete(route('superadmin.website.pages.destroy', deleting.id)); setDeleting(null); }}
+            >
+                This removes the page and its sections from the public site. This cannot be undone.
+            </ConfirmDialog>
+        </SectionCard>
     );
 }
 
 function LinkRow({ item, fields, onSave, onDelete }) {
     const [editing, setEditing] = useState(false);
-    const { data, setData, put, processing } = useForm(Object.fromEntries(fields.map((field) => [field.key, item[field.key] ?? ''])));
+    const { data, setData, processing } = useForm(Object.fromEntries(fields.map((field) => [field.key, item[field.key] ?? ''])));
 
     if (!editing) {
         return (
             <div className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div>
-                    <div className="font-semibold text-slate-950">{item.label}</div>
+                    <div className="font-semibold text-slate-900">{item.label}</div>
                     <div className="mt-0.5 text-xs text-slate-500">{item.url}{item.group ? ` · ${item.group}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => setEditing(true)} className="text-sm font-semibold text-slate-600 hover:text-slate-950">Edit</button>
-                    <button type="button" onClick={onDelete} className="text-sm font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={onDelete}>Remove</Button>
                 </div>
             </div>
         );
@@ -78,25 +81,23 @@ function LinkRow({ item, fields, onSave, onDelete }) {
 
     return (
         <form
-            onSubmit={(event) => {
-                event.preventDefault();
-                onSave(data, () => setEditing(false));
-            }}
+            onSubmit={(event) => { event.preventDefault(); onSave(data, () => setEditing(false)); }}
             className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 py-3 md:grid-cols-[1fr_1fr_auto]"
         >
             {fields.map((field) => (
-                <input key={field.key} className={inputClass} placeholder={field.label} value={data[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
+                <Input key={field.key} placeholder={field.label} value={data[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
             ))}
             <div className="flex gap-2">
-                <button disabled={processing} type="submit" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm">Save</button>
-                <button type="button" onClick={() => setEditing(false)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">Cancel</button>
+                <Button type="submit" variant="brand" size="sm" loading={processing}>Save</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
             </div>
         </form>
     );
 }
 
-function LinkListEditor({ title, subtitle, items, fields, storeRoute, updateRouteName, destroyRouteName }) {
+function LinkListEditor({ title, description, items, fields, storeRoute, updateRouteName, destroyRouteName }) {
     const { data, setData, post, processing, reset } = useForm(Object.fromEntries(fields.map((field) => [field.key, ''])));
+    const [removing, setRemoving] = useState(null);
 
     const addItem = (event) => {
         event.preventDefault();
@@ -104,14 +105,14 @@ function LinkListEditor({ title, subtitle, items, fields, storeRoute, updateRout
     };
 
     return (
-        <Panel title={title} subtitle={subtitle}>
+        <SectionCard title={title} description={description}>
             <div className="divide-y divide-slate-100">
                 {items.map((item) => (
                     <LinkRow
                         key={item.id}
                         item={item}
                         fields={fields}
-                        onDelete={() => window.confirm(`Remove "${item.label}"?`) && router.delete(route(destroyRouteName, item.id), { preserveScroll: true })}
+                        onDelete={() => setRemoving(item)}
                         onSave={(payload, done) => router.put(route(updateRouteName, item.id), payload, { preserveScroll: true, onSuccess: done })}
                     />
                 ))}
@@ -119,11 +120,20 @@ function LinkListEditor({ title, subtitle, items, fields, storeRoute, updateRout
             </div>
             <form onSubmit={addItem} className="mt-4 grid gap-3 rounded-md border border-dashed border-slate-300 p-3 md:grid-cols-[1fr_1fr_auto]">
                 {fields.map((field) => (
-                    <input key={field.key} className={inputClass} placeholder={field.label} value={data[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
+                    <Input key={field.key} placeholder={field.label} value={data[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
                 ))}
-                <button disabled={processing} className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm">Add</button>
+                <Button type="submit" variant="brand" size="sm" loading={processing}>Add</Button>
             </form>
-        </Panel>
+
+            <ConfirmDialog
+                open={!!removing}
+                title={`Remove "${removing?.label}"?`}
+                variant="danger"
+                confirmLabel="Remove"
+                onCancel={() => setRemoving(null)}
+                onConfirm={() => { router.delete(route(destroyRouteName, removing.id), { preserveScroll: true }); setRemoving(null); }}
+            />
+        </SectionCard>
     );
 }
 
@@ -145,49 +155,51 @@ function SettingsTab({ settings }) {
     ];
 
     return (
-        <Panel title="Site settings" subtitle="Used by the public site's header, footer, and metadata.">
-            <form onSubmit={submit} className="grid gap-5 md:grid-cols-2">
-                {fields.map((field) => (
-                    <label key={field.key} className="block">
-                        <span className="text-sm font-semibold text-slate-700">{field.label}</span>
-                        <input className={`${inputClass} mt-2`} value={data[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
-                        {errors[field.key] && <p className="mt-1 text-xs font-semibold text-rose-600">{errors[field.key]}</p>}
-                    </label>
-                ))}
-                <div className="md:col-span-2 flex items-center justify-end gap-3">
-                    {recentlySuccessful && <span className="text-xs font-semibold text-emerald-600">Saved</span>}
-                    <button disabled={processing} className="rounded-md bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Save settings</button>
+        <SectionCard title="Site settings" description="Used by the public site's header, footer, and metadata.">
+            <form onSubmit={submit}>
+                <div className="grid gap-5 md:grid-cols-2">
+                    {fields.map((field) => (
+                        <FormField key={field.key} id={field.key} label={field.label} error={errors[field.key]}>
+                            <Input id={field.key} value={data[field.key]} error={!!errors[field.key]} onChange={(event) => setData(field.key, event.target.value)} />
+                        </FormField>
+                    ))}
+                </div>
+                {data.primary_color && (
+                    <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+                        Preview: <span className="h-5 w-5 rounded border border-slate-200" style={{ backgroundColor: data.primary_color }} /> {data.primary_color}
+                    </div>
+                )}
+                <div className="mt-5 flex items-center justify-end gap-3">
+                    {recentlySuccessful && <span className="text-xs font-semibold text-brand-700">Saved</span>}
+                    <Button type="submit" variant="brand" loading={processing}>Save settings</Button>
                 </div>
             </form>
-        </Panel>
+        </SectionCard>
     );
 }
 
 export default function Index({ pages, navigation, footerLinks, settings }) {
     const [tab, setTab] = useState('pages');
-    const tabs = ['pages', 'navigation', 'footer', 'settings'];
+    const tabs = [
+        { value: 'pages', label: 'Pages' },
+        { value: 'navigation', label: 'Navigation' },
+        { value: 'footer', label: 'Footer' },
+        { value: 'settings', label: 'Branding' },
+    ];
 
     return (
         <AuthenticatedLayout header={<PageHeader title="Website" subtitle="Manage your public marketing site: pages, navigation, footer, and branding." />}>
             <Head title="Website" />
 
             <div className="space-y-6">
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-                    <div className="flex min-w-max gap-1">
-                        {tabs.map((item) => (
-                            <button key={item} type="button" onClick={() => setTab(item)} className={`rounded-md px-3 py-2 text-sm font-semibold capitalize transition ${tab === item ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-                                {item}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <Tabs items={tabs} active={tab} onChange={setTab} />
 
                 {tab === 'pages' && <PagesTab pages={pages} />}
 
                 {tab === 'navigation' && (
                     <LinkListEditor
                         title="Navigation"
-                        subtitle="Header menu links shown on every public page."
+                        description="Header menu links shown on every public page."
                         items={navigation}
                         fields={[{ key: 'label', label: 'Label' }, { key: 'url', label: 'URL' }]}
                         storeRoute="superadmin.website.navigation.store"
@@ -199,7 +211,7 @@ export default function Index({ pages, navigation, footerLinks, settings }) {
                 {tab === 'footer' && (
                     <LinkListEditor
                         title="Footer links"
-                        subtitle="Grouped links shown in the site footer."
+                        description="Grouped links shown in the site footer."
                         items={footerLinks}
                         fields={[{ key: 'label', label: 'Label' }, { key: 'url', label: 'URL' }, { key: 'group', label: 'Group (optional)' }]}
                         storeRoute="superadmin.website.footer-links.store"

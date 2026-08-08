@@ -38,6 +38,6 @@ class RegistrationTest extends TestCase
     {
         CentralUser::factory()->create();
 
-        $this->get('/')->assertInertia(fn ($page) => $page->where('canRegister', false));
+        $this->get('/')->assertInertia(fn ($page) => $page->missing('canRegister'));
     }
 }
