@@ -2,7 +2,7 @@ import Select from '@/Components/UI/Select';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Building2, Database, Layers, LayoutGrid, Shield, UserPlus, Users,
+    Building2, CalendarDays, Clock3, Layers, LayoutGrid, Settings, Shield, UserPlus, Users,
 } from 'lucide-react';
 
 const SECTIONS = [
@@ -17,6 +17,14 @@ const SECTIONS = [
             { label: 'Roles & permissions', route: 'tenant.admin.administration.roles.index', pattern: 'tenant.admin.administration.roles.*', icon: Shield, permission: 'roles.view' },
         ],
     },
+    {
+        label: 'Workspace settings',
+        items: [
+            { label: 'Workspace', route: 'tenant.admin.administration.workspace.edit', routeParams: ['general'], pattern: 'tenant.admin.administration.workspace.*', icon: Settings, permission: 'workspace.view' },
+            { label: 'Business hours', route: 'tenant.admin.administration.business-hours.index', pattern: 'tenant.admin.administration.business-hours.*', icon: Clock3, permission: 'workspace.view' },
+            { label: 'Holidays', route: 'tenant.admin.administration.holidays.index', pattern: 'tenant.admin.administration.holidays.*', icon: CalendarDays, permission: 'workspace.view' },
+        ],
+    },
 ];
 
 export default function AdministrationShell({ title, description, actions, children }) {
@@ -24,15 +32,16 @@ export default function AdministrationShell({ title, description, actions, child
     const can = (permission) => !permission || auth?.permissions?.includes(permission);
     const sections = SECTIONS.map((section) => ({ ...section, items: section.items.filter((item) => can(item.permission)) })).filter((section) => section.items.length);
     const flatItems = sections.flatMap((section) => section.items);
+    const itemHref = (item) => (item ? route(item.route, item.routeParams || undefined) : '');
 
     return (
         <AuthenticatedLayout title="Administration">
             <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
                 <div className="lg:hidden">
-                    <Select value={flatItems.find((item) => route().current(item.pattern))?.route || ''} onChange={(event) => router_visit(event.target.value)}>
+                    <Select value={itemHref(flatItems.find((item) => route().current(item.pattern)) || flatItems[0])} onChange={(event) => router_visit(event.target.value)} disabled={!flatItems.length}>
                         {sections.map((section) => (
                             <optgroup key={section.label} label={section.label}>
-                                {section.items.map((item) => <option key={item.route} value={item.route}>{item.label}</option>)}
+                                {section.items.map((item) => <option key={item.route} value={itemHref(item)}>{item.label}</option>)}
                             </optgroup>
                         ))}
                     </Select>
@@ -49,7 +58,7 @@ export default function AdministrationShell({ title, description, actions, child
                                     return (
                                         <Link
                                             key={item.route}
-                                            href={route(item.route)}
+                                            href={itemHref(item)}
                                             aria-current={isActive ? 'page' : undefined}
                                             className={`flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors ${
                                                 isActive ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-100 hover:text-navy-900'

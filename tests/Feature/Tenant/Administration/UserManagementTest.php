@@ -63,4 +63,46 @@ class UserManagementTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_seeded_tenant_administrator_can_access_administration_settings_modules(): void
+    {
+        [$tenant, $domain] = $this->createTenantWithDomain('cortifox');
+        $admin = $this->createTenantUser($tenant, ['name' => 'Cortifox Admin'], 'Tenant Administrator');
+
+        foreach ([
+            "http://{$domain}/administration",
+            "http://{$domain}/administration/workspace/general",
+            "http://{$domain}/administration/business-hours",
+            "http://{$domain}/administration/holidays",
+        ] as $url) {
+            $this->actingAs($admin, 'tenant')->get($url)->assertOk();
+        }
+    }
+
+    public function test_tenant_authorization_seeder_repairs_legacy_owner_role_assignments(): void
+    {
+        [$tenant] = $this->createTenantWithDomain();
+
+        tenancy()->initialize($tenant);
+
+        try {
+            $user = User::factory()->create(['status' => 'active', 'email_verified_at' => now()]);
+            $legacyRole = \App\Models\TenantRole::firstOrCreate(
+                ['name' => 'tenant_owner', 'guard_name' => 'tenant'],
+                ['label' => 'Tenant Owner']
+            );
+            $user->assignRole($legacyRole);
+
+            $this->assertFalse($user->can('users.view'));
+
+            $this->seed(\Database\Seeders\TenantAuthorizationSeeder::class);
+
+            $user->refresh();
+            $this->assertTrue($user->hasRole('Tenant Owner'));
+            $this->assertTrue($user->can('users.view'));
+            $this->assertTrue($user->can('workspace.view'));
+        } finally {
+            tenancy()->end();
+        }
+    }
 }

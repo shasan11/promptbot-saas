@@ -143,16 +143,46 @@ class RoleController extends Controller
             'audit_logs.export' => 'audit_logs.view',
             'security.update' => 'security.view',
             'security.revoke_sessions' => 'security.view_sessions',
+
+            // Knowledge Base. These form chains (documents.upload →
+            // sources.view → knowledge.view), which is why resolution below
+            // iterates to a fixpoint rather than making a single pass.
+            'knowledge.create' => 'knowledge.view',
+            'knowledge.update' => 'knowledge.view',
+            'knowledge.delete' => 'knowledge.view',
+            'knowledge.manage' => 'knowledge.update',
+            'knowledge.sources.view' => 'knowledge.view',
+            'knowledge.sources.create' => 'knowledge.sources.view',
+            'knowledge.sources.update' => 'knowledge.sources.view',
+            'knowledge.sources.delete' => 'knowledge.sources.view',
+            'knowledge.sync' => 'knowledge.sources.view',
+            'knowledge.reindex' => 'knowledge.sources.view',
+            'knowledge.documents.upload' => 'knowledge.sources.view',
+            'knowledge.documents.download' => 'knowledge.sources.view',
+            'knowledge.documents.delete' => 'knowledge.sources.view',
+            'knowledge.retrieval.test' => 'knowledge.view',
+            'knowledge.analytics.view' => 'knowledge.view',
+            'knowledge.permissions.manage' => 'knowledge.manage',
+            'knowledge.settings.manage' => 'knowledge.manage',
         ];
 
         $permissions = TenantPermission::query()->whereIn('id', $permissionIds)->get();
         $names = $permissions->pluck('name')->all();
 
-        foreach ($dependencies as $needs => $requires) {
-            if (in_array($needs, $names, true) && ! in_array($requires, $names, true)) {
-                $names[] = $requires;
+        // Iterate until nothing new is added. A single pass would only resolve
+        // dependencies that happen to be declared in the right order, silently
+        // granting a permission without the "view" it is meaningless (and, for
+        // policies that check the prerequisite, non-functional) without.
+        do {
+            $added = false;
+
+            foreach ($dependencies as $needs => $requires) {
+                if (in_array($needs, $names, true) && ! in_array($requires, $names, true)) {
+                    $names[] = $requires;
+                    $added = true;
+                }
             }
-        }
+        } while ($added);
 
         return TenantPermission::query()->whereIn('name', array_unique($names))->get();
     }

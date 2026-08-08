@@ -32,8 +32,8 @@ class HandleInertiaRequests extends Middleware
             'platform' => fn () => app(PlatformSettingsService::class)->publicBranding(),
             'tenant' => fn () => tenancy()->initialized ? [
                 'id' => tenant('id'),
-                'companyName' => tenant('company_name'),
-                'logoUrl' => Setting::query()->where('key', 'branding')->value('value')['logo'] ?? null,
+                'companyName' => Setting::query()->where('key', 'general.workspace_name')->value('value')['value'] ?? tenant('company_name'),
+                'logoUrl' => Setting::query()->where('key', 'branding.logo')->value('value')['value'] ?? null,
             ] : null,
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),

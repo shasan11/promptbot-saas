@@ -10,7 +10,9 @@ class TenantDatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(TenantAuthorizationSeeder::class);
+        $this->call(ConnectionIntegrationSeeder::class);
 
-        Setting::firstOrCreate(['key' => 'branding'], ['value' => ['logo' => null, 'sender_name' => tenant('company_name')]]);
+        Setting::firstOrCreate(['key' => 'general.workspace_name'], ['value' => ['value' => tenant('company_name')]]);
+        Setting::firstOrCreate(['key' => 'branding.sender_name'], ['value' => ['value' => tenant('company_name')]]);
     }
 }

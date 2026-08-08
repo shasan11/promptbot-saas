@@ -28,7 +28,7 @@ export default function Dashboard({ tenant, stats = {}, recentUsers = [] }) {
     const hasRoles = (stats.roles ?? 0) > 0;
     const checklist = [
         { label: 'Workspace provisioned', done: true },
-        { label: 'Company settings configured', done: hasSettingsConfigured, href: route('tenant.admin.settings.edit') },
+        { label: 'Company settings configured', done: hasSettingsConfigured, href: route('tenant.admin.administration.workspace.edit', 'general') },
         { label: 'Team roles available', done: hasRoles, href: route('tenant.admin.users.index') },
         { label: 'Team members invited', done: (stats.users ?? 0) > 1, href: route('tenant.admin.users.index') },
     ];
@@ -100,7 +100,7 @@ export default function Dashboard({ tenant, stats = {}, recentUsers = [] }) {
                     <SectionCard title="Quick actions">
                         <div className="space-y-2">
                             <Button href={route('tenant.admin.users.index')} variant="secondary" icon={UsersIcon} className="w-full justify-start">Manage users</Button>
-                            <Button href={route('tenant.admin.settings.edit')} variant="secondary" icon={SettingsIcon} className="w-full justify-start">Workspace settings</Button>
+                            <Button href={route('tenant.admin.administration.workspace.edit', 'general')} variant="secondary" icon={SettingsIcon} className="w-full justify-start">Workspace settings</Button>
                         </div>
                     </SectionCard>
 
@@ -108,7 +108,7 @@ export default function Dashboard({ tenant, stats = {}, recentUsers = [] }) {
                         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                             <p className="flex items-center gap-2 font-semibold"><Shield className="h-4 w-4" /> Finish workspace setup</p>
                             <p className="mt-1 text-xs text-amber-700/90">Company identity and mail sender settings aren't configured yet.</p>
-                            <Button href={route('tenant.admin.settings.edit')} variant="secondary" size="sm" className="mt-3">Go to settings</Button>
+                            <Button href={route('tenant.admin.administration.workspace.edit', 'general')} variant="secondary" size="sm" className="mt-3">Go to settings</Button>
                         </div>
                     )}
                 </div>

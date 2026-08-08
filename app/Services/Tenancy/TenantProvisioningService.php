@@ -169,7 +169,7 @@ class TenantProvisioningService
                 ]
             );
             $owner->assignRole('Tenant Owner');
-            Setting::firstOrCreate(['key' => 'company.name'], ['value' => ['value' => $tenant->company_name]]);
+            Setting::firstOrCreate(['key' => 'general.workspace_name'], ['value' => ['value' => $tenant->company_name]]);
         } finally {
             tenancy()->end();
         }

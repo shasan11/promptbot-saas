@@ -24,7 +24,7 @@ trait InteractsWithTenancy
 
     protected function createTenantWithDomain(?string $slug = null): array
     {
-        $slug ??= 'test-'.Str::random(8);
+        $slug ??= 'test-'.Str::lower(Str::random(8));
         $database = 'tenant_'.str_replace('-', '_', $slug);
 
         DB::connection('tenant_template')->statement("CREATE DATABASE IF NOT EXISTS `{$database}`");

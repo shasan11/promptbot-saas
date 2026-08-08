@@ -3,13 +3,14 @@ import Avatar from '@/Components/UI/Avatar';
 import DropdownMenu from '@/Components/UI/DropdownMenu';
 import SuperadminLayout from '@/Layouts/SuperadminLayout';
 import { Link, router, usePage } from '@inertiajs/react';
-import { LayoutDashboard, LogOut, Menu, ShieldCheck, Settings, User, X } from 'lucide-react';
+import { Cable, LayoutDashboard, Library, LogOut, Menu, ShieldCheck, User, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navigation = [
     { label: 'Dashboard', routeName: 'tenant.admin.dashboard', active: 'tenant.admin.dashboard', icon: LayoutDashboard },
+    { label: 'Knowledge base', routeName: 'tenant.admin.knowledge.index', active: 'tenant.admin.knowledge.*', icon: Library, permission: 'knowledge.view' },
     { label: 'Administration', routeName: 'tenant.admin.administration.index', active: 'tenant.admin.administration.*', icon: ShieldCheck },
-    { label: 'Settings', routeName: 'tenant.admin.settings.edit', active: 'tenant.admin.settings.*', icon: Settings },
+    { label: 'Connections', routeName: 'tenant.admin.connections.overview', active: 'tenant.admin.connections.*', icon: Cable, permission: 'connections.view' },
 ];
 
 function Brand({ tenant }) {
@@ -46,13 +47,16 @@ function NavItem({ item, onNavigate }) {
 }
 
 function Sidebar({ tenant, user, onNavigate }) {
+    const { auth } = usePage().props;
+    const visibleNavigation = navigation.filter((item) => !item.permission || auth?.permissions?.includes(item.permission));
+
     return (
         <div className="flex h-full flex-col bg-white">
             <div className="flex h-header items-center border-b border-slate-200 px-4"><Brand tenant={tenant} /></div>
             <div className="flex-1 overflow-y-auto px-2 py-3">
                 <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Workspace</p>
                 <nav className="space-y-0.5" aria-label="Tenant navigation">
-                    {navigation.map((item) => <NavItem key={item.routeName} item={item} onNavigate={onNavigate} />)}
+                    {visibleNavigation.map((item) => <NavItem key={item.routeName} item={item} onNavigate={onNavigate} />)}
                 </nav>
             </div>
             <div className="border-t border-slate-200 p-3">
