@@ -51,4 +51,9 @@ class ConnectionResource extends Model
     {
         return $this->hasMany(DataSource::class);
     }
+
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(ConnectionResourcePermission::class);
+    }
 }

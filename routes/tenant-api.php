@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use App\Http\Controllers\Tenant\Api\V1\ConnectionUsageController;
+use App\Http\Controllers\Tenant\Api\V1\ResourceController;
 
 Route::middleware([
     InitializeTenancyByDomain::class,
@@ -13,4 +15,10 @@ Route::middleware([
         'tenant_id' => tenant('id'),
         'status' => tenant('status')?->value ?? tenant('status'),
     ]);
+    Route::prefix('v1')->middleware('throttle:120,1')->group(function (): void {
+        Route::get('contacts', [ResourceController::class, 'contacts'])->middleware('developer.key:contacts.read');
+        Route::get('conversations', [ResourceController::class, 'conversations'])->middleware('developer.key:conversations.read');
+        Route::get('tickets', [ResourceController::class, 'tickets'])->middleware('developer.key:tickets.read');
+        Route::get('connections/{connection}/usage', [ConnectionUsageController::class, 'show'])->middleware('developer.key:reports.read');
+    });
 });

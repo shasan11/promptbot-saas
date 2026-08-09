@@ -55,6 +55,5 @@
 - Email sender and reply-to identity.
 - SMTP transport and test-email delivery.
 - Payment defaults and encrypted provider credentials.
-- AI provider, model, API endpoint/key, embeddings, vector store, and RAG chunk/retrieval settings.
 - Logos, favicon, colors, company name, email logo, and footer copy.
-- Runtime application of platform identity, localization, mail, payment, AI/RAG, and branding configuration.
+- Runtime application of platform identity, localization, mail, payment, and branding configuration.

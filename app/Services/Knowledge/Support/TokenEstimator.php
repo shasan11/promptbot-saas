@@ -8,8 +8,8 @@ namespace App\Services\Knowledge\Support;
  * Every consumer of this class uses it for *budgeting* — chunk sizes, context
  * windows, cost projections — never for anything that must be exact. The
  * character-per-token ratio is configurable because it varies by script: ~4 for
- * English, closer to 1.5 for CJK. Where a provider reports real usage (OpenAI
- * does), that figure is preferred over this estimate for cost accounting.
+ * English and closer to 1.5 for CJK. It is used only for deterministic local
+ * processing limits and approximate usage reporting.
  */
 final class TokenEstimator
 {

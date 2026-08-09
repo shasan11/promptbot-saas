@@ -8,6 +8,7 @@ use App\Enums\Connections\ConnectionStatus;
 use App\Enums\Connections\ConnectionType;
 use App\Enums\Connections\CredentialStatus;
 use App\Enums\Connections\Environment;
+use App\Enums\Connections\SyncStatus;
 use App\Models\Connections\Concerns\BelongsToTenant;
 use App\Models\Connections\Concerns\HasUuid;
 use App\Models\Team;
@@ -15,6 +16,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Connection extends Model
@@ -93,6 +95,25 @@ class Connection extends Model
         return $this->hasMany(SyncRun::class);
     }
 
+    public function latestFailedSyncRun(): HasOne
+    {
+        return $this->hasOne(SyncRun::class)
+            ->whereIn('status', [
+                SyncStatus::Failed->value,
+                SyncStatus::CompletedWithErrors->value,
+                SyncStatus::RateLimited->value,
+                SyncStatus::WaitingForAuth->value,
+            ])
+            ->latestOfMany();
+    }
+
+    public function latestSuccessfulSyncRun(): HasOne
+    {
+        return $this->hasOne(SyncRun::class)
+            ->where('status', SyncStatus::Completed->value)
+            ->latestOfMany();
+    }
+
     public function logs(): HasMany
     {
         return $this->hasMany(ConnectionLog::class);
@@ -121,6 +142,11 @@ class Connection extends Model
     public function actions(): HasMany
     {
         return $this->hasMany(ConnectionAction::class);
+    }
+
+    public function mcpTools(): HasMany
+    {
+        return $this->hasMany(ConnectionAction::class)->where('action_type', 'mcp_tool');
     }
 
     public function triggers(): HasMany

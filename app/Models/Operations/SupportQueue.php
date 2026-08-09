@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Operations; use App\Models\Concerns\HasPublicUuid; use App\Models\Team; use App\Models\User; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+class SupportQueue extends Model {use HasPublicUuid;protected $fillable=['name','description','team_id','priority','active','assignment_method','capacity','channel_scope','conditions','last_assigned_user_id','created_by'];protected function casts():array{return ['active'=>'boolean','channel_scope'=>'array','conditions'=>'array'];}public function team():BelongsTo{return $this->belongsTo(Team::class);}public function creator():BelongsTo{return $this->belongsTo(User::class,'created_by');}}

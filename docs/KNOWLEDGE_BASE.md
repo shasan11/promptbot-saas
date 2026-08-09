@@ -1,23 +1,23 @@
 # Knowledge Base Module
 
-PromptBot's Knowledge Base module is the tenant-local RAG layer used by agents, support workflows, automations, and admins.
+PromptBot's Knowledge Base module is the tenant-local searchable content library used by agents, support workflows, automations, and admins.
 
 ## Architecture
 
 - Tenant isolation is database-per-tenant through `stancl/tenancy`; knowledge rows live in tenant migrations under `database/migrations/tenant`.
 - Knowledge bases are containers. Sources describe where knowledge came from. Documents, website pages, FAQs, and manual text hold source content. Chunks are the retrieval units.
 - Retrieval is always scoped before search through `App\Services\Knowledge\KnowledgePermissionService`.
-- Vectors are stored by `App\Contracts\Knowledge\VectorStoreInterface`; the shipped implementation is MySQL-backed exact search.
-- Embeddings are provided by `App\Contracts\Knowledge\EmbeddingProviderInterface`; local hash embeddings are available for development and OpenAI embeddings can be enabled by configuration.
+- Deterministic token signatures are stored by `App\Contracts\Knowledge\VectorStoreInterface`; the implementation is MySQL-backed exact search.
+- Token signatures are produced locally with no API key, external intelligence provider, or generated content.
 
 ## Main Flows
 
 1. Tenant admin creates a knowledge base.
 2. Admin adds content through uploaded documents, manual text, FAQs, or website sources.
 3. Content enters queued processing jobs.
-4. The pipeline extracts or reads text, normalizes it, detects language, chunks it, and queues embeddings.
-5. Embedded chunks become retrievable.
-6. Retrieval playground and agent callers search through permission-filtered semantic, keyword, or hybrid retrieval.
+4. The pipeline extracts or reads text, normalizes it, detects language, chunks it, and queues deterministic token indexing.
+5. Indexed chunks become searchable.
+6. The search playground and agent callers use permission-filtered keyword or token-similarity search.
 7. Retrieval logs, usage records, gaps, failures, and processing logs support analytics and operations.
 
 ## HTTP Surfaces

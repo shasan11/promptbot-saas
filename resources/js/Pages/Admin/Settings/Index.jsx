@@ -12,7 +12,7 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { ImageOff, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-const SENSITIVE_GROUPS = ['security', 'payment', 'ai_rag'];
+const SENSITIVE_GROUPS = ['security', 'payment'];
 
 function ColorField({ value, disabled, onChange }) {
     const hex = /^#[0-9A-Fa-f]{6}$/.test(value ?? '') ? value : '#000000';
@@ -160,7 +160,7 @@ function GroupForm({ group, canUpdate }) {
                 onCancel={() => setConfirmOpen(false)}
                 onConfirm={() => { setConfirmOpen(false); performSave(); }}
             >
-                Changing {group.key === 'security' ? 'security settings' : group.key === 'payment' ? 'payment credentials' : 'AI/RAG credentials'} can affect platform access or billing behavior for every tenant. Confirm you want to save these changes.
+                Changing {group.key === 'security' ? 'security settings' : group.key === 'payment' ? 'payment credentials' : 'platform settings'} can affect platform access or billing behavior for every tenant. Confirm you want to save these changes.
             </ConfirmDialog>
         </form>
     );
@@ -201,7 +201,7 @@ export default function Index({ groups = [] }) {
     const activeGroup = groups.find((group) => group.key === activeKey) || groups[0];
 
     return (
-        <AuthenticatedLayout header={<PageHeader title="General settings" subtitle="Configure platform identity, security, email, mail delivery, payments, AI/RAG, and branding." />}>
+        <AuthenticatedLayout header={<PageHeader title="General settings" subtitle="Configure platform identity, security, email, mail delivery, payments, and branding." />}>
             <Head title="General settings" />
 
             <div className="mx-auto max-w-6xl">

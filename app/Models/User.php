@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Operations\AgentPresence;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -67,6 +69,11 @@ class User extends Authenticatable
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_user')->withTimestamps();
+    }
+
+    public function presence(): HasOne
+    {
+        return $this->hasOne(AgentPresence::class);
     }
 
     public function suspendedBy(): BelongsTo

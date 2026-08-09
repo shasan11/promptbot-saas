@@ -10,7 +10,7 @@
 - Date-filtered reports and CSV exports
 - Section-based website customization
 - System health and queue/cache actions
-- Runtime general, security, email, mail, payment, AI/RAG, and branding settings
+- Runtime general, security, email, mail, payment, and branding settings
 
 ## Quality improvements
 

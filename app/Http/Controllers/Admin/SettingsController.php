@@ -322,31 +322,6 @@ class SettingsController extends Controller
                     'gateway_webhook_secret' => ['label' => 'Webhook signing secret', 'type' => 'password', 'sensitive' => true, 'rules' => ['sometimes', 'nullable', 'string', 'max:4096']],
                 ],
             ],
-            'ai_rag' => [
-                'title' => 'AI & RAG',
-                'description' => 'Model provider, embeddings, retrieval, chunking, and encrypted API credentials.',
-                'fields' => [
-                    'ai_provider' => ['label' => 'AI provider', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:openai,anthropic,google,custom'], 'options' => [
-                        ['value' => 'openai', 'label' => 'OpenAI'],
-                        ['value' => 'anthropic', 'label' => 'Anthropic'],
-                        ['value' => 'google', 'label' => 'Google'],
-                        ['value' => 'custom', 'label' => 'Custom / OpenAI-compatible'],
-                    ]],
-                    'ai_model' => ['label' => 'Default chat model', 'rules' => ['sometimes', 'required', 'string', 'max:255']],
-                    'ai_base_url' => ['label' => 'Custom API base URL', 'type' => 'url', 'rules' => ['sometimes', 'nullable', 'url', 'max:500']],
-                    'ai_api_key' => ['label' => 'AI API key', 'type' => 'password', 'sensitive' => true, 'rules' => ['sometimes', 'nullable', 'string', 'max:4096']],
-                    'embedding_model' => ['label' => 'Embedding model', 'rules' => ['sometimes', 'required', 'string', 'max:255']],
-                    'rag_vector_store' => ['label' => 'Vector store', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:pgvector,pinecone,qdrant,weaviate'], 'options' => [
-                        ['value' => 'pgvector', 'label' => 'PostgreSQL / pgvector'],
-                        ['value' => 'pinecone', 'label' => 'Pinecone'],
-                        ['value' => 'qdrant', 'label' => 'Qdrant'],
-                        ['value' => 'weaviate', 'label' => 'Weaviate'],
-                    ]],
-                    'rag_top_k' => ['label' => 'Retrieved chunks (top K)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:1', 'max:100']],
-                    'rag_chunk_size' => ['label' => 'Chunk size', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:100', 'max:10000']],
-                    'rag_chunk_overlap' => ['label' => 'Chunk overlap', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:5000']],
-                ],
-            ],
             'branding' => [
                 'title' => 'Branding',
                 'description' => 'Logos, colors, company naming, email identity, and footer copy.',

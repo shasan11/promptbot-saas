@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Tenant\Admin\Connections;
 
 use App\Http\Controllers\Controller;
+use App\Enums\Connections\ConnectionHealth;
+use App\Enums\Connections\SyncStatus;
 use App\Models\Connections\Connection;
 use App\Models\Connections\ConnectionCredential;
 use App\Models\Connections\ConnectionLog;
@@ -17,12 +19,39 @@ class OperationsController extends Controller
 {
     public function api(Request $request): Response
     {
-        return $this->connectionsByType($request, 'connections.api.view', 'api', 'Tenant/Admin/Connections/API/Index');
+        abort_unless($request->user('tenant')?->can('connections.api.view'), 403);
+
+        return Inertia::render('Tenant/Admin/Connections/API/Index', [
+            'connections' => Connection::query()
+                ->with([
+                    'integration:id,name,key,provider,capabilities',
+                    'apiOperations' => fn ($query) => $query->latest(),
+                ])
+                ->where('connection_type', 'api')
+                ->latest()
+                ->paginate(15),
+            'riskLevels' => ['low', 'medium', 'high', 'critical'],
+            'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        ]);
     }
 
     public function databases(Request $request): Response
     {
-        return $this->connectionsByType($request, 'connections.databases.view', 'database', 'Tenant/Admin/Connections/Databases/Index');
+        abort_unless($request->user('tenant')?->can('connections.databases.view'), 403);
+
+        return Inertia::render('Tenant/Admin/Connections/Databases/Index', [
+            'connections' => Connection::query()
+                ->with([
+                    'integration:id,name,key,provider,capabilities',
+                    'dataSources' => fn ($query) => $query
+                        ->with('databaseConfig')
+                        ->whereIn('resource_type', ['database_table', 'database_view'])
+                        ->latest(),
+                ])
+                ->where('connection_type', 'database')
+                ->latest()
+                ->paginate(15),
+        ]);
     }
 
     public function webhooks(Request $request): Response
@@ -37,7 +66,27 @@ class OperationsController extends Controller
 
     public function mcp(Request $request): Response
     {
-        return $this->connectionsByType($request, 'connections.mcp.view', 'mcp_server', 'Tenant/Admin/Connections/MCP/Index');
+        abort_unless($request->user('tenant')?->can('connections.mcp.view'), 403);
+
+        return Inertia::render('Tenant/Admin/Connections/MCP/Index', [
+            'connections' => Connection::query()
+                ->with([
+                    'integration:id,name,key,provider,capabilities',
+                    'mcpTools' => fn ($query) => $query->orderByDesc('enabled_for_ai')->orderBy('risk_level')->orderBy('name'),
+                    'resources' => fn ($query) => $query->latest('discovered_at')->limit(8),
+                ])
+                ->withCount([
+                    'mcpTools',
+                    'mcpTools as enabled_mcp_tools_count' => fn ($query) => $query->where(function ($query): void {
+                        $query->where('enabled_for_ai', true)->orWhere('enabled_for_workflows', true);
+                    }),
+                    'resources',
+                ])
+                ->where('connection_type', 'mcp_server')
+                ->latest()
+                ->paginate(15),
+            'riskLevels' => ['low', 'medium', 'high', 'critical'],
+        ]);
     }
 
     public function syncJobs(Request $request): Response
@@ -53,8 +102,14 @@ class OperationsController extends Controller
     {
         abort_unless($request->user('tenant')?->can('connections.logs.view'), 403);
 
+        $query = ConnectionLog::query()
+            ->with('connection.integration:id,name,key')
+            ->when($request->integer('connection'), fn ($query, int $connectionId) => $query->where('connection_id', $connectionId))
+            ->latest('created_at');
+
         return Inertia::render('Tenant/Admin/Connections/Logs/Index', [
-            'logs' => ConnectionLog::query()->with('connection.integration:id,name,key')->latest('created_at')->paginate(20),
+            'logs' => $query->paginate(20)->withQueryString(),
+            'filters' => $request->only('connection'),
         ]);
     }
 
@@ -62,8 +117,31 @@ class OperationsController extends Controller
     {
         abort_unless($request->user('tenant')?->can('connections.view'), 403);
 
+        $failedSyncStatuses = [
+            SyncStatus::Failed->value,
+            SyncStatus::CompletedWithErrors->value,
+            SyncStatus::RateLimited->value,
+            SyncStatus::WaitingForAuth->value,
+        ];
+
         return Inertia::render('Tenant/Admin/Connections/Failed/Index', [
-            'connections' => Connection::query()->with('integration:id,name,key,provider')->whereIn('health_status', ['needs_attention', 'authentication_expired', 'rate_limited', 'error'])->latest('last_error_at')->paginate(15),
+            'connections' => Connection::query()
+                ->with([
+                    'integration:id,name,key,provider',
+                    'latestFailedSyncRun',
+                    'latestSuccessfulSyncRun',
+                ])
+                ->withCount([
+                    'syncRuns as failed_sync_runs_count' => fn ($query) => $query->whereIn('status', $failedSyncStatuses),
+                ])
+                ->whereIn('health_status', [
+                    ConnectionHealth::NeedsAttention->value,
+                    ConnectionHealth::AuthenticationExpired->value,
+                    ConnectionHealth::RateLimited->value,
+                    ConnectionHealth::Error->value,
+                ])
+                ->latest('last_error_at')
+                ->paginate(15),
         ]);
     }
 

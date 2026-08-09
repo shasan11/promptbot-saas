@@ -40,7 +40,6 @@ class PlatformSettingsService
         $email = $this->group('email');
         $mail = $this->group('mail');
         $payment = $this->group('payment');
-        $aiRag = $this->group('ai_rag');
         $branding = $this->group('branding');
         $encryption = filled($mail['smtp_encryption'] ?? null) ? $mail['smtp_encryption'] : null;
 
@@ -84,7 +83,6 @@ class PlatformSettingsService
             'platform.support_email' => $general['support_email'] ?? null,
             'platform.default_currency' => strtoupper((string) ($general['default_currency'] ?? 'USD')),
             'platform.payment' => $payment,
-            'platform.ai_rag' => $aiRag,
             'platform.branding' => $branding,
         ]);
     }

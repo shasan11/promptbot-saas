@@ -38,7 +38,7 @@ class InboundWebhookController extends Controller
                 [
                     'tenant_id' => tenant('id'),
                     'connection_id' => $endpoint->connection_id,
-                    'event_type' => (string) ($request->header('X-Event-Type') ?? data_get($validated['payload'], 'type') ?? 'webhook.received'),
+                    'event_type' => $validated['event_type'],
                     'status' => 'received',
                     'http_method' => $request->method(),
                     'headers' => $redactor->redact($request->headers->all()),

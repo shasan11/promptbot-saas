@@ -1,0 +1,3 @@
+<?php
+namespace App\Services\Ticket; use Illuminate\Support\Facades\DB;
+class TicketNumberService { public function next():string { DB::table('ticket_sequences')->insertOrIgnore(['key'=>'tickets','current_value'=>0,'created_at'=>now(),'updated_at'=>now()]); $row=DB::table('ticket_sequences')->where('key','tickets')->lockForUpdate()->first(); $next=$row->current_value+1; DB::table('ticket_sequences')->where('key','tickets')->update(['current_value'=>$next,'updated_at'=>now()]); $stored=\App\Models\Setting::query()->where('key','ticket_prefix')->value('value'); $prefix=is_array($stored)?($stored['prefix']??$stored[0]??'TKT'):($stored?:'TKT'); return strtoupper(preg_replace('/[^A-Z0-9]/i','',(string)$prefix)?:'TKT').'-'.str_pad((string)$next,6,'0',STR_PAD_LEFT); } }

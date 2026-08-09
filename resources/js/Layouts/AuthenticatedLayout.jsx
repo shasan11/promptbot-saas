@@ -3,11 +3,26 @@ import Avatar from '@/Components/UI/Avatar';
 import DropdownMenu from '@/Components/UI/DropdownMenu';
 import SuperadminLayout from '@/Layouts/SuperadminLayout';
 import { Link, router, usePage } from '@inertiajs/react';
-import { Cable, LayoutDashboard, Library, LogOut, Menu, ShieldCheck, User, X } from 'lucide-react';
+import { BarChart3, Bell, Building2, Cable, CalendarClock, CheckSquare, Code2, Gauge, Globe2, Inbox, LayoutDashboard, Library, LogOut, Menu, MessagesSquare, Search, ShieldCheck, Star, TicketCheck, User, UsersRound, Workflow, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navigation = [
     { label: 'Dashboard', routeName: 'tenant.admin.dashboard', active: 'tenant.admin.dashboard', icon: LayoutDashboard },
+    { label: 'Search', routeName: 'tenant.admin.search', active: 'tenant.admin.search', icon: Search },
+    { label: 'Notifications', routeName: 'tenant.admin.notifications.index', active: 'tenant.admin.notifications.*', icon: Bell },
+    { label: 'Inbox', routeName: 'tenant.admin.inbox.index', active: 'tenant.admin.inbox.*', icon: Inbox, permission: 'inbox.view' },
+    { label: 'Tickets', routeName: 'tenant.admin.tickets.index', active: 'tenant.admin.tickets.*', icon: TicketCheck, permission: 'tickets.view' },
+    { label: 'Tasks', routeName: 'tenant.admin.tasks.index', active: 'tenant.admin.tasks.*', icon: CheckSquare, permission: 'tasks.view' },
+    { label: 'Operations', routeName: 'tenant.admin.operations.index', active: 'tenant.admin.operations.*', icon: Gauge, permission: 'operations.view' },
+    { label: 'Automation', routeName: 'tenant.admin.automation.index', active: 'tenant.admin.automation.*', icon: Workflow, permission: 'automation.view' },
+    { label: 'Experience', routeName: 'tenant.admin.experience.index', active: 'tenant.admin.experience.*', icon: Globe2, permission: 'experience.view' },
+    { label: 'Reports', routeName: 'tenant.admin.reports.index', active: 'tenant.admin.reports.*', icon: BarChart3, permission: 'reports.view' },
+    { label: 'Developer & security', routeName: 'tenant.admin.governance.index', active: 'tenant.admin.governance.*', icon: Code2, permission: 'governance.view' },
+    { label: 'Quality', routeName: 'tenant.admin.quality.index', active: 'tenant.admin.quality.*', icon: Star, permission: 'quality.view' },
+    { label: 'Workforce', routeName: 'tenant.admin.workforce.index', active: 'tenant.admin.workforce.*', icon: CalendarClock, permission: 'workforce.view' },
+    { label: 'Contacts', routeName: 'tenant.admin.customers.contacts.index', active: 'tenant.admin.customers.contacts.*', icon: UsersRound, permission: 'customers.view' },
+    { label: 'Companies', routeName: 'tenant.admin.customers.companies.index', active: 'tenant.admin.customers.companies.*', icon: Building2, permission: 'companies.view' },
+    { label: 'Channels', routeName: 'tenant.admin.channels.index', active: 'tenant.admin.channels.*', icon: MessagesSquare, permission: 'channels.view' },
     { label: 'Knowledge base', routeName: 'tenant.admin.knowledge.index', active: 'tenant.admin.knowledge.*', icon: Library, permission: 'knowledge.view' },
     { label: 'Administration', routeName: 'tenant.admin.administration.index', active: 'tenant.admin.administration.*', icon: ShieldCheck },
     { label: 'Connections', routeName: 'tenant.admin.connections.overview', active: 'tenant.admin.connections.*', icon: Cable, permission: 'connections.view' },

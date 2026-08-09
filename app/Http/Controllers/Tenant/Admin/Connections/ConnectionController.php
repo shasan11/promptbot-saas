@@ -11,6 +11,7 @@ use App\Enums\Connections\Environment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Connections\ConnectionActionExecuteRequest;
 use App\Http\Requests\Tenant\Connections\ConnectionStoreRequest;
+use App\Http\Requests\Tenant\Connections\ConnectionUpdateRequest;
 use App\Jobs\Connections\DiscoverConnectionResourcesJob;
 use App\Jobs\Connections\RunConnectionSyncJob;
 use App\Jobs\Connections\TestConnectionJob;
@@ -21,6 +22,7 @@ use App\Services\Connections\ConnectionAuditService;
 use App\Services\Connections\ConnectionActionExecutionService;
 use App\Services\Connections\ConnectionLifecycleService;
 use App\Services\Connections\CredentialVault;
+use App\Services\Connections\SyncRecoveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -96,6 +98,29 @@ class ConnectionController extends Controller
         return redirect()->route('tenant.admin.connections.show', $connection)->with('status', 'Connection created.');
     }
 
+    public function edit(Request $request, Connection $connection): Response
+    {
+        abort_unless($request->user('tenant')?->can('connections.update'), 403);
+
+        return Inertia::render('Tenant/Admin/Connections/Connections/Edit', [
+            'connection' => $connection->load('integration:id,name,key,provider'),
+            'connectionTypes' => array_map(fn ($case) => $case->value, ConnectionType::cases()),
+            'environments' => array_map(fn ($case) => $case->value, Environment::cases()),
+        ]);
+    }
+
+    public function update(ConnectionUpdateRequest $request, Connection $connection, ConnectionAuditService $audit): RedirectResponse
+    {
+        $connection->forceFill([
+            ...$request->validated(),
+            'updated_by' => $request->user('tenant')?->id,
+        ])->save();
+
+        $audit->record('connection.updated', $connection, $request->user('tenant'), message: 'Connection settings updated.');
+
+        return redirect()->route('tenant.admin.connections.show', $connection)->with('status', 'Connection updated.');
+    }
+
     public function show(Request $request, Connection $connection, ConnectionLifecycleService $lifecycle): Response
     {
         abort_unless($request->user('tenant')?->can('connections.view'), 403);
@@ -165,6 +190,61 @@ class ConnectionController extends Controller
         RunConnectionSyncJob::dispatch($connection->id, null, $request->user('tenant')?->id);
 
         return back()->with('status', 'Sync queued.');
+    }
+
+    public function reconnect(Request $request, Connection $connection, ConnectionAuditService $audit): RedirectResponse
+    {
+        abort_unless($request->user('tenant')?->can('connections.reconnect'), 403);
+
+        $hasActiveCredential = $connection->credentials()
+            ->where('status', CredentialStatus::Active->value)
+            ->exists();
+        $requiresCredential = $connection->auth_type !== AuthenticationType::None
+            && (! $hasActiveCredential || in_array($connection->credential_status, [
+                CredentialStatus::Expired,
+                CredentialStatus::Revoked,
+                CredentialStatus::Missing,
+            ], true));
+
+        $connection->forceFill([
+            'status' => $requiresCredential ? ConnectionStatus::AuthenticationRequired : ConnectionStatus::Connecting,
+            'health_status' => $requiresCredential ? ConnectionHealth::AuthenticationExpired : ConnectionHealth::NeedsAttention,
+            'last_error_at' => now(),
+            'last_error_code' => $requiresCredential ? 'AUTHENTICATION_REQUIRED' : null,
+            'last_error_message' => $requiresCredential
+                ? 'Reconnect requires fresh credentials before sync can resume.'
+                : 'Reconnect validation queued.',
+            'updated_by' => $request->user('tenant')?->id,
+        ])->save();
+
+        if (! $requiresCredential) {
+            TestConnectionJob::dispatch($connection->id, $request->user('tenant')?->id);
+        }
+
+        $audit->record('connection.reconnect_requested', $connection, $request->user('tenant'), message: $connection->last_error_message, context: [
+            'requires_credentials' => $requiresCredential,
+        ], level: 'warning');
+
+        return back()->with($requiresCredential ? 'error' : 'status', $requiresCredential ? 'Reconnect requires updated credentials.' : 'Reconnect validation queued.');
+    }
+
+    public function retryFailedSync(Request $request, Connection $connection, SyncRecoveryService $recovery): RedirectResponse
+    {
+        abort_unless($request->user('tenant')?->can('connections.sync.run'), 403);
+
+        $syncRun = $connection->latestFailedSyncRun()->first();
+
+        if (! $syncRun) {
+            return back()->with('error', 'No failed sync run is available to retry.');
+        }
+
+        try {
+            $recovery->retry($syncRun, $request->user('tenant'));
+        } catch (InvalidArgumentException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('status', 'Latest failed sync retry queued.');
     }
 
     public function disable(Request $request, Connection $connection, ConnectionAuditService $audit): RedirectResponse

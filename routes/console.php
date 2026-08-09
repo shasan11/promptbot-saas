@@ -28,3 +28,15 @@ Schedule::command('knowledge:release-stale-jobs')
     ->hourly()
     ->withoutOverlapping(10)
     ->runInBackground();
+
+Schedule::command('inbox:release-snoozed')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
+Schedule::command('sla:evaluate')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
+Schedule::command('webhooks:deliver')->everyMinute()->withoutOverlapping(5)->runInBackground();

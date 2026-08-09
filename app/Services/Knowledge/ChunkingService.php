@@ -10,9 +10,8 @@ use App\Services\Knowledge\Support\TokenEstimator;
 /**
  * Splits extracted content into retrieval units.
  *
- * Chunking quality sets the ceiling on RAG quality, and the failure modes pull
- * in opposite directions: chunks that are too large dilute the embedding until
- * nothing matches strongly, chunks that are too small lose the context that
+ * Chunking quality sets the ceiling on search quality. Chunks that are too
+ * large dilute token matches, while chunks that are too small lose context that
  * makes an answer usable ("30 days" is worthless without "refund window").
  *
  * Every strategy here therefore obeys the same two rules:

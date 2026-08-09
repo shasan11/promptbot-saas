@@ -45,7 +45,6 @@ class EmbeddingProviderFactory
 
         return $this->resolved[$cacheKey] ??= match ($config['driver']) {
             'local' => new LocalHashEmbeddingProvider((int) $config['dimensions'], (string) $config['model']),
-            'openai' => new OpenAiEmbeddingProvider($config),
             default => throw new InvalidArgumentException("Unsupported embedding driver [{$config['driver']}]."),
         };
     }
@@ -66,17 +65,13 @@ class EmbeddingProviderFactory
                 'model' => $config['model'],
                 'dimensions' => $config['dimensions'],
                 'cost_per_million_tokens' => $config['cost_per_million_tokens'] ?? 0,
-                'configured' => $config['driver'] === 'local' || filled($config['api_key'] ?? null),
+                'configured' => $config['driver'] === 'local',
                 'label' => match ($key) {
                     'local' => 'Built-in (offline)',
-                    'openai' => 'OpenAI',
                     default => ucfirst((string) $key),
                 },
                 'description' => match ($key) {
-                    'local' => 'Works with no API key or internet access. Matches wording well but does not understand '
-                        .'that differently-phrased questions mean the same thing. Best for trialling the module.',
-                    'openai' => 'Full semantic search. Finds answers phrased differently from the question. '
-                        .'Requires an API key and bills per token embedded.',
+                    'local' => 'Deterministic offline token matching. Requires no API key, external service, or usage billing.',
                     default => '',
                 },
             ];

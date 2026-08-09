@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Automation; use App\Models\Concerns\HasPublicUuid; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\HasMany;
+class AutomationRule extends Model {use HasPublicUuid;protected $fillable=['name','description','trigger','resource_type','priority','active','conditions','actions','run_count','last_run_at','last_error_at','last_error','created_by'];protected function casts():array{return['active'=>'boolean','conditions'=>'array','actions'=>'array','last_run_at'=>'datetime','last_error_at'=>'datetime'];}public function logs():HasMany{return $this->hasMany(AutomationLog::class);}}

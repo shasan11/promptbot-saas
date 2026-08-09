@@ -120,15 +120,6 @@ class PlatformAuthorizationSeeder extends Seeder
                 'invoice_prefix' => 'INV',
                 'tax_rate' => 0,
             ],
-            'ai_rag' => [
-                'ai_provider' => env('AI_PROVIDER', 'openai'),
-                'ai_model' => env('AI_MODEL', 'gpt-4.1-mini'),
-                'embedding_model' => env('AI_EMBEDDING_MODEL', 'text-embedding-3-small'),
-                'rag_vector_store' => env('RAG_VECTOR_STORE', 'pgvector'),
-                'rag_top_k' => 5,
-                'rag_chunk_size' => 1000,
-                'rag_chunk_overlap' => 150,
-            ],
             'branding' => [
                 'company_name' => 'PromptBot',
                 'primary_color' => '#0F172A',

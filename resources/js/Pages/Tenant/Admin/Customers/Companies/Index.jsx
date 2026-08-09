@@ -1,0 +1,17 @@
+import Pagination from '@/Components/Superadmin/Pagination';
+import CustomersShell from '@/Components/Tenant/Customers/CustomersShell';
+import Badge from '@/Components/UI/Badge';
+import Button from '@/Components/UI/Button';
+import EmptyState from '@/Components/UI/EmptyState';
+import FilterBar from '@/Components/UI/FilterBar';
+import SearchInput from '@/Components/UI/SearchInput';
+import Select from '@/Components/UI/Select';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Building2, Plus } from 'lucide-react';
+import { useState } from 'react';
+
+export default function Index({ companies, filters, industries }) {
+    const permissions = usePage().props.auth?.permissions || []; const [search, setSearch] = useState(filters.search || '');
+    const apply = (next = {}) => router.get(route('tenant.admin.customers.companies.index'), { ...filters, search, ...next }, { preserveState: true });
+    return <CustomersShell title="Companies" description="B2B accounts and the customer relationships attached to them." actions={permissions.includes('companies.create') && <Button href={route('tenant.admin.customers.companies.create')} variant="brand" icon={Plus}>Add company</Button>}><Head title="Companies" /><div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft"><FilterBar><SearchInput value={search} onChange={setSearch} onClear={() => { setSearch(''); apply({ search: '' }); }} placeholder="Search company or domain" className="w-full max-w-xs" /><Select value={filters.status || ''} onChange={(e) => apply({ status: e.target.value })} className="w-40"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></Select><Select value={filters.industry || ''} onChange={(e) => apply({ industry: e.target.value })} className="w-44"><option value="">All industries</option>{industries.map((x) => <option key={x}>{x}</option>)}</Select><Button variant="secondary" size="sm" onClick={() => apply()}>Apply</Button></FilterBar></div><div className="mt-4">{companies.data.length ? <><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-soft"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50"><tr>{['Company', 'Industry', 'Owner', 'Contacts', 'Status'].map((x) => <th key={x} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">{x}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{companies.data.map((company) => <tr key={company.public_uuid}><td className="px-4 py-3"><Link href={route('tenant.admin.customers.companies.show', company.public_uuid)} className="font-medium text-brand-700 hover:underline">{company.name}</Link><p className="text-xs text-slate-500">{company.domain || 'No domain'}</p></td><td className="px-4 py-3 text-slate-600">{company.industry || '—'}</td><td className="px-4 py-3 text-slate-600">{company.account_owner?.name || 'Unassigned'}</td><td className="px-4 py-3 text-slate-600">{company.contacts_count}</td><td className="px-4 py-3"><Badge tone={company.status === 'active' ? 'brand' : 'neutral'}>{company.status}</Badge></td></tr>)}</tbody></table></div><Pagination links={companies.links} /></> : <EmptyState icon={Building2} title="No companies found" description="Create a company to organize B2B customers." />}</div></CustomersShell>;
+}

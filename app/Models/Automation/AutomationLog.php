@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Automation; use App\Models\Concerns\HasPublicUuid; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+class AutomationLog extends Model {use HasPublicUuid;protected $fillable=['automation_rule_id','trigger','resource_type','resource_id','execution_key','status','condition_result','actions_executed','error_message','started_at','finished_at'];protected function casts():array{return['condition_result'=>'array','actions_executed'=>'array','started_at'=>'datetime','finished_at'=>'datetime'];}public function rule():BelongsTo{return $this->belongsTo(AutomationRule::class,'automation_rule_id');}}

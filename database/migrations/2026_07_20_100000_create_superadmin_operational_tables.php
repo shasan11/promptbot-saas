@@ -19,7 +19,6 @@ return new class extends Migration
         foreach ([
             'maintenance_windows',
             'provider_health_logs',
-            'ai_model_configs',
             'integration_definitions',
             'support_messages',
             'announcements',
@@ -265,13 +264,6 @@ return new class extends Migration
             $table->string('status')->default('inactive')->index();
             $table->json('settings')->nullable();
             $table->json('encrypted_secrets')->nullable();
-        });
-        $this->create('ai_model_configs', function (Blueprint $table): void {
-            $table->string('provider')->index();
-            $table->string('model');
-            $table->string('purpose')->default('default')->index();
-            $table->boolean('is_active')->default(false);
-            $table->json('settings')->nullable();
         });
         $this->create('provider_health_logs', function (Blueprint $table): void {
             $table->string('provider')->index();

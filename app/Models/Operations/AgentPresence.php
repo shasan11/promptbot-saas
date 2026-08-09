@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Operations; use App\Models\User; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+class AgentPresence extends Model {protected $table='agent_presence';protected $primaryKey='user_id';public $incrementing=false;protected $fillable=['user_id','status','conversation_capacity','ticket_capacity','last_seen_at','status_changed_at','metadata'];protected function casts():array{return ['last_seen_at'=>'datetime','status_changed_at'=>'datetime','metadata'=>'array'];}public function user():BelongsTo{return $this->belongsTo(User::class);}}

@@ -11,6 +11,7 @@ class TenantDatabaseSeeder extends Seeder
     {
         $this->call(TenantAuthorizationSeeder::class);
         $this->call(ConnectionIntegrationSeeder::class);
+        $this->call(TicketConfigurationSeeder::class);
 
         Setting::firstOrCreate(['key' => 'general.workspace_name'], ['value' => ['value' => tenant('company_name')]]);
         Setting::firstOrCreate(['key' => 'branding.sender_name'], ['value' => ['value' => tenant('company_name')]]);

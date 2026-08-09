@@ -125,9 +125,8 @@ return [
     | The `local` provider is a deterministic, dependency-free hashed-token
     | embedder. It ships as the default so the module is fully functional out of
     | the box (and in CI) with no API key, but it is NOT semantically strong —
-    | production installs should switch to `openai` and re-index. Changing the
-    | model invalidates existing vectors: KnowledgeIndexService refuses to mix
-    | dimensions and flags affected bases for re-indexing.
+    | it deliberately provides deterministic token similarity rather than
+    | generated or intelligent behavior. Model changes require re-indexing.
     |
     */
 
@@ -142,15 +141,6 @@ return [
                 'model' => 'promptbot-local-hash-v1',
                 'dimensions' => 384,
                 'cost_per_million_tokens' => 0.0,
-            ],
-            'openai' => [
-                'driver' => 'openai',
-                'model' => env('KNOWLEDGE_OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
-                'dimensions' => (int) env('KNOWLEDGE_OPENAI_EMBEDDING_DIMENSIONS', 1536),
-                'api_key' => env('KNOWLEDGE_OPENAI_API_KEY', env('OPENAI_API_KEY')),
-                'base_url' => env('KNOWLEDGE_OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-                'timeout' => 60,
-                'cost_per_million_tokens' => 0.02,
             ],
         ],
     ],

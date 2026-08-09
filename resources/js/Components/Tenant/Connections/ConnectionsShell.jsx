@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity, AlertTriangle, AppWindow, Braces, Cable, ClipboardList, Database,
-    Globe2, KeyRound, PlugZap, RotateCcw, Settings, ServerCog,
+    Globe2, KeyRound, PlugZap, RotateCcw, Settings, ServerCog, ShieldCheck,
 } from 'lucide-react';
 
 const SECTIONS = [
@@ -32,6 +32,7 @@ const SECTIONS = [
             { label: 'Connection logs', route: 'tenant.admin.connections.logs.index', pattern: 'tenant.admin.connections.logs.*', icon: Activity, permission: 'connections.logs.view' },
             { label: 'Failed connections', route: 'tenant.admin.connections.failed.index', pattern: 'tenant.admin.connections.failed.*', icon: AlertTriangle, permission: 'connections.view' },
             { label: 'Credentials', route: 'tenant.admin.connections.credentials.index', pattern: 'tenant.admin.connections.credentials.*', icon: KeyRound, permission: 'connections.credentials.view' },
+            { label: 'Permissions', route: 'tenant.admin.connections.permissions.index', pattern: 'tenant.admin.connections.permissions.*', icon: ShieldCheck, permission: 'connections.permissions.manage' },
             { label: 'Settings', route: 'tenant.admin.connections.settings.index', pattern: 'tenant.admin.connections.settings.*', icon: Settings, permission: 'connections.settings.manage' },
         ],
     },

@@ -38,6 +38,11 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
                 'error' => fn () => $request->session()->get('error'),
+                'channel_secret' => fn () => $request->session()->get('channel_secret'),
+                'api_key' => fn () => $request->session()->get('api_key'),
+                'webhook_secret' => fn () => $request->session()->get('webhook_secret'),
+                'portal_url' => fn () => $request->session()->get('portal_url'),
+                'oauth_authorization' => fn () => $request->session()->get('oauth_authorization'),
             ],
         ];
     }

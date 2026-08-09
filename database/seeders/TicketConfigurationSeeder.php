@@ -1,0 +1,3 @@
+<?php
+namespace Database\Seeders; use App\Models\Ticket\TicketStatus; use Illuminate\Database\Seeder; use Illuminate\Support\Str;
+class TicketConfigurationSeeder extends Seeder { public function run():void { foreach([['New','new','new','#3b82f6',0,true],['Open','open','open','#2563eb',10,false],['Pending','pending','pending','#f59e0b',20,false],['Waiting on customer','waiting-on-customer','waiting_on_customer','#8b5cf6',30,false],['Resolved','resolved','resolved','#10b981',40,false],['Closed','closed','closed','#64748b',50,false]] as [$name,$slug,$category,$color,$order,$default]) TicketStatus::updateOrCreate(['slug'=>$slug],['name'=>$name,'category'=>$category,'color'=>$color,'display_order'=>$order,'is_default'=>$default,'active'=>true]); } }

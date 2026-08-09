@@ -263,12 +263,110 @@ class ConnectionIntegrationSeeder extends Seeder
             'action_definitions' => [],
             'trigger_definitions' => [],
             'configuration_schema' => ['usage' => ['knowledge_base', 'ai_agent_tool', 'workflow_automation', 'search', 'analytics']],
-            'credential_schema' => ['auth_methods' => array_map(fn ($type) => $type->value, $auth)],
+            'credential_schema' => $this->credentialSchema($key, $auth),
             'connector_class' => null,
             'connector_version' => 'v1',
             'status' => 'available',
             'is_beta' => in_array($key, ['mcp-server'], true),
         ];
+    }
+
+    private function credentialSchema(string $key, array $auth): array
+    {
+        $schema = ['auth_methods' => array_map(fn ($type) => $type->value, $auth)];
+
+        $oauth = match ($key) {
+            'google-drive' => [
+                'default_scopes' => ['https://www.googleapis.com/auth/drive.readonly'],
+                'allowed_scopes' => [
+                    'https://www.googleapis.com/auth/drive.readonly',
+                    'https://www.googleapis.com/auth/drive.metadata.readonly',
+                    'https://www.googleapis.com/auth/spreadsheets.readonly',
+                ],
+                'required_scopes_by_usage' => [
+                    'knowledge_base' => ['https://www.googleapis.com/auth/drive.readonly'],
+                    'search' => ['https://www.googleapis.com/auth/drive.metadata.readonly'],
+                    'analytics' => ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+                ],
+                'scope_descriptions' => [
+                    'https://www.googleapis.com/auth/drive.readonly' => 'Read files selected for knowledge and sync.',
+                    'https://www.googleapis.com/auth/drive.metadata.readonly' => 'Read file and folder metadata for discovery and search.',
+                    'https://www.googleapis.com/auth/spreadsheets.readonly' => 'Read selected Google Sheets data.',
+                ],
+            ],
+            'hubspot' => [
+                'default_scopes' => ['crm.objects.contacts.read', 'crm.objects.companies.read'],
+                'allowed_scopes' => [
+                    'crm.objects.contacts.read',
+                    'crm.objects.companies.read',
+                    'crm.objects.deals.read',
+                    'crm.objects.tickets.read',
+                    'crm.objects.contacts.write',
+                    'crm.objects.companies.write',
+                ],
+                'required_scopes_by_usage' => [
+                    'customer_data' => ['crm.objects.contacts.read', 'crm.objects.companies.read'],
+                    'analytics' => ['crm.objects.deals.read'],
+                    'workflow_automation' => ['crm.objects.contacts.write'],
+                ],
+                'scope_descriptions' => [
+                    'crm.objects.contacts.read' => 'Read contacts selected for CRM sync.',
+                    'crm.objects.companies.read' => 'Read companies selected for CRM sync.',
+                    'crm.objects.deals.read' => 'Read deal data for analytics.',
+                    'crm.objects.tickets.read' => 'Read HubSpot tickets.',
+                    'crm.objects.contacts.write' => 'Create or update contacts from approved workflows.',
+                    'crm.objects.companies.write' => 'Create or update companies from approved workflows.',
+                ],
+            ],
+            'slack' => [
+                'default_scopes' => ['channels:read', 'channels:history'],
+                'allowed_scopes' => ['channels:read', 'channels:history', 'groups:read', 'groups:history', 'chat:write'],
+                'required_scopes_by_usage' => [
+                    'knowledge_base' => ['channels:read', 'channels:history'],
+                    'workflow_automation' => ['chat:write'],
+                ],
+                'scope_descriptions' => [
+                    'channels:read' => 'List approved Slack channels.',
+                    'channels:history' => 'Read messages from approved public channels.',
+                    'groups:read' => 'List approved private channels.',
+                    'groups:history' => 'Read messages from approved private channels.',
+                    'chat:write' => 'Send approved workflow messages.',
+                ],
+            ],
+            'github' => [
+                'default_scopes' => ['read:org', 'repo:status'],
+                'allowed_scopes' => ['read:org', 'repo:status', 'public_repo', 'repo'],
+                'required_scopes_by_usage' => [
+                    'knowledge_base' => ['public_repo'],
+                    'developer_platform' => ['read:org'],
+                    'workflow_automation' => ['repo'],
+                ],
+                'scope_descriptions' => [
+                    'read:org' => 'Read organization membership for repository discovery.',
+                    'repo:status' => 'Read repository status metadata.',
+                    'public_repo' => 'Read selected public repositories.',
+                    'repo' => 'Access selected private repositories and approved write workflows.',
+                ],
+            ],
+            'notion' => [
+                'default_scopes' => ['read_content'],
+                'allowed_scopes' => ['read_content', 'read_user'],
+                'required_scopes_by_usage' => [
+                    'knowledge_base' => ['read_content'],
+                ],
+                'scope_descriptions' => [
+                    'read_content' => 'Read selected Notion pages and databases.',
+                    'read_user' => 'Read workspace user metadata for attribution.',
+                ],
+            ],
+            default => null,
+        };
+
+        if ($oauth) {
+            $schema['oauth'] = $oauth;
+        }
+
+        return $schema;
     }
 
     private function ensureCredential(Connection $connection, ?User $actor): void

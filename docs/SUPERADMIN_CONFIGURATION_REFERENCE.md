@@ -27,14 +27,6 @@
 - Default tax rate
 - Public key, encrypted secret key, and encrypted webhook secret
 
-## AI and RAG
-
-- Provider, model, compatible base URL, and encrypted API key
-- Embedding model
-- Vector store
-- Top-K retrieval
-- Chunk size and overlap
-
 ## Branding
 
 - Company name

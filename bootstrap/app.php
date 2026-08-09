@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureTenancyIsInitialized;
 use App\Http\Middleware\EnsureTenantIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RequireTenantFeature;
+use App\Http\Middleware\AuthenticateDeveloperApiKey;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -34,6 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'widget/api/*',
+            'channels/email/*/inbound',
+        ]);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
@@ -49,6 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.feature' => RequireTenantFeature::class,
             'tenant.limit' => EnforceTenantLimit::class,
             'permission' => PermissionMiddleware::class,
+            'developer.key' => AuthenticateDeveloperApiKey::class,
         ]);
 
         // An unauthenticated visitor on a tenant subdomain must be sent to

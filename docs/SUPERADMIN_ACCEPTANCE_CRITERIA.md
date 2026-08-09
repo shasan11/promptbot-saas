@@ -11,6 +11,6 @@ The release is acceptable when:
 - Reports filter by date, separate monetary totals by currency, and export CSV.
 - Website pages remain section-editable and publishable.
 - System health reports live checks and supports permission-controlled queue/cache actions.
-- General, security, email, SMTP, payment, AI/RAG, and branding settings persist and apply at runtime.
+- General, security, email, SMTP, payment, and branding settings persist and apply at runtime.
 - Sensitive values are encrypted and masked.
 - Read-only administrators cannot perform write actions.
