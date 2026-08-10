@@ -33,6 +33,10 @@ class PlanSeeder extends Seeder
             $features['users'] => ['enabled' => true, 'limit' => 5, 'unlimited' => false],
             $features['storage_mb'] => ['enabled' => true, 'limit' => 1024, 'unlimited' => false],
             $features['exports'] => ['enabled' => true, 'limit' => null, 'unlimited' => true],
+            $features['ai_platform'] => ['enabled' => true, 'limit' => null, 'unlimited' => true],
+            $features['ai_monthly_tokens'] => ['enabled' => true, 'limit' => 250000, 'unlimited' => false],
+            $features['ai_agents'] => ['enabled' => true, 'limit' => 3, 'unlimited' => false],
+            $features['ai_autonomous_replies'] => ['enabled' => false, 'limit' => null, 'unlimited' => false],
         ]);
     }
 }

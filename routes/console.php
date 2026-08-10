@@ -40,3 +40,4 @@ Schedule::command('sla:evaluate')
     ->runInBackground();
 
 Schedule::command('webhooks:deliver')->everyMinute()->withoutOverlapping(5)->runInBackground();
+Schedule::command('ai:maintain')->dailyAt('02:30')->withoutOverlapping(60)->runInBackground();

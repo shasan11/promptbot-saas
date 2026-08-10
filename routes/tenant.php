@@ -11,6 +11,19 @@ use App\Http\Controllers\Tenant\Admin\Administration\RoleController;
 use App\Http\Controllers\Tenant\Admin\Administration\TeamController;
 use App\Http\Controllers\Tenant\Admin\Administration\UserController as AdministrationUserController;
 use App\Http\Controllers\Tenant\Admin\Administration\WorkspaceSettingsController;
+use App\Http\Controllers\Tenant\Admin\AI\OverviewController as AIOverviewController;
+use App\Http\Controllers\Tenant\Admin\AI\AgentController as AIAgentController;
+use App\Http\Controllers\Tenant\Admin\AI\PlaygroundController as AIPlaygroundController;
+use App\Http\Controllers\Tenant\Admin\AI\PromptController as AIPromptController;
+use App\Http\Controllers\Tenant\Admin\AI\ApprovalController as AIApprovalController;
+use App\Http\Controllers\Tenant\Admin\AI\OperationsController as AIOperationsController;
+use App\Http\Controllers\Tenant\Admin\AI\EvaluationController as AIEvaluationController;
+use App\Http\Controllers\Tenant\Admin\AI\InboxCopilotController as AIInboxCopilotController;
+use App\Http\Controllers\Tenant\Admin\AI\TicketCopilotController as AITicketCopilotController;
+use App\Http\Controllers\Tenant\Admin\AI\ReportInsightController as AIReportInsightController;
+use App\Http\Controllers\Tenant\Admin\AI\CustomerBriefController as AICustomerBriefController;
+use App\Http\Controllers\Tenant\Admin\AI\ProviderController as AIProviderController;
+use App\Http\Controllers\Tenant\Admin\AI\SettingsController as AISettingsController;
 use App\Http\Controllers\Tenant\Admin\Connections\ApiOperationController;
 use App\Http\Controllers\Tenant\Admin\Connections\ConnectionController;
 use App\Http\Controllers\Tenant\Admin\Connections\CredentialController;
@@ -123,6 +136,8 @@ Route::middleware([
         Route::put('/notification-preferences', [NotificationController::class, 'preference'])->name('notifications.preferences');
 
         Route::prefix('customers')->name('customers.')->group(function (): void {
+            Route::post('contacts/{contact}/ai-brief', [AICustomerBriefController::class, 'contact'])->middleware(['tenant.feature:ai_platform','throttle:10,60'])->name('contacts.ai-brief');
+            Route::post('companies/{company}/ai-brief', [AICustomerBriefController::class, 'company'])->middleware(['tenant.feature:ai_platform','throttle:10,60'])->name('companies.ai-brief');
             Route::post('contacts/bulk', [ContactController::class, 'bulk'])->name('contacts.bulk');
             Route::post('contacts/{contact}/restore', [ContactController::class, 'restore'])->name('contacts.restore');
             Route::resource('contacts', ContactController::class);
@@ -155,11 +170,13 @@ Route::middleware([
             Route::put('{conversation}', [ConversationController::class, 'update'])->name('update');
             Route::post('{conversation}/assign', [ConversationController::class, 'assign'])->name('assign');
             Route::post('{conversation}/follow', [ConversationController::class, 'follow'])->name('follow');
+            Route::post('{conversation}/ai', [AIInboxCopilotController::class, 'run'])->middleware(['tenant.feature:ai_platform','throttle:20,1'])->name('ai.run');
             Route::post('messages/{message}/attachments', [AttachmentController::class, 'store'])->name('attachments.store');
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download'])->middleware('signed')->name('attachments.download');
         });
 
         Route::post('tickets/{ticket}/comments', [TicketController::class, 'comment'])->name('tickets.comments.store');
+        Route::post('tickets/{ticket}/ai', [AITicketCopilotController::class, 'run'])->middleware(['tenant.feature:ai_platform','throttle:20,1'])->name('tickets.ai.run');
         Route::post('tickets/{ticket}/merge', [TicketController::class, 'merge'])->name('tickets.merge');
         Route::get('tickets/settings/configuration', [TicketSettingsController::class, 'index'])->name('tickets.settings.index');
         Route::post('tickets/settings/statuses', [TicketSettingsController::class, 'storeStatus'])->name('tickets.settings.statuses.store');
@@ -192,6 +209,7 @@ Route::middleware([
         Route::post('experience/csat', [ExperienceController::class, 'storeSurvey'])->name('experience.csat.store');
         Route::post('experience/portal-link', [ExperienceController::class, 'portalLink'])->name('experience.portal-link');
         Route::get('reports', [ReportingController::class, 'index'])->name('reports.index');
+        Route::post('reports/ai-insight', AIReportInsightController::class)->middleware(['tenant.feature:ai_platform','throttle:10,60'])->name('reports.ai-insight');
         Route::get('reports/export', [ReportingController::class, 'export'])->name('reports.export');
         Route::get('developer', [GovernanceController::class, 'index'])->name('governance.index');
         Route::post('developer/api-keys', [GovernanceController::class, 'createKey'])->name('governance.api-keys.store');
@@ -303,6 +321,44 @@ Route::middleware([
             Route::put('{connection}', [ConnectionController::class, 'update'])->name('update');
             Route::delete('{connection}', [ConnectionController::class, 'destroy'])->name('destroy');
             Route::get('{connection}', [ConnectionController::class, 'show'])->name('show');
+        });
+
+        Route::prefix('ai')->name('ai.')->middleware('tenant.feature:ai_platform')->group(function (): void {
+            Route::get('/', AIOverviewController::class)->name('index');
+            Route::get('agents', [AIAgentController::class, 'index'])->name('agents.index');
+            Route::post('agents', [AIAgentController::class, 'store'])->name('agents.store');
+            Route::put('agents/{agent}', [AIAgentController::class, 'update'])->name('agents.update');
+            Route::post('agents/{agent}/deploy', [AIAgentController::class, 'deploy'])->name('agents.deploy');
+            Route::post('agents/{agent}/pause', [AIAgentController::class, 'pause'])->name('agents.pause');
+            Route::post('agents/{agent}/versions/{version}/restore', [AIAgentController::class, 'restore'])->name('agents.versions.restore');
+            Route::put('agents/{agent}/tools', [AIAgentController::class, 'updateTools'])->name('agents.tools.update');
+            Route::put('agents/{agent}/channels', [AIAgentController::class, 'updateChannels'])->name('agents.channels.update');
+            Route::get('playground', [AIPlaygroundController::class, 'index'])->name('playground.index');
+            Route::post('playground', [AIPlaygroundController::class, 'run'])->middleware('throttle:15,1')->name('playground.run');
+            Route::post('playground/stream', [AIPlaygroundController::class, 'stream'])->middleware('throttle:15,1')->name('playground.stream');
+            Route::post('playground/cancel', [AIPlaygroundController::class, 'cancel'])->middleware('throttle:30,1')->name('playground.cancel');
+            Route::get('prompts', [AIPromptController::class, 'index'])->name('prompts.index');
+            Route::post('prompts', [AIPromptController::class, 'store'])->name('prompts.store');
+            Route::put('prompts/{prompt}', [AIPromptController::class, 'update'])->name('prompts.update');
+            Route::post('prompts/{prompt}/publish', [AIPromptController::class, 'publish'])->name('prompts.publish');
+            Route::get('approvals', [AIApprovalController::class, 'index'])->name('approvals.index');
+            Route::post('approvals/{approval}/approve', [AIApprovalController::class, 'approve'])->name('approvals.approve');
+            Route::post('approvals/{approval}/reject', [AIApprovalController::class, 'reject'])->name('approvals.reject');
+            Route::get('usage', [AIOperationsController::class, 'usage'])->name('usage.index');
+            Route::get('logs', [AIOperationsController::class, 'logs'])->name('logs.index');
+            Route::get('evaluations', [AIEvaluationController::class, 'index'])->name('evaluations.index');
+            Route::post('evaluations', [AIEvaluationController::class, 'storeSuite'])->name('evaluations.store');
+            Route::post('evaluations/{suite}/cases', [AIEvaluationController::class, 'storeCase'])->name('evaluations.cases.store');
+            Route::post('evaluations/{suite}/run', [AIEvaluationController::class, 'run'])->middleware('throttle:5,60')->name('evaluations.run');
+            Route::get('providers', [AIProviderController::class, 'index'])->name('providers.index');
+            Route::post('providers', [AIProviderController::class, 'store'])->name('providers.store');
+            Route::put('providers/{provider}', [AIProviderController::class, 'update'])->name('providers.update');
+            Route::post('providers/{provider}/test', [AIProviderController::class, 'test'])
+                ->middleware('throttle:10,60')->name('providers.test');
+            Route::delete('providers/{provider}', [AIProviderController::class, 'destroy'])->name('providers.destroy');
+            Route::get('settings', [AISettingsController::class, 'edit'])->name('settings.edit');
+            Route::put('settings', [AISettingsController::class, 'update'])->name('settings.update');
+            Route::post('suggestions/{suggestion}/feedback', [AIInboxCopilotController::class, 'feedback'])->name('suggestions.feedback');
         });
 
         /*

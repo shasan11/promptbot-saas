@@ -136,12 +136,18 @@ return [
         'max_retries' => 5,
 
         'providers' => [
-            'local' => [
+              'local' => [
                 'driver' => 'local',
                 'model' => 'promptbot-local-hash-v1',
                 'dimensions' => 384,
                 'cost_per_million_tokens' => 0.0,
-            ],
+              ],
+              'tenant_ai' => [
+                  'driver' => 'tenant_ai',
+                  'model' => 'tenant-provider-default',
+                  'dimensions' => (int) env('KNOWLEDGE_AI_EMBEDDING_DIMENSIONS', 1024),
+                  'cost_per_million_tokens' => null,
+              ],
         ],
     ],
 

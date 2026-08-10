@@ -93,7 +93,8 @@ class ContactController extends Controller
     {
         Gate::authorize('view', $contact);
         $contact->load(['company:id,public_uuid,name', 'owner:id,name,email', 'contactPoints', 'tags:id,public_uuid,name,color', 'customFieldValues.field', 'activities.actor:id,name']);
-        return Inertia::render('Tenant/Admin/Customers/Contacts/Show', ['contact' => $contact]);
+        $aiEnabled = request()->user('tenant')->can('ai.copilot.use') && app(\App\Services\SaaS\TenantFeatureService::class)->enabled('ai_platform');
+        return Inertia::render('Tenant/Admin/Customers/Contacts/Show', ['contact' => $contact, 'aiBrief' => $aiEnabled ? \App\Models\AI\Suggestion::query()->where('resource_type', Contact::class)->where('resource_id', $contact->id)->where('type', 'customer_brief')->latest()->first() : null, 'aiEnabled' => $aiEnabled]);
     }
 
     public function edit(Contact $contact): Response

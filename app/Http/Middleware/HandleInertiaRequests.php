@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Services\Platform\PlatformSettingsService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Services\SaaS\TenantFeatureService;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -35,6 +36,9 @@ class HandleInertiaRequests extends Middleware
                 'companyName' => Setting::query()->where('key', 'general.workspace_name')->value('value')['value'] ?? tenant('company_name'),
                 'logoUrl' => Setting::query()->where('key', 'branding.logo')->value('value')['value'] ?? null,
             ] : null,
+            'tenantFeatures' => fn () => tenancy()->initialized ? [
+                'ai_platform' => app(TenantFeatureService::class)->enabled('ai_platform'),
+            ] : [],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
                 'error' => fn () => $request->session()->get('error'),

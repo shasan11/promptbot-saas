@@ -6,6 +6,9 @@ use App\Contracts\TenantDatabaseProvisioner;
 use App\Services\Platform\PlatformSettingsService;
 use App\Services\Tenancy\TenantDatabaseProvisionerFactory;
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Event;
+use App\Events\Inbox\ConversationReceived;
+use App\Listeners\AI\QueueConversationAnalysis;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(PlatformSettingsService $settings): void
     {
         $settings->apply();
+        Event::listen(ConversationReceived::class, QueueConversationAnalysis::class);
         Vite::prefetch(concurrency: 3);
     }
 }

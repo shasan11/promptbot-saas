@@ -3,7 +3,7 @@ import Avatar from '@/Components/UI/Avatar';
 import DropdownMenu from '@/Components/UI/DropdownMenu';
 import SuperadminLayout from '@/Layouts/SuperadminLayout';
 import { Link, router, usePage } from '@inertiajs/react';
-import { BarChart3, Bell, Building2, Cable, CalendarClock, CheckSquare, Code2, Gauge, Globe2, Inbox, LayoutDashboard, Library, LogOut, Menu, MessagesSquare, Search, ShieldCheck, Star, TicketCheck, User, UsersRound, Workflow, X } from 'lucide-react';
+import { BarChart3, Bell, Building2, Cable, CalendarClock, CheckSquare, Code2, Gauge, Globe2, Inbox, LayoutDashboard, Library, LogOut, Menu, MessagesSquare, Search, ShieldCheck, Sparkles, Star, TicketCheck, User, UsersRound, Workflow, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navigation = [
@@ -24,6 +24,7 @@ const navigation = [
     { label: 'Companies', routeName: 'tenant.admin.customers.companies.index', active: 'tenant.admin.customers.companies.*', icon: Building2, permission: 'companies.view' },
     { label: 'Channels', routeName: 'tenant.admin.channels.index', active: 'tenant.admin.channels.*', icon: MessagesSquare, permission: 'channels.view' },
     { label: 'Knowledge base', routeName: 'tenant.admin.knowledge.index', active: 'tenant.admin.knowledge.*', icon: Library, permission: 'knowledge.view' },
+    { label: 'AI platform', routeName: 'tenant.admin.ai.index', active: 'tenant.admin.ai.*', icon: Sparkles, permission: 'ai.view', feature: 'ai_platform' },
     { label: 'Administration', routeName: 'tenant.admin.administration.index', active: 'tenant.admin.administration.*', icon: ShieldCheck },
     { label: 'Connections', routeName: 'tenant.admin.connections.overview', active: 'tenant.admin.connections.*', icon: Cable, permission: 'connections.view' },
 ];
@@ -62,8 +63,8 @@ function NavItem({ item, onNavigate }) {
 }
 
 function Sidebar({ tenant, user, onNavigate }) {
-    const { auth } = usePage().props;
-    const visibleNavigation = navigation.filter((item) => !item.permission || auth?.permissions?.includes(item.permission));
+    const { auth, tenantFeatures } = usePage().props;
+    const visibleNavigation = navigation.filter((item) => (!item.permission || auth?.permissions?.includes(item.permission)) && (!item.feature || tenantFeatures?.[item.feature]));
 
     return (
         <div className="flex h-full flex-col bg-white">

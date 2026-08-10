@@ -56,7 +56,8 @@ class CompanyController extends Controller
         Gate::authorize('view', $company);
         $company->load(['accountOwner:id,name,email', 'tags:id,public_uuid,name,color', 'customFieldValues.field', 'activities.actor:id,name']);
         $contacts = $company->contacts()->with('owner:id,name')->orderBy('display_name')->paginate(15);
-        return Inertia::render('Tenant/Admin/Customers/Companies/Show', ['company' => $company, 'contacts' => $contacts]);
+        $aiEnabled = request()->user('tenant')->can('ai.copilot.use') && app(\App\Services\SaaS\TenantFeatureService::class)->enabled('ai_platform');
+        return Inertia::render('Tenant/Admin/Customers/Companies/Show', ['company' => $company, 'contacts' => $contacts, 'aiBrief' => $aiEnabled ? \App\Models\AI\Suggestion::query()->where('resource_type', Company::class)->where('resource_id', $company->id)->where('type', 'customer_brief')->latest()->first() : null, 'aiEnabled' => $aiEnabled]);
     }
 
     public function edit(Company $company): Response
