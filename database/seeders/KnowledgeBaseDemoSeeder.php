@@ -144,7 +144,7 @@ class KnowledgeBaseDemoSeeder extends Seeder
         $result = $provider->embedBatch($pending->pluck('content')->all());
 
         foreach ($pending as $offset => $chunk) {
-            $chunk->setVector($result->vectors[$offset], $result->provider, $result->model, $base->embedding_version);
+            $chunk->setVector($result->vectors[$offset], $result->provider, $result->model, (int) ($base->embedding_version ?: 1));
             $chunk->is_retrievable = true;
             $chunk->save();
         }

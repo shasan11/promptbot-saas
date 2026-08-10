@@ -5,6 +5,8 @@ namespace App\Services\Knowledge\Embedding;
 use App\Contracts\Knowledge\EmbeddingProviderInterface;
 use App\Models\Knowledge\KnowledgeBase;
 use InvalidArgumentException;
+use App\Models\AI\ProviderConfig;
+use App\Enums\AI\ProviderStatus;
 
 /**
  * Resolves the embedding provider a given knowledge base was indexed with.
@@ -45,6 +47,11 @@ class EmbeddingProviderFactory
 
         return $this->resolved[$cacheKey] ??= match ($config['driver']) {
             'local' => new LocalHashEmbeddingProvider((int) $config['dimensions'], (string) $config['model']),
+            'tenant_ai' => new NeuronEmbeddingProviderAdapter(
+                ProviderConfig::query()->where('enabled', true)->where('status', ProviderStatus::Healthy)->whereNotNull('default_embedding_model')->orderBy('id')->first()
+                    ?? throw new InvalidArgumentException('No healthy tenant AI provider with an embedding model is configured.'),
+                (string) $config['model'], (int) $config['dimensions'], app(\App\Services\Knowledge\Crawler\UrlSafetyGuard::class),
+            ),
             default => throw new InvalidArgumentException("Unsupported embedding driver [{$config['driver']}]."),
         };
     }
@@ -65,13 +72,15 @@ class EmbeddingProviderFactory
                 'model' => $config['model'],
                 'dimensions' => $config['dimensions'],
                 'cost_per_million_tokens' => $config['cost_per_million_tokens'] ?? 0,
-                'configured' => $config['driver'] === 'local',
+                'configured' => $config['driver'] === 'local' || ($config['driver'] === 'tenant_ai' && ProviderConfig::query()->where('enabled', true)->whereNotNull('default_embedding_model')->exists()),
                 'label' => match ($key) {
                     'local' => 'Built-in (offline)',
+                    'tenant_ai' => 'Tenant AI provider (semantic)',
                     default => ucfirst((string) $key),
                 },
                 'description' => match ($key) {
                     'local' => 'Deterministic offline token matching. Requires no API key, external service, or usage billing.',
+                    'tenant_ai' => 'Real semantic embeddings through the first healthy tenant provider with an embedding model.',
                     default => '',
                 },
             ];

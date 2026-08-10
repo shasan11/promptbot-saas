@@ -5,7 +5,7 @@ import { SectionCard } from '@/Components/UI/Card';
 import EmptyState from '@/Components/UI/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
-import { CheckCircle2, Circle, Settings as SettingsIcon, Shield, Users as UsersIcon } from 'lucide-react';
+import { CheckCircle2, Circle, Settings as SettingsIcon, Shield, Sparkles, Users as UsersIcon } from 'lucide-react';
 
 function StatCard({ label, value, tone = 'slate' }) {
     const tones = {
@@ -23,7 +23,7 @@ function StatCard({ label, value, tone = 'slate' }) {
     );
 }
 
-export default function Dashboard({ tenant, stats = {}, recentUsers = [] }) {
+export default function Dashboard({ tenant, stats = {}, recentUsers = [], ai = null }) {
     const hasSettingsConfigured = (stats.settings ?? 0) > 0;
     const hasRoles = (stats.roles ?? 0) > 0;
     const checklist = [
@@ -52,6 +52,8 @@ export default function Dashboard({ tenant, stats = {}, recentUsers = [] }) {
                 <StatCard label="Permissions" value={stats.permissions ?? 0} />
                 <StatCard label="Configured settings" value={stats.settings ?? 0} />
             </div>
+
+            {ai && <SectionCard className="mt-6" title="AI operations" description="Live tenant AI health; output remains human-controlled." actions={<Button href={route('tenant.admin.ai.index')} variant="ghost" size="sm" icon={Sparkles}>Open AI platform</Button>}><div className="grid gap-3 sm:grid-cols-4"><div><p className="text-xs text-slate-500">Active agents</p><p className="mt-1 text-xl font-bold">{ai.active_agents}</p></div><div><p className="text-xs text-slate-500">Runs today</p><p className="mt-1 text-xl font-bold">{ai.runs_today}</p></div><div><p className="text-xs text-slate-500">Pending approvals</p><p className="mt-1 text-xl font-bold">{ai.pending_approvals}</p></div><div><p className="text-xs text-slate-500">Failed today</p><p className={`mt-1 text-xl font-bold ${ai.failed_today ? 'text-rose-600' : ''}`}>{ai.failed_today}</p></div></div></SectionCard>}
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
                 <SectionCard

@@ -43,7 +43,20 @@ class ConversationController extends Controller
             $message->attachments->each(fn ($attachment) => $attachment->setAttribute('download_url', URL::temporarySignedRoute('tenant.admin.inbox.attachments.download', now()->addMinutes(10), $attachment)));
             return $message;
         });
-        return Inertia::render('Tenant/Admin/Inbox/Show', ['conversation' => $conversation, 'messages' => $messages, 'users' => User::query()->where('status','active')->orderBy('name')->get(['id','name']), 'teams' => Team::query()->where('status','active')->orderBy('name')->get(['id','name'])]);
+        $aiEnabled = request()->user('tenant')->can('ai.copilot.use') && app(\App\Services\SaaS\TenantFeatureService::class)->enabled('ai_platform');
+        return Inertia::render('Tenant/Admin/Inbox/Show', [
+            'conversation' => $conversation, 'messages' => $messages,
+            'users' => User::query()->where('status','active')->orderBy('name')->get(['id','name']),
+            'teams' => Team::query()->where('status','active')->orderBy('name')->get(['id','name']),
+            'ai' => $aiEnabled ? [
+                'insight' => $conversation->aiInsight()->first(),
+                'suggestions' => $conversation->aiSuggestions()->latest()->limit(10)->get()->map(fn ($suggestion) => [
+                    'public_uuid' => $suggestion->public_uuid, 'type' => $suggestion->type, 'text' => $suggestion->text,
+                    'citations' => $suggestion->citations ?? [], 'status' => $suggestion->status->value,
+                    'created_at' => $suggestion->created_at,
+                ]),
+            ] : null,
+        ]);
     }
 
     public function reply(Request $request, Conversation $conversation): RedirectResponse

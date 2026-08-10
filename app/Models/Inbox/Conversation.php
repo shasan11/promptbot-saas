@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use App\Models\AI\ConversationInsight;
+use App\Models\AI\Suggestion;
 
 class Conversation extends Model
 {
@@ -28,4 +30,6 @@ class Conversation extends Model
     public function assignments(): HasMany { return $this->hasMany(ConversationAssignment::class); }
     public function followers(): BelongsToMany { return $this->belongsToMany(User::class, 'conversation_followers')->withPivot('created_at'); }
     public function tags(): MorphToMany { return $this->morphToMany(Tag::class, 'taggable')->withPivot(['assigned_by', 'created_at']); }
+    public function aiInsight(): HasOne { return $this->hasOne(ConversationInsight::class); }
+    public function aiSuggestions(): HasMany { return $this->hasMany(Suggestion::class); }
 }
