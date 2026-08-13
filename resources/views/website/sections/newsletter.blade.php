@@ -1,0 +1,4 @@
+@php
+    $form = \App\Models\WebsiteForm::where('slug', $content['form_slug'] ?? 'newsletter')->where('is_active', true)->first();
+@endphp
+<section class="bg-slate-950 py-14 text-white"><div class="mx-auto max-w-3xl px-6 text-center"><h2 class="text-3xl font-bold">{{ $content['heading'] ?? 'Stay informed' }}</h2><p class="mt-3 text-slate-300">{{ $content['description'] ?? '' }}</p>@if($form)<form method="POST" action="{{ route('website.forms.submit', $form) }}" class="mx-auto mt-7 flex max-w-lg gap-2">@csrf<input type="text" name="_website" tabindex="-1" autocomplete="off" class="absolute -left-[10000px]" aria-hidden="true"><input required type="email" name="email" aria-label="Email address" placeholder="you@example.com" class="min-w-0 flex-1 rounded-lg border-0 text-slate-900"><button class="rounded-lg bg-white px-5 py-3 font-semibold text-slate-950">{{ $content['button_label'] ?? 'Subscribe' }}</button></form>@endif</div></section>

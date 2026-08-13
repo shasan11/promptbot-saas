@@ -14,7 +14,11 @@ class TenantStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // Nullable for legacy/API callers; Tenant's compatibility resolver
+            // creates and links a deterministic account when omitted.
+            'customer_account_id' => ['nullable', 'exists:customer_accounts,id'],
             'company_name' => ['required', 'string', 'max:255'],
+            'region' => ['nullable', 'string', 'max:100'],
             'slug' => ['nullable', 'alpha_dash:ascii', 'max:60', 'unique:tenants,slug'],
             'subdomain' => ['nullable', 'string', 'max:255', 'unique:domains,domain'],
             'owner_name' => ['required', 'string', 'max:255'],

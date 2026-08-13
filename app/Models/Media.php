@@ -10,7 +10,7 @@ class Media extends Model
 {
     use HasUuid;
 
-    protected $fillable = ['disk', 'path', 'mime_type', 'size', 'metadata'];
+    protected $fillable = ['disk', 'path', 'filename', 'alt_text', 'caption', 'mime_type', 'size', 'width', 'height', 'uploaded_by', 'metadata'];
 
     protected $casts = [
         'size' => 'integer',

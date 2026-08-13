@@ -8,9 +8,10 @@ import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
-export default function Login({ status, canResetPassword, loginRoute = 'login', panelName = 'Super Admin' }) {
+export default function Login({ status, canResetPassword, loginRoute = 'login', passwordRequestRoute = 'password.request', panelName = 'Super Admin' }) {
     const { tenant } = usePage().props;
     const isTenant = panelName === 'Tenant Admin';
+    const isPortal = panelName === 'Customer Portal';
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -38,13 +39,13 @@ export default function Login({ status, canResetPassword, loginRoute = 'login', 
                         </span>
                         <div className="mt-10">
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">
-                                {isTenant ? (tenant?.companyName || 'Tenant workspace') : 'Superadmin console'}
+                                {isTenant ? (tenant?.companyName || 'Tenant workspace') : (isPortal ? 'Customer portal' : 'Superadmin console')}
                             </p>
                             <h1 className="mt-3 text-3xl font-bold tracking-tight">Welcome back</h1>
                             <p className="mt-4 text-sm leading-6 text-slate-300">
                                 {isTenant
                                     ? 'Sign in to manage your team, workspace users, and settings.'
-                                    : 'Sign in to manage tenants, billing, platform features, and operational controls.'}
+                                    : (isPortal ? 'Sign in once to manage all of your PromptBot workspaces, billing, members, and support.' : 'Sign in to manage tenants, billing, platform features, and operational controls.')}
                             </p>
                         </div>
                         <div className="mt-10 flex items-start gap-3 rounded-md border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
@@ -52,7 +53,7 @@ export default function Login({ status, canResetPassword, loginRoute = 'login', 
                             <span>
                                 {isTenant
                                     ? 'This workspace is only accessible to invited team members.'
-                                    : 'Tenant admins keep using their tenant domain. Platform operators use this console.'}
+                                    : (isPortal ? 'Your customer portal identity is separate from workspace staff and platform administrators.' : 'Tenant admins keep using their tenant domain. Platform operators use this console.')}
                             </span>
                         </div>
                     </div>
@@ -115,7 +116,7 @@ export default function Login({ status, canResetPassword, loginRoute = 'login', 
                             </label>
 
                             {canResetPassword && (
-                                <Link href={route('password.request')} className="font-semibold text-navy-800 hover:text-brand-700">
+                                <Link href={route(passwordRequestRoute)} className="font-semibold text-navy-800 hover:text-brand-700">
                                     Forgot password?
                                 </Link>
                             )}
@@ -124,6 +125,11 @@ export default function Login({ status, canResetPassword, loginRoute = 'login', 
                         <Button type="submit" variant="brand" size="lg" loading={processing} className="mt-6 w-full">
                             {processing ? 'Signing in…' : 'Sign in'}
                         </Button>
+                        {isPortal && (
+                            <p className="mt-5 text-center text-sm text-slate-500">
+                                New to PromptBot? <Link href={route('portal.register')} className="font-semibold text-navy-800 hover:text-brand-700">Create an account</Link>
+                            </p>
+                        )}
                     </form>
                 </div>
             </div>

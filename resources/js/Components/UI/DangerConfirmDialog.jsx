@@ -2,7 +2,7 @@ import Button from '@/Components/UI/Button';
 import Input from '@/Components/UI/Input';
 import Modal from '@/Components/UI/Modal';
 import { AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function DangerConfirmDialog({
     open,
@@ -11,12 +11,21 @@ export default function DangerConfirmDialog({
     reversible = false,
     affected,
     confirmation,
+    reasonRequired = false,
     confirmLabel = 'Confirm',
     processing = false,
     onConfirm,
     onCancel,
 }) {
     const [value, setValue] = useState('');
+    const [reason, setReason] = useState('');
+
+    useEffect(() => {
+        if (open) {
+            setValue('');
+            setReason('');
+        }
+    }, [open]);
 
     if (!open) {
         return null;
@@ -37,9 +46,9 @@ export default function DangerConfirmDialog({
                     <Button variant="secondary" onClick={onCancel}>Cancel</Button>
                     <Button
                         variant="danger"
-                        onClick={onConfirm}
+                        onClick={() => onConfirm(reason)}
                         loading={processing}
-                        disabled={confirmation ? value !== confirmation : false}
+                        disabled={(confirmation ? value !== confirmation : false) || (reasonRequired && !reason.trim())}
                     >
                         {confirmLabel}
                     </Button>
@@ -58,6 +67,12 @@ export default function DangerConfirmDialog({
                             Type <span className="font-semibold text-slate-900">{confirmation}</span> to confirm.
                         </p>
                         <Input value={value} onChange={(event) => setValue(event.target.value)} autoComplete="off" />
+                    </div>
+                )}
+                {reasonRequired && (
+                    <div>
+                        <p className="mb-1.5 text-xs text-slate-500">Reason (stored in the audit log)</p>
+                        <Input value={reason} onChange={(event) => setReason(event.target.value)} autoComplete="off" />
                     </div>
                 )}
             </div>

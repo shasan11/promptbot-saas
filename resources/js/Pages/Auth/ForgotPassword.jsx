@@ -6,7 +6,7 @@ import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
-export default function ForgotPassword({ status }) {
+export default function ForgotPassword({ status, emailRoute = 'password.email', loginRoute = 'login' }) {
     const { data, setData, post, processing, errors } = useForm({
         email: '',
     });
@@ -14,7 +14,7 @@ export default function ForgotPassword({ status }) {
     const submit = (event) => {
         event.preventDefault();
 
-        post(route('password.email'));
+        post(route(emailRoute));
     };
 
     return (
@@ -46,7 +46,7 @@ export default function ForgotPassword({ status }) {
                 </Button>
             </form>
 
-            <Link href={route('login')} className="mt-6 flex items-center gap-1.5 text-sm font-semibold text-navy-800 hover:text-brand-700">
+            <Link href={route(loginRoute)} className="mt-6 flex items-center gap-1.5 text-sm font-semibold text-navy-800 hover:text-brand-700">
                 <ArrowLeft className="h-4 w-4" /> Back to login
             </Link>
         </GuestLayout>

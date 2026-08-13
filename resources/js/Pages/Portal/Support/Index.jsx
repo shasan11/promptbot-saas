@@ -1,0 +1,6 @@
+import Panel from '@/Components/Portal/Panel';
+import StatusPill from '@/Components/Portal/StatusPill';
+import PortalLayout from '@/Layouts/PortalLayout';
+import { Link } from '@inertiajs/react';
+
+export default function Index({ tickets }) { return <PortalLayout title="Support tickets" actions={<Link href={route('portal.support.create')} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Create ticket</Link>}><Panel>{tickets.data.length ? <div className="divide-y">{tickets.data.map((ticket) => <Link href={route('portal.support.show', ticket.id)} key={ticket.id} className="grid gap-2 py-4 sm:grid-cols-[120px_1fr_150px_100px]"><span className="text-sm font-semibold text-indigo-600">{ticket.number}</span><div><p className="font-medium text-slate-900">{ticket.subject}</p><p className="text-sm text-slate-500">{ticket.tenant?.company_name || 'General account'}</p></div><span className="self-center text-sm capitalize text-slate-500">{ticket.category}</span><span className="self-center"><StatusPill value={ticket.status} /></span></Link>)}</div> : <div className="py-14 text-center"><p className="font-semibold text-slate-900">No open support tickets</p><p className="mt-1 text-sm text-slate-500">Create a ticket whenever you need help.</p></div>}</Panel></PortalLayout>; }

@@ -1,245 +1,109 @@
 import PageHeader from '@/Components/Superadmin/PageHeader';
 import Alert from '@/Components/UI/Alert';
-import Badge from '@/Components/UI/Badge';
 import Button from '@/Components/UI/Button';
 import { SectionCard } from '@/Components/UI/Card';
-import FormField from '@/Components/UI/FormField';
-import Input from '@/Components/UI/Input';
-import Select from '@/Components/UI/Select';
-import Textarea from '@/Components/UI/Textarea';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Copy, ExternalLink, Eye, EyeOff, GripVertical, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-function DetailsForm({ page }) {
-    const { data, setData, post, put, processing, errors, isDirty } = useForm({
-        title: page?.title || '',
-        slug: page?.slug || '',
-        status: page?.status || 'draft',
-        seo_title: page?.seo?.title || '',
-        seo_description: page?.seo?.description || '',
-    });
+const inputClass = 'mt-1.5 w-full rounded-lg border-slate-300 text-sm';
+const itemSchemas = {
+    logo_cloud: ['name', 'image_url', 'url'],
+    feature_grid: ['icon', 'title', 'description', 'url'],
+    feature_list: ['title', 'description'],
+    feature_showcase: ['title', 'description'],
+    stats: ['value', 'label'],
+    testimonials: ['quote', 'name', 'role', 'company', 'avatar_url', 'logo_url'],
+    integrations: ['name', 'description', 'image_url', 'url'],
+    how_it_works: ['title', 'description'],
+    faq: ['question', 'answer'],
+    gallery: ['image_url', 'alt_text'],
+    how_it_works: ['title', 'description'],
+    comparison_table: ['feature', 'starter', 'growth', 'scale'],
+    pricing: ['name', 'description', 'monthly_price', 'annual_price', 'currency', 'url'],
+};
+const itemCollectionKeys = { how_it_works: 'steps', comparison_table: 'rows' };
 
+function PageDetails({ page }) {
+    const { media = [] } = usePage().props;
+    const form = useForm({
+        title: page?.title || '', slug: page?.slug || '', page_type: page?.page_type || 'standard',
+        template: page?.template || 'default', status: page?.status || 'draft', scheduled_at: page?.scheduled_at || '',
+        seo_title: page?.seo?.title || '', seo_description: page?.seo?.description || '',
+        canonical_url: page?.canonical_url || '', robots_index: page?.robots_index ?? true, robots_follow: page?.robots_follow ?? true,
+        og_title: page?.open_graph?.title || '', og_description: page?.open_graph?.description || '', og_image: page?.open_graph?.image || '',
+        twitter_title: page?.twitter?.title || '', twitter_description: page?.twitter?.description || '', twitter_image: page?.twitter?.image || '',
+        schema_json: page?.schema_json ? JSON.stringify(page.schema_json, null, 2) : '', create_slug_redirect: true,
+    });
+    const [schemaError, setSchemaError] = useState('');
     const submit = (event) => {
         event.preventDefault();
-        page ? put(route('superadmin.website.pages.update', page.id)) : post(route('superadmin.website.pages.store'));
+        let schema = null;
+        try { schema = form.data.schema_json.trim() ? JSON.parse(form.data.schema_json) : null; if (schema !== null && typeof schema !== 'object') throw new Error(); setSchemaError(''); }
+        catch { setSchemaError('Structured data must be valid JSON.'); return; }
+        form.transform((data) => ({ ...data, schema_json: schema }));
+        page ? form.put(route('superadmin.website.pages.update', page.id)) : form.post(route('superadmin.website.pages.store'));
     };
-
-    return (
-        <form onSubmit={submit}>
-            <SectionCard title="Page details">
-                <div className="grid gap-5 md:grid-cols-2">
-                    <FormField id="title" label="Title" required error={errors.title}>
-                        <Input id="title" value={data.title} error={!!errors.title} onChange={(event) => setData('title', event.target.value)} />
-                    </FormField>
-                    <FormField id="slug" label="Slug" required error={errors.slug} hint={data.slug === 'home' ? 'Renders at the site root.' : undefined}>
-                        <Input id="slug" value={data.slug} error={!!errors.slug} onChange={(event) => setData('slug', event.target.value)} placeholder="home" />
-                    </FormField>
-                    <FormField id="status" label="Status" error={errors.status}>
-                        <Select id="status" value={data.status} onChange={(event) => setData('status', event.target.value)}>
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                        </Select>
-                    </FormField>
-                    <div />
-                    <FormField id="seo_title" label="SEO title" optional error={errors.seo_title} hint={`${data.seo_title.length}/60 characters`}>
-                        <Input id="seo_title" maxLength={70} value={data.seo_title} onChange={(event) => setData('seo_title', event.target.value)} />
-                    </FormField>
-                    <FormField id="seo_description" label="SEO description" optional error={errors.seo_description} hint={`${data.seo_description.length}/160 characters`}>
-                        <Input id="seo_description" maxLength={180} value={data.seo_description} onChange={(event) => setData('seo_description', event.target.value)} />
-                    </FormField>
-                </div>
-
-                {(data.seo_title || data.seo_description) && (
-                    <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Search result preview</p>
-                        <p className="truncate text-sm text-blue-800">{data.seo_title || data.title || 'Untitled page'}</p>
-                        <p className="text-xs text-brand-700">yoursite.com/{data.slug === 'home' ? '' : data.slug}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{data.seo_description || 'No description set yet.'}</p>
-                    </div>
-                )}
-            </SectionCard>
-            <div className="mt-4 flex items-center justify-end gap-3">
-                {isDirty && <span className="text-xs font-medium text-amber-700">Unsaved changes</span>}
-                <Button type="submit" variant="brand" loading={processing}>{page ? 'Save details' : 'Create page'}</Button>
-            </div>
-        </form>
-    );
+    const field = (key, label, type = 'text') => <label className="text-sm font-medium text-slate-700">{label}<input type={type} list={key.includes('image') ? 'cms-media-urls' : undefined} value={form.data[key] || ''} onChange={(event) => form.setData(key, event.target.value)} className={inputClass} />{form.errors[key] && <span className="text-xs text-rose-600">{form.errors[key]}</span>}</label>;
+    return <form onSubmit={submit} className="space-y-6"><datalist id="cms-media-urls">{media.map(item => <option key={item.id} value={item.url}>{item.filename}</option>)}</datalist>
+        <SectionCard title="Page details"><div className="grid gap-4 md:grid-cols-2">
+            {field('title', 'Title')}{field('slug', 'Slug')}
+            <label className="text-sm font-medium">Page type<select value={form.data.page_type} onChange={(event) => form.setData('page_type', event.target.value)} className={inputClass}>{['standard','home','pricing','features','integrations','about','contact','legal','custom'].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label className="text-sm font-medium">Status<select value={form.data.status} onChange={(event) => form.setData('status', event.target.value)} className={inputClass}>{['draft','scheduled','published','archived'].map((value) => <option key={value}>{value}</option>)}</select></label>
+            {form.data.status === 'scheduled' && field('scheduled_at', 'Publish at', 'datetime-local')}
+        </div></SectionCard>
+        <SectionCard title="Search and social metadata" description="Control search snippets, canonical URL, robots, Open Graph, Twitter, and structured data."><div className="grid gap-4 md:grid-cols-2">
+            {field('seo_title','SEO title')}{field('seo_description','Meta description')}{field('canonical_url','Canonical URL')}
+            <div className="flex items-center gap-5 pt-7 text-sm"><label><input type="checkbox" className="mr-2 rounded" checked={form.data.robots_index} onChange={(event) => form.setData('robots_index', event.target.checked)} />Index</label><label><input type="checkbox" className="mr-2 rounded" checked={form.data.robots_follow} onChange={(event) => form.setData('robots_follow', event.target.checked)} />Follow</label></div>
+            {field('og_title','Open Graph title')}{field('og_description','Open Graph description')}{field('og_image','Open Graph image URL')}
+            {field('twitter_title','Twitter title')}{field('twitter_description','Twitter description')}{field('twitter_image','Twitter image URL')}
+        </div><label className="mt-4 block text-sm font-medium text-slate-700">Structured data (JSON-LD)<textarea rows="7" className={`${inputClass} font-mono`} value={form.data.schema_json} onChange={(event) => form.setData('schema_json', event.target.value)} placeholder={'{"@context":"https://schema.org","@type":"WebPage"}'} /></label>{(schemaError || form.errors.schema_json) && <p className="mt-1 text-xs text-rose-600">{schemaError || form.errors.schema_json}</p>}<div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">SERP preview</p><p className="mt-2 text-lg text-blue-800">{form.data.seo_title || form.data.title || 'Untitled page'}</p><p className="text-sm text-emerald-700">yoursite.com/{form.data.slug === 'home' ? '' : form.data.slug}</p><p className="mt-1 text-sm text-slate-600">{form.data.seo_description || 'Add a concise page description.'}</p></div>{page && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.data.create_slug_redirect} onChange={(event) => form.setData('create_slug_redirect', event.target.checked)} className="rounded" />Create a 301 redirect automatically if this published page's slug changes</label>}</SectionCard>
+        <div className="flex justify-end"><Button type="submit" variant="brand" loading={form.processing}>{page ? 'Save details' : 'Create page'}</Button></div>
+    </form>;
 }
 
-const emptyContent = (type) => {
-    if (type === 'hero') return { heading: '', subheading: '', image_url: '', button_label: '', button_url: '' };
-    if (type === 'cta') return { heading: '', button_label: '', button_url: '' };
-
-    return { html: '' };
-};
-
-function SectionFields({ section, onChange }) {
-    const content = section.content || {};
-    const set = (key, value) => onChange({ ...section, content: { ...content, [key]: value } });
-
-    if (section.type === 'rich_text') {
-        return (
-            <FormField label="HTML content">
-                <Textarea className="min-h-32 font-mono" value={content.html || ''} onChange={(event) => set('html', event.target.value)} />
-            </FormField>
-        );
-    }
-
-    if (section.type === 'hero') {
-        return (
-            <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="Heading"><Input value={content.heading || ''} onChange={(event) => set('heading', event.target.value)} /></FormField>
-                <FormField label="Subheading"><Input value={content.subheading || ''} onChange={(event) => set('subheading', event.target.value)} /></FormField>
-                <FormField label="Image URL" className="md:col-span-2"><Input value={content.image_url || ''} onChange={(event) => set('image_url', event.target.value)} /></FormField>
-                <FormField label="Button label"><Input value={content.button_label || ''} onChange={(event) => set('button_label', event.target.value)} /></FormField>
-                <FormField label="Button URL"><Input value={content.button_url || ''} onChange={(event) => set('button_url', event.target.value)} /></FormField>
-            </div>
-        );
-    }
-
-    return (
-        <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Heading" className="md:col-span-2"><Input value={content.heading || ''} onChange={(event) => set('heading', event.target.value)} /></FormField>
-            <FormField label="Button label"><Input value={content.button_label || ''} onChange={(event) => set('button_label', event.target.value)} /></FormField>
-            <FormField label="Button URL"><Input value={content.button_url || ''} onChange={(event) => set('button_url', event.target.value)} /></FormField>
-        </div>
-    );
+function ItemsField({ block, setContent }) {
+    const schema = itemSchemas[block.type];
+    const collectionKey = itemCollectionKeys[block.type] || 'items';
+    if (!schema || !Array.isArray(block.content[collectionKey])) return null;
+    const items = block.content[collectionKey];
+    const update = (index, key, value) => setContent(collectionKey, items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+    return <div className="md:col-span-2"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold capitalize">{collectionKey.replaceAll('_', ' ')}</p><button type="button" onClick={() => setContent(collectionKey, [...items, Object.fromEntries(schema.map((key) => [key, '']))])} className="text-sm font-semibold text-indigo-600">+ Add item</button></div><div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2">{schema.map((key) => <label key={key} className="text-xs font-semibold capitalize text-slate-600">{key.replaceAll('_',' ')}{['description','quote','answer'].includes(key) ? <textarea rows="2" className={inputClass} value={item[key] || ''} onChange={(event) => update(index,key,event.target.value)} /> : <input list={key.includes('image') || key.includes('avatar') || key.includes('logo') ? 'cms-media-urls' : undefined} className={inputClass} value={item[key] || ''} onChange={(event) => update(index,key,event.target.value)} />}</label>)}<button type="button" onClick={() => setContent(collectionKey, items.filter((_, itemIndex) => itemIndex !== index))} className="text-left text-xs font-semibold text-rose-600">Remove item</button></div>)}</div></div>;
 }
 
-function SectionPreview({ section }) {
-    const content = section.content || {};
-
-    if (section.type === 'hero') {
-        return (
-            <div className="rounded-md bg-navy-900 p-6 text-center text-white">
-                <h3 className="text-lg font-bold">{content.heading || 'Hero heading'}</h3>
-                {content.subheading && <p className="mt-1 text-sm text-slate-300">{content.subheading}</p>}
-                {content.button_label && <span className="mt-3 inline-block rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold">{content.button_label}</span>}
-            </div>
-        );
-    }
-
-    if (section.type === 'cta') {
-        return (
-            <div className="flex items-center justify-between rounded-md bg-brand-50 p-4">
-                <span className="text-sm font-semibold text-brand-900">{content.heading || 'Call to action heading'}</span>
-                {content.button_label && <span className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">{content.button_label}</span>}
-            </div>
-        );
-    }
-
-    return <div className="prose prose-sm max-w-none rounded-md bg-white p-4" dangerouslySetInnerHTML={{ __html: content.html || '<p class="text-slate-400">Empty rich text block</p>' }} />;
+function BlockFields({ block, onChange }) {
+    const setContent = (key, value) => onChange({ ...block, content: { ...block.content, [key]: value } });
+    const scalars = Object.entries(block.content).filter(([, value]) => !Array.isArray(value) && value !== null);
+    return <div className="grid gap-4 md:grid-cols-2">{scalars.map(([key, value]) => <label key={key} className={['description','html'].includes(key) ? 'text-sm font-medium capitalize md:col-span-2' : 'text-sm font-medium capitalize'}>{key.replaceAll('_',' ')}{typeof value === 'boolean' ? <span className="mt-3 flex items-center gap-2"><input type="checkbox" checked={value} onChange={(event) => setContent(key,event.target.checked)} className="rounded" />Enabled</span> : key === 'data_source' ? <select className={inputClass} value={value} onChange={(event) => setContent(key,event.target.value)}><option value="live_plans">Live plans</option><option value="manual">Manual</option></select> : ['description','html'].includes(key) ? <textarea rows={key === 'html' ? 7 : 3} className={key === 'html' ? inputClass + ' font-mono' : inputClass} value={value} onChange={(event) => setContent(key,event.target.value)} /> : <input list={key.includes('image') || key.includes('poster') ? 'cms-media-urls' : undefined} className={inputClass} value={value} onChange={(event) => setContent(key,event.target.value)} />}</label>)}{block.type === 'comparison_table' && <label className="text-sm font-medium md:col-span-2">Column labels (comma separated)<Input value={(block.content.columns || []).join(', ')} onChange={(event) => setContent('columns', event.target.value.split(',').map(value => value.trim()).filter(Boolean))} /></label>}<ItemsField block={block} setContent={setContent} /></div>;
 }
 
-function SectionsEditor({ page, sectionTypes }) {
-    const [sections, setSections] = useState(page.sections?.map((section) => ({ type: section.type, content: section.content || {} })) || []);
-    const [collapsed, setCollapsed] = useState({});
+function BlocksEditor({ page, blockDefinitions }) {
+    const { auth } = usePage().props;
+    const available = blockDefinitions.filter((definition) => !definition.permission || auth.permissions.includes(definition.permission));
+    const [blocks, setBlocks] = useState(page.sections.map((section) => ({ type: section.type, content: section.content || {}, is_hidden: section.is_hidden || false })));
     const [saving, setSaving] = useState(false);
-    const [dirty, setDirty] = useState(false);
-
-    const mutate = (next) => { setSections(next); setDirty(true); };
-    const addSection = (type) => mutate([...sections, { type, content: emptyContent(type) }]);
-    const removeSection = (index) => mutate(sections.filter((_, sectionIndex) => sectionIndex !== index));
-    const updateSection = (index, next) => mutate(sections.map((section, sectionIndex) => (sectionIndex === index ? next : section)));
-    const move = (index, direction) => {
-        const next = [...sections];
-        const target = index + direction;
-        if (target < 0 || target >= next.length) return;
+    const [draggedIndex, setDraggedIndex] = useState(null);
+    const definition = (type) => available.find((item) => item.key === type) || blockDefinitions.find((item) => item.key === type);
+    const add = (item) => setBlocks([...blocks, { type: item.key, content: structuredClone(item.defaults), is_hidden: false }]);
+    const move = (index, offset) => {
+        const target = index + offset;
+        if (target < 0 || target >= blocks.length) return;
+        const next = [...blocks];
         [next[index], next[target]] = [next[target], next[index]];
-        mutate(next);
+        setBlocks(next);
     };
-
     const save = () => {
         setSaving(true);
-        router.put(route('superadmin.website.pages.sections', page.id), { sections }, {
-            preserveScroll: true,
-            onFinish: () => setSaving(false),
-            onSuccess: () => setDirty(false),
-        });
+        router.put(route('superadmin.website.pages.sections', page.id), { sections: blocks }, { preserveScroll: true, onFinish: () => setSaving(false) });
     };
-
-    return (
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-soft">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h2 className="text-sm font-semibold text-slate-900">Sections</h2>
-                        <p className="mt-1 text-xs text-slate-500">Rendered top to bottom on the public page.</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {sectionTypes.map((type) => (
-                            <Button key={type} variant="secondary" size="sm" onClick={() => addSection(type)}>+ {type.replace('_', ' ')}</Button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    {sections.map((section, index) => {
-                        const isCollapsed = collapsed[index];
-                        return (
-                            <div key={index} className="rounded-md border border-slate-200 bg-slate-50">
-                                <div className="flex items-center justify-between gap-2 p-3">
-                                    <button type="button" onClick={() => setCollapsed((state) => ({ ...state, [index]: !state[index] }))} className="flex items-center gap-2">
-                                        {isCollapsed ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
-                                        <Badge tone="neutral">{section.type.replace('_', ' ')}</Badge>
-                                    </button>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="sm" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up">Up</Button>
-                                        <Button variant="ghost" size="sm" onClick={() => move(index, 1)} disabled={index === sections.length - 1} aria-label="Move down">Down</Button>
-                                        <Button variant="ghost" size="sm" icon={Trash2} onClick={() => removeSection(index)} aria-label="Remove section" />
-                                    </div>
-                                </div>
-                                {!isCollapsed && <div className="border-t border-slate-200 p-4"><SectionFields section={section} onChange={(next) => updateSection(index, next)} /></div>}
-                            </div>
-                        );
-                    })}
-                    {!sections.length && <p className="rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">No sections yet. Add one above.</p>}
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-3">
-                    {dirty && <span className="text-xs font-medium text-amber-700">Unsaved changes</span>}
-                    <Button type="button" variant="brand" loading={saving} onClick={save}>Save sections</Button>
-                </div>
-            </section>
-
-            <aside className="xl:sticky xl:top-20 xl:h-fit">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Live preview</p>
-                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-100 p-4">
-                    {sections.length ? sections.map((section, index) => <SectionPreview key={index} section={section} />) : <p className="py-10 text-center text-sm text-slate-400">Nothing to preview yet.</p>}
-                </div>
-            </aside>
-        </div>
-    );
+    return <div className="mt-6 grid gap-6 xl:grid-cols-[260px_1fr]">
+        <aside className="h-fit rounded-lg border border-slate-200 bg-white p-4 xl:sticky xl:top-20"><h2 className="font-semibold">Add blocks</h2><div className="mt-3 space-y-1">{available.map((item) => <button key={item.key} type="button" onClick={() => add(item)} className="flex w-full justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50"><span>{item.label}</span><span className="text-xs text-slate-400">{item.category}</span></button>)}</div></aside>
+        <section className="space-y-4">{blocks.map((block,index) => <div key={index} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (draggedIndex === null || draggedIndex === index) return; const next = [...blocks]; const [dragged] = next.splice(draggedIndex, 1); next.splice(index, 0, dragged); setBlocks(next); setDraggedIndex(null); }} className={`${block.is_hidden ? 'opacity-60' : ''} rounded-lg border bg-white ${draggedIndex === index ? 'ring-2 ring-indigo-300' : ''}`}><header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3"><div className="flex items-center gap-2"><span draggable onDragStart={() => setDraggedIndex(index)} onDragEnd={() => setDraggedIndex(null)} title="Drag to reorder" className="cursor-grab text-slate-400"><GripVertical className="h-4 w-4" /></span><div><p className="font-semibold">{definition(block.type)?.label || block.type}</p><p className="text-xs text-slate-500">Position {index + 1}</p></div></div><div className="flex items-center gap-1"><button type="button" onClick={() => move(index,-1)} disabled={!index} className="rounded px-2 py-1 text-xs font-semibold disabled:opacity-30">Up</button><button type="button" onClick={() => move(index,1)} disabled={index===blocks.length-1} className="rounded px-2 py-1 text-xs font-semibold disabled:opacity-30">Down</button><button type="button" title="Duplicate" onClick={() => setBlocks([...blocks.slice(0,index+1), structuredClone(block), ...blocks.slice(index+1)])} className="p-2 text-slate-500"><Copy className="h-4 w-4"/></button><button type="button" title={block.is_hidden?'Show':'Hide'} onClick={() => setBlocks(blocks.map((item,i)=>i===index?{...item,is_hidden:!item.is_hidden}:item))} className="p-2 text-slate-500">{block.is_hidden?<Eye className="h-4 w-4"/>:<EyeOff className="h-4 w-4"/>}</button><button type="button" title="Delete" onClick={() => setBlocks(blocks.filter((_,i)=>i!==index))} className="p-2 text-rose-600"><Trash2 className="h-4 w-4"/></button></div></header><div className="p-4"><BlockFields block={block} onChange={(next)=>setBlocks(blocks.map((item,i)=>i===index?next:item))}/></div></div>)}{!blocks.length&&<div className="rounded-lg border border-dashed p-12 text-center text-sm text-slate-500">Add the first block from the library.</div>}<div className="flex justify-end"><Button type="button" variant="brand" loading={saving} onClick={save}>Save blocks</Button></div></section>
+    </div>;
 }
 
-export default function PageEditor({ page, sectionTypes }) {
-    return (
-        <AuthenticatedLayout
-            header={(
-                <PageHeader
-                    title={page ? `Edit: ${page.title}` : 'Create page'}
-                    subtitle="Page details and content sections."
-                    actions={(
-                        <div className="flex gap-2">
-                            {page?.status === 'published' && (
-                                <Button href={`/${page.slug === 'home' ? '' : page.slug}`} variant="secondary" icon={ExternalLink}>View public page</Button>
-                            )}
-                            <Button href={route('superadmin.website.index')} variant="secondary">Back to website</Button>
-                        </div>
-                    )}
-                />
-            )}
-        >
-            <Head title={page ? `Edit ${page.title}` : 'Create page'} />
-
-            {page && page.status === 'draft' && (
-                <Alert tone="info" className="mb-6">This page is a draft and won't appear on the public site until you publish it.</Alert>
-            )}
-
-            <DetailsForm page={page} />
-            {page && <SectionsEditor page={page} sectionTypes={sectionTypes} />}
-        </AuthenticatedLayout>
-    );
+export default function PageEditor({ page, blockDefinitions = [], previewUrl, revisions = [] }) {
+    const title = page ? 'Edit: ' + page.title : 'Create page';
+    return <AuthenticatedLayout header={<PageHeader title={title} subtitle="Structured blocks, publishing workflow, revisions, and page-level SEO." actions={<div className="flex gap-2">{previewUrl&&<Button href={previewUrl} variant="secondary" icon={ExternalLink}>Preview draft</Button>}<Button href={route('superadmin.website.index')} variant="secondary">Back</Button></div>}/>}><Head title={title} />{page?.status !== 'published'&&<Alert tone="info" className="mb-6">This page is not publicly visible. Use the signed preview while editing.</Alert>}<PageDetails page={page}/>{page&&<BlocksEditor page={page} blockDefinitions={blockDefinitions}/>} {page&&revisions.length>0&&<SectionCard title="Revision history" className="mt-6"><div className="divide-y">{revisions.map((revision)=><div key={revision.id} className="flex items-center justify-between py-3 text-sm"><span>Version {revision.version} · {new Date(revision.created_at).toLocaleString()}</span><button onClick={()=>router.post(route('superadmin.website.pages.revisions.restore',[page.id,revision.id]))} className="font-semibold text-indigo-600">Restore</button></div>)}</div></SectionCard>}</AuthenticatedLayout>;
 }

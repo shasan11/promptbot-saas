@@ -1,0 +1,17 @@
+import Panel from '@/Components/Portal/Panel';
+import StatusPill from '@/Components/Portal/StatusPill';
+import PortalLayout from '@/Layouts/PortalLayout';
+import { router, useForm, usePage } from '@inertiajs/react';
+
+export default function Show({ ticket }) {
+    const user = usePage().props.auth.user;
+    const form = useForm({ body: '', attachment: null });
+    const reply = event => { event.preventDefault(); form.post(route('portal.support.reply', ticket.id), { forceFormData: true, onSuccess: () => form.reset('body', 'attachment') }); };
+    return <PortalLayout title={ticket.subject} actions={<div className="flex items-center gap-2"><StatusPill value={ticket.priority} /><StatusPill value={ticket.status} /></div>}><div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <Panel title={ticket.number} description={ticket.tenant?.company_name || 'General account'}><div className="rounded-lg bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-900">{ticket.requester_name}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{ticket.description}</p></div>
+            <div className="mt-5 space-y-4">{ticket.messages.map(message => { const mine = message.portal_user?.id === user.id; return <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] rounded-xl px-4 py-3 ${mine ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}><p className="text-xs font-semibold opacity-70">{message.portal_user?.name || message.central_user?.name || 'PromptBot Support'}</p><p className="mt-1 whitespace-pre-wrap text-sm">{message.body}</p>{message.has_attachment && <a href={route('portal.support.attachments.download', [ticket.id, message.id])} className="mt-3 block rounded-lg border border-current/20 px-3 py-2 text-xs font-semibold underline">Download {message.attachment_name || 'attachment'}{message.attachment_size ? ` · ${Math.ceil(message.attachment_size / 1024)} KB` : ''}</a>}<p className="mt-2 text-[11px] opacity-60">{new Date(message.created_at).toLocaleString()}</p></div></div>; })}</div>
+            {ticket.status !== 'closed' && <form onSubmit={reply} className="mt-6 space-y-3"><textarea rows="4" required value={form.data.body} onChange={event => form.setData('body', event.target.value)} className="w-full rounded-lg border-slate-300" placeholder="Write a reply…" /><input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv" onChange={event => form.setData('attachment', event.target.files[0] || null)} className="block w-full text-sm" />{Object.values(form.errors).map(error => <p key={error} className="text-xs text-rose-600">{error}</p>)}<button disabled={form.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Send reply</button></form>}
+        </Panel>
+        <Panel title="Ticket details"><dl className="space-y-4 text-sm">{[['Status',ticket.status],['Priority',ticket.priority],['Category',ticket.category],['Created',new Date(ticket.created_at).toLocaleString()]].map(([key,value]) => <div key={key}><dt className="text-xs uppercase text-slate-500">{key}</dt><dd className="mt-1 font-medium capitalize">{value}</dd></div>)}</dl>{ticket.status !== 'closed' && <button onClick={() => router.post(route('portal.support.close', ticket.id))} className="mt-6 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Close ticket</button>}</Panel>
+    </div></PortalLayout>;
+}

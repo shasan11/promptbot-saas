@@ -40,11 +40,17 @@ class TenantProvisioningService
                 ['slug' => $slug],
                 [
                     'id' => $slug,
+                    'customer_account_id' => $data['customer_account_id'] ?? null,
                     'company_name' => $data['company_name'],
+                    'region' => $data['region'] ?? null,
                     'plan_id' => $data['plan_id'] ?? Plan::query()->where('is_active', true)->orderBy('sort_order')->value('id'),
                     'status' => TenantStatus::Pending,
                 ]
             );
+
+            if (isset($data['customer_account_id']) && (int) $tenant->customer_account_id !== (int) $data['customer_account_id']) {
+                throw new TenancyProvisioningException('This workspace slug is already owned by another customer account.', 'validation');
+            }
 
             return $this->runProvisioning($tenant, $data);
         } finally {
@@ -52,16 +58,15 @@ class TenantProvisioningService
         }
     }
 
-    public function retry(Tenant $tenant): Tenant
+    public function retry(Tenant $tenant, array $data = []): Tenant
     {
-        return $this->runProvisioning($tenant, [
+        return $this->runProvisioning($tenant, [...[
             'company_name' => $tenant->company_name,
             'slug' => $tenant->slug,
-            'owner_name' => 'Tenant Owner',
-            'owner_email' => 'owner@'.$tenant->slug.'.invalid',
-            'owner_password' => Str::password(24),
+            'region' => $tenant->region,
+            'create_tenant_owner' => false,
             'provisioning_mode' => config('saas.db_provisioning_mode', 'manual'),
-        ]);
+        ], ...$data]);
     }
 
     public function suspend(Tenant $tenant): void
@@ -119,7 +124,9 @@ class TenantProvisioningService
 
             $this->mark($tenant, TenantStatus::Seeding, 'seeding');
             Artisan::call('tenants:seed', ['--tenants' => [$tenant->id], '--class' => 'Database\\Seeders\\TenantDatabaseSeeder', '--force' => true]);
-            $this->createTenantOwner($tenant, $data);
+            if ($data['create_tenant_owner'] ?? true) {
+                $this->createTenantOwner($tenant, $data);
+            }
 
             if (! $tenant->domains()->where('type', 'subdomain')->exists()) {
                 $tenant->domains()->create([
@@ -133,7 +140,7 @@ class TenantProvisioningService
 
             $this->mark($tenant, TenantStatus::Active, 'active');
             $tenant->forceFill(['provisioned_at' => now(), 'last_provisioning_error' => null])->save();
-            $this->subscriptions->createInitialSubscription($tenant);
+            $this->subscriptions->createInitialSubscription($tenant, null, $data['billing_interval'] ?? 'monthly');
 
             return $tenant->refresh();
         } catch (Throwable $exception) {
@@ -198,10 +205,14 @@ class TenantProvisioningService
             'company_name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'alpha_dash:ascii', 'max:60'],
             'subdomain' => ['nullable', 'string', 'max:255'],
-            'owner_name' => ['required', 'string', 'max:255'],
-            'owner_email' => ['required', 'email:rfc'],
-            'owner_password' => ['required', 'string', 'min:10'],
+            'region' => ['nullable', 'string', 'max:100'],
+            'customer_account_id' => ['nullable', 'exists:customer_accounts,id'],
+            'create_tenant_owner' => ['nullable', 'boolean'],
+            'owner_name' => ['nullable', 'required_if:create_tenant_owner,true', 'string', 'max:255'],
+            'owner_email' => ['nullable', 'required_if:create_tenant_owner,true', 'email:rfc'],
+            'owner_password' => ['nullable', 'required_if:create_tenant_owner,true', 'string', 'min:10'],
             'plan_id' => ['nullable', 'exists:plans,id'],
+            'billing_interval' => ['nullable', 'in:monthly,yearly'],
             'provisioning_mode' => ['nullable', 'in:manual,cpanel,mysql'],
             'database_host' => ['nullable', 'string', 'max:255'],
             'database_port' => ['nullable', 'integer', 'min:1', 'max:65535'],

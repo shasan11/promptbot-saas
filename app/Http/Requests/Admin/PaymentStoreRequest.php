@@ -14,7 +14,8 @@ class PaymentStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'string', 'exists:tenants,id'],
+            'customer_account_id' => ['required', 'integer', 'exists:customer_accounts,id'],
+            'tenant_id' => ['nullable', 'string', 'exists:tenants,id'],
             'invoice_id' => ['nullable', 'uuid', 'exists:invoices,id'],
             'subscription_id' => ['nullable', 'integer', 'exists:subscriptions,id'],
             'provider' => ['required', 'in:manual,bank_transfer,stripe,paypal,khalti,esewa'],

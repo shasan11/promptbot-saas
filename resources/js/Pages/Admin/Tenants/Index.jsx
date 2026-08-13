@@ -21,6 +21,9 @@ const statusOptions = [
     { value: 'pending', label: 'Pending' },
     { value: 'suspended', label: 'Suspended' },
     { value: 'failed', label: 'Failed' },
+    { value: 'trial', label: 'Trial' },
+    { value: 'past_due', label: 'Past due' },
+    { value: 'cancelled', label: 'Cancelled' },
 ];
 
 function tenantUrl(domain) {
@@ -33,6 +36,10 @@ export default function Index({ tenants, filters = {} }) {
     const [search, setSearch] = useState(filters.search || '');
     const [status, setStatus] = useState(filters.status || '');
     const rows = tenants?.data || [];
+    const lifecycle = (operation, tenant) => {
+        const reason = window.prompt(`Reason to ${operation} ${tenant.company_name}:`);
+        if (reason?.trim()) router.post(route(`superadmin.tenants.${operation}`, tenant.id), { reason: reason.trim() });
+    };
 
     const applyFilters = (next = {}) => {
         const params = { search, status, ...next };
@@ -58,8 +65,10 @@ export default function Index({ tenants, filters = {} }) {
                 </div>
             ),
         },
+        { title: 'Customer account', dataIndex: ['customer_account', 'name'], render: (value, tenant) => <div><span className="font-medium">{value || '—'}</span><p className="text-xs text-slate-500">{tenant.customer_account?.owner?.name || tenant.customer_account?.owner?.email || 'No owner'}</p></div> },
         { title: 'Status', dataIndex: 'status', render: (status) => <StatusBadge status={status} /> },
         { title: 'Plan', dataIndex: ['plan', 'name'], render: (value) => value || '—' },
+        { title: 'Subscription', dataIndex: 'subscriptions', render: (subscriptions = []) => subscriptions[0] ? <div><StatusBadge status={subscriptions[0].status} /><p className="mt-1 text-xs capitalize text-slate-500">{subscriptions[0].billing_interval}</p></div> : '—' },
         {
             title: 'Primary domain',
             dataIndex: 'domains',
@@ -84,7 +93,10 @@ export default function Index({ tenants, filters = {} }) {
                 );
             },
         },
+        { key: 'usage', title: 'Usage', dataIndex: 'id', render: (_, tenant) => <Link href={route('superadmin.usage.index', { tenant_id: tenant.id })} className="text-xs font-semibold text-brand-700">View usage</Link> },
+        { title: 'Created', dataIndex: 'created_at', render: value => value ? new Date(value).toLocaleDateString() : '—' },
         {
+            key: 'actions',
             title: '',
             dataIndex: 'id',
             render: (_, tenant) => (
@@ -92,8 +104,8 @@ export default function Index({ tenants, filters = {} }) {
                     items={[
                         { label: 'View details', icon: Eye, onClick: () => router.visit(route('superadmin.tenants.show', tenant.public_uuid || tenant.id)) },
                         tenant.status === 'suspended'
-                            ? { label: 'Reactivate tenant', icon: Play, onClick: () => router.post(route('superadmin.tenants.activate', tenant.id)) }
-                            : { label: 'Suspend tenant', icon: Pause, onClick: () => router.post(route('superadmin.tenants.suspend', tenant.id)) },
+                            ? { label: 'Reactivate tenant', icon: Play, onClick: () => lifecycle('activate', tenant) }
+                            : { label: 'Suspend tenant', icon: Pause, onClick: () => lifecycle('suspend', tenant) },
                     ]}
                 />
             ),

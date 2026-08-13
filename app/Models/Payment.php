@@ -11,8 +11,11 @@ class Payment extends Model
 {
     use HasUuid;
 
+    protected $hidden = ['metadata'];
+
     protected $fillable = [
         'tenant_id',
+        'customer_account_id',
         'invoice_id',
         'subscription_id',
         'provider',
@@ -39,6 +42,11 @@ class Payment extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function customerAccount(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAccount::class);
     }
 
     public function invoice(): BelongsTo

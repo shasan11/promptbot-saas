@@ -5,8 +5,8 @@ import DropdownMenu from '@/Components/UI/DropdownMenu';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity, BadgeDollarSign, BarChart3, Building2, ChevronsLeft, ChevronsRight, CreditCard,
-    Flag, Headphones, LayoutDashboard, LogOut, Menu, ReceiptText, Settings, User,
-    SlidersHorizontal, Tags, X,
+    Flag, Headphones, LayoutDashboard, LogOut, Menu, ReceiptText, Settings, User, Users,
+    SlidersHorizontal, Tags, X, ShieldCheck, Search, Plus, TicketPercent, Mail, RotateCcw, TrendingUp, ServerCog,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -17,23 +17,39 @@ const sections = [
     { title: 'Overview', items: [
         { label: 'Dashboard', route: 'superadmin.dashboard', patterns: ['superadmin.dashboard'], permission: 'dashboard.view', icon: LayoutDashboard },
     ]},
-    { title: 'Tenants', items: [
-        { label: 'Tenants & subdomains', route: 'superadmin.tenants.index', patterns: ['superadmin.tenants.*'], permission: 'tenants.view', icon: Building2 },
+    { title: 'Customers', items: [
+        { label: 'Accounts', route: 'superadmin.customers.accounts.index', patterns: ['superadmin.customers.accounts.*'], permission: 'customers.view', icon: Building2 },
+        { label: 'Portal users', route: 'superadmin.customers.users.index', patterns: ['superadmin.customers.users.*'], permission: 'customers.view', icon: Users },
+        { label: 'Services / Tenants', route: 'superadmin.services.index', patterns: ['superadmin.services.*', 'superadmin.tenants.*'], permission: 'tenants.view', icon: Building2 },
     ]},
-    { title: 'Billing', items: [
+    { title: 'Revenue', items: [
+        { label: 'Overview', route: 'superadmin.revenue.index', patterns: ['superadmin.revenue.*'], permission: 'revenue.view', icon: BadgeDollarSign },
+        { label: 'Growth', route: 'superadmin.growth.index', patterns: ['superadmin.growth.*'], permission: 'revenue.view', icon: TrendingUp },
         { label: 'Plans', route: 'superadmin.billing.plans.index', patterns: ['superadmin.plans.*', 'superadmin.billing.plans.*'], permission: 'plans.view', icon: Tags },
         { label: 'Subscriptions', route: 'superadmin.billing.subscriptions.index', patterns: ['superadmin.subscriptions.*', 'superadmin.billing.subscriptions.*'], permission: 'subscriptions.view', icon: BadgeDollarSign },
         { label: 'Payments', route: 'superadmin.billing.payments.index', patterns: ['superadmin.billing.payments.*'], permission: 'payments.view', icon: CreditCard },
+        { label: 'Refunds', route: 'superadmin.billing.refunds.index', patterns: ['superadmin.billing.refunds.*'], permission: 'payments.view', icon: RotateCcw },
         { label: 'Invoices', route: 'superadmin.billing.invoices.index', patterns: ['superadmin.billing.invoices.*'], permission: 'invoices.view', icon: ReceiptText },
+        { label: 'Coupons', route: 'superadmin.coupons.index', patterns: ['superadmin.coupons.*'], permission: 'coupons.view', icon: TicketPercent },
     ]},
-    { title: 'Support & operations', items: [
+    { title: 'Support', items: [
         { label: 'Tickets', route: 'superadmin.tickets.index', patterns: ['superadmin.tickets.*'], permission: 'support.view', icon: Headphones },
+    ]},
+    { title: 'Website & CMS', items: [
+        { label: 'Website overview', route: 'superadmin.website.index', patterns: ['superadmin.website.*'], permission: 'website.view', icon: SlidersHorizontal },
+    ]},
+    { title: 'Operations', items: [
+        { label: 'Provisioning', route: 'superadmin.operations.provisioning', patterns: ['superadmin.operations.provisioning'], permission: 'operations.view', icon: ServerCog },
         { label: 'Reports', route: 'superadmin.reports.index', patterns: ['superadmin.reports.*'], permission: 'dashboard.view', icon: BarChart3 },
-        { label: 'Website customization', route: 'superadmin.website.index', patterns: ['superadmin.website.*'], permission: 'website.view', icon: SlidersHorizontal },
-        { label: 'System health', route: 'superadmin.operations.health', patterns: ['superadmin.operations.*'], permission: 'operations.view', icon: Activity },
+        { label: 'Usage', route: 'superadmin.usage.index', patterns: ['superadmin.usage.*'], permission: 'usage.view', icon: BarChart3 },
+        { label: 'System health', route: 'superadmin.operations.health', patterns: ['superadmin.operations.health'], permission: 'operations.view', icon: Activity },
+    ]},
+    { title: 'Security', items: [
+        { label: 'Platform admins', route: 'superadmin.security.admins.index', patterns: ['superadmin.security.*'], permission: 'administrators.view', icon: ShieldCheck },
     ]},
     { title: 'Configuration', items: [
         { label: 'Feature flags', route: 'superadmin.features.index', patterns: ['superadmin.features.*'], permission: 'features.view', icon: Flag },
+        { label: 'Email templates', route: 'superadmin.communications.email-templates.index', patterns: ['superadmin.communications.email-templates.*'], permission: 'communications.view', icon: Mail },
         { label: 'General settings', route: 'superadmin.system.settings.index', patterns: ['superadmin.system.settings.*'], permission: 'settings.view', icon: Settings },
     ]},
 ];
@@ -110,11 +126,25 @@ function UserMenu({ user }) {
             )}
             items={[
                 { label: user?.email || 'Signed in', icon: User, disabled: true },
+                { label: 'Two-factor security', icon: ShieldCheck, onClick: () => router.visit(route('superadmin.security.two-factor.setup')) },
                 { divider: true },
                 { label: 'Log out', icon: LogOut, danger: true, onClick: () => router.post(route('logout')) },
             ]}
         />
     );
+}
+
+function HeaderActions({ auth }) {
+    const [query, setQuery] = useState('');
+    const actions = [
+        ['New account', 'superadmin.customers.accounts.create', 'customers.manage'],
+        ['New service', 'superadmin.services.create', 'tenants.create'],
+        ['New invoice', 'superadmin.billing.invoices.create', 'invoices.manage'],
+        ['New ticket', 'superadmin.tickets.create', 'support.manage'],
+        ['New plan', 'superadmin.plans.create', 'plans.create'],
+        ['New page', 'superadmin.website.pages.create', 'website.manage'],
+    ].filter(([, routeName, permission]) => typeof route === 'function' && route().has(routeName) && can(auth, permission));
+    return <div className="flex items-center gap-2"><form onSubmit={event => { event.preventDefault(); if (query.trim()) router.get(route('superadmin.search'), { q: query.trim() }); }} className="hidden items-center md:flex"><Search className="relative left-7 h-4 w-4 text-slate-400" /><input data-platform-search value={query} onChange={event => setQuery(event.target.value)} className="w-64 rounded-lg border-slate-300 py-1.5 pl-9 text-sm" placeholder="Search platform…" /></form>{actions.length > 0 && <DropdownMenu trigger={<span className="flex h-9 items-center gap-1 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" /> <span className="hidden sm:inline">Create</span></span>} items={actions.map(([label, routeName]) => ({ label, onClick: () => router.visit(route(routeName)) }))} />}<UserMenu user={auth?.user} /></div>;
 }
 
 export default function SuperadminLayout({ header, breadcrumbs, children }) {
@@ -127,6 +157,18 @@ export default function SuperadminLayout({ header, breadcrumbs, children }) {
     useEffect(() => {
         window.localStorage.setItem('sa-sidebar-collapsed', collapsed ? '1' : '0');
     }, [collapsed]);
+
+    useEffect(() => {
+        const shortcut = (event) => {
+            if ((event.key === '/' && !event.ctrlKey && !event.metaKey) || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')) {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+                event.preventDefault();
+                document.querySelector('[data-platform-search]')?.focus();
+            }
+        };
+        window.addEventListener('keydown', shortcut);
+        return () => window.removeEventListener('keydown', shortcut);
+    }, []);
 
     return (
         <div className="min-h-screen bg-[var(--color-bg)] text-slate-900">
@@ -163,7 +205,7 @@ export default function SuperadminLayout({ header, breadcrumbs, children }) {
                             {breadcrumbs}
                         </div>
                     </div>
-                    <UserMenu user={auth?.user} />
+                    <HeaderActions auth={auth} />
                 </header>
                 <main className="px-4 py-6 sm:px-6">
                     {flash?.status && <Alert tone="success" className="mb-4">{flash.status}</Alert>}

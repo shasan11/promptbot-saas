@@ -33,6 +33,7 @@ export default function Create({ plan = null, features = [] }) {
         currency: plan?.currency || 'USD',
         trial_days: plan?.trial_days || 0,
         is_active: plan?.is_active ?? true,
+        is_public: plan?.is_public ?? true,
         sort_order: plan?.sort_order || 0,
         is_recommended: plan?.is_recommended ?? false,
         user_limit: plan?.user_limit || '',
@@ -128,7 +129,8 @@ export default function Create({ plan = null, features = [] }) {
                                 <Input id="sort_order" type="number" value={data.sort_order} error={!!errors.sort_order} onChange={(event) => setData('sort_order', event.target.value)} />
                             </FormField>
                             <div className="space-y-3">
-                                <Switch label="Active plan" description="Visible for new subscriptions" checked={data.is_active} onChange={(value) => setData('is_active', value)} />
+                                <Switch label="Active plan" description="Available for subscription operations" checked={data.is_active} onChange={(value) => setData('is_active', value)} />
+                                <Switch label="Published publicly" description="Visible on pricing and customer workspace purchase" checked={data.is_public} onChange={(value) => setData('is_public', value)} />
                                 <Switch label="Recommended" description="Highlighted in the catalog" checked={data.is_recommended} onChange={(value) => setData('is_recommended', value)} />
                             </div>
                         </div>
@@ -185,7 +187,7 @@ export default function Create({ plan = null, features = [] }) {
                             )}
                             <div className="flex items-start justify-between">
                                 <span className="text-base font-bold text-slate-900">{data.name || 'Untitled plan'}</span>
-                                <Badge tone={data.is_active ? 'brand' : 'neutral'}>{data.is_active ? 'Active' : 'Inactive'}</Badge>
+                                <div className="flex gap-1"><Badge tone={data.is_active ? 'brand' : 'neutral'}>{data.is_active ? 'Active' : 'Inactive'}</Badge><Badge tone={data.is_public ? 'success' : 'neutral'}>{data.is_public ? 'Public' : 'Private'}</Badge></div>
                             </div>
                             <div className="mt-4">
                                 <span className="text-2xl font-bold text-slate-900">{money(data.monthly_price, data.currency)}</span>

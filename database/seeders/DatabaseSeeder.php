@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             PlatformAuthorizationSeeder::class,
             FeatureSeeder::class,
             PlanSeeder::class,
+            WebsiteSeeder::class,
         ]);
     }
 }

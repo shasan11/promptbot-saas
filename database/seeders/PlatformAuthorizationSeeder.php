@@ -6,6 +6,7 @@ use App\Models\CentralUser;
 use App\Models\PlatformPermission;
 use App\Models\PlatformRole;
 use App\Models\PlatformSetting;
+use App\Models\NotificationTemplate;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
@@ -18,6 +19,9 @@ class PlatformAuthorizationSeeder extends Seeder
 
         $permissions = [
             'dashboard.view',
+            'customers.view',
+            'customers.manage',
+            'revenue.view',
             'tenants.view',
             'tenants.create',
             'tenants.update',
@@ -51,6 +55,7 @@ class PlatformAuthorizationSeeder extends Seeder
             'usage.view',
             'website.view',
             'website.manage',
+            'website.custom_html',
             'communications.view',
             'communications.manage',
             'support.view',
@@ -81,6 +86,38 @@ class PlatformAuthorizationSeeder extends Seeder
             ['id' => (string) Str::uuid()]
         );
         $auditor->syncPermissions($permissionModels->filter(fn ($permission, string $name) => str_ends_with($name, '.view'))->values());
+
+        $rolePermissions = [
+            'Platform Administrator' => $permissions,
+            'Billing Manager' => [
+                'dashboard.view', 'customers.view', 'revenue.view', 'plans.view', 'plans.update',
+                'subscriptions.view', 'subscriptions.update', 'subscriptions.cancel', 'payments.view',
+                'payments.manage', 'invoices.view', 'invoices.manage', 'coupons.view', 'coupons.manage',
+                'gateways.manage', 'usage.view', 'audit_logs.view',
+            ],
+            'Support Manager' => [
+                'dashboard.view', 'customers.view', 'tenants.view', 'support.view', 'support.manage',
+                'communications.view', 'communications.manage', 'audit_logs.view',
+            ],
+            'Content Manager' => [
+                'dashboard.view', 'website.view', 'website.manage', 'communications.view',
+                'communications.manage',
+            ],
+            'Operations Manager' => [
+                'dashboard.view', 'customers.view', 'customers.manage', 'tenants.view', 'tenants.create',
+                'tenants.update', 'tenants.suspend', 'usage.view', 'operations.view', 'integrations.view',
+                'integrations.manage', 'maintenance.manage', 'audit_logs.view', 'login_attempts.view',
+            ],
+            'Auditor' => array_values(array_filter($permissions, fn (string $permission) => str_ends_with($permission, '.view'))),
+        ];
+
+        foreach ($rolePermissions as $roleName => $grants) {
+            $role = PlatformRole::firstOrCreate(
+                ['name' => $roleName, 'guard_name' => 'central'],
+                ['id' => (string) Str::uuid()]
+            );
+            $role->syncPermissions($permissionModels->only($grants)->values());
+        }
 
         CentralUser::query()
             ->where('role', 'super_admin')
@@ -119,13 +156,75 @@ class PlatformAuthorizationSeeder extends Seeder
                 'default_gateway' => 'manual',
                 'invoice_prefix' => 'INV',
                 'tax_rate' => 0,
+                'billing_mode' => 'per_service',
+                'trial_days' => 14,
+                'grace_period_days' => 7,
+                'allow_plan_changes' => true,
+                'allow_self_service_cancellation' => true,
+                'prorate_plan_changes' => true,
+            ],
+            'registration' => [
+                'enabled' => true,
+                'mode' => 'enabled',
+                'require_email_verification' => true,
+                'email_verification_required' => true,
+                'default_plan' => 'starter',
+                'require_terms_acceptance' => true,
+                'require_payment_before_provisioning' => false,
+                'maximum_workspaces_per_account' => 0,
+            ],
+            'billing' => [
+                'invoice_number_start' => 1,
+                'payment_terms_days' => 0,
+                'grace_period_days' => 7,
+                'billing_mode_support' => 'both',
+                'proration_policy' => 'next_invoice',
+                'plan_change_policy' => 'customer_choice',
+                'allow_immediate_cancellation' => false,
+            ],
+            'tax' => [
+                'enabled' => false,
+                'default_rate' => 0,
+                'prices_include_tax' => false,
+                'tax_label' => 'Tax',
+            ],
+            'trials' => [
+                'default_trial_days' => 14,
+                'trial_ending_notice_days' => 7,
+                'allow_trial_without_payment_method' => true,
+            ],
+            'tenant_provisioning' => [
+                'mode' => config('saas.db_provisioning_mode', 'manual'),
+                'default_region' => env('TENANT_DEFAULT_REGION'),
+                'automatic_retry_count' => 1,
+                'customer_can_retry' => true,
+            ],
+            'notifications' => [
+                'billing_events_enabled' => true,
+                'workspace_events_enabled' => true,
+                'support_events_enabled' => true,
+                'renewal_notice_days' => 7,
+            ],
+            'customer_portal' => [
+                'enabled' => true,
+                'allow_workspace_creation' => true,
+                'allow_plan_changes' => true,
+                'allow_cancellations' => true,
+                'allow_member_invitations' => true,
+                'allow_billing_profile_updates' => true,
+                'allow_support_tickets' => true,
+                'support_tickets_enabled' => true,
+            ],
+            'maintenance' => [
+                'banner_enabled' => false,
+                'block_new_provisioning' => false,
             ],
             'branding' => [
                 'company_name' => 'PromptBot',
                 'primary_color' => '#0F172A',
                 'secondary_color' => '#4F46E5',
                 'accent_color' => '#22C55E',
-                'copyright_text' => '© '.date('Y').' PromptBot. All rights reserved.',
+                'copyright_text' => "\u{00A9} ".date('Y').' PromptBot. All rights reserved.',
             ],
             'security' => [
                 'login_attempt_limit' => 5,
@@ -150,6 +249,29 @@ class PlatformAuthorizationSeeder extends Seeder
                     ]
                 );
             }
+        }
+
+        $templates = [
+            'welcome' => ['Welcome to {{platform_name}}', '<h1>Welcome, {{customer_name}}</h1><p>Your customer account for {{account_name}} is ready.</p><p><a href="{{action_url}}">Open customer portal</a></p>', ['platform_name', 'customer_name', 'account_name', 'action_url']],
+            'account_invitation' => ['You are invited to {{account_name}}', '<h1>Join {{account_name}}</h1><p>Hello {{customer_name}}, you have been invited to manage services in {{platform_name}}.</p><p><a href="{{action_url}}">Accept invitation</a></p>', ['platform_name', 'customer_name', 'account_name', 'action_url']],
+            'email_verification' => ['Verify your {{platform_name}} email', '<h1>Verify your email</h1><p>Hello {{customer_name}}, confirm your email to finish setting up your account.</p><p><a href="{{action_url}}">Verify email</a></p>', ['platform_name', 'customer_name', 'action_url']],
+            'password_reset' => ['Reset your {{platform_name}} password', '<h1>Password reset</h1><p>Hello {{customer_name}}, use the secure link below to choose a new password.</p><p><a href="{{action_url}}">Reset password</a></p>', ['platform_name', 'customer_name', 'action_url']],
+            'workspace_provisioned' => ['{{workspace_name}} is ready', '<h1>Your service is ready</h1><p>Hello {{customer_name}}, {{workspace_name}} has been provisioned for {{account_name}}.</p><p><a href="{{action_url}}">Open workspace</a></p>', ['customer_name', 'account_name', 'workspace_name', 'action_url']],
+            'invoice_issued' => ['Invoice {{invoice_number}} from {{platform_name}}', '<h1>New invoice</h1><p>Invoice {{invoice_number}} for {{account_name}} totals {{invoice_total}}.</p><p><a href="{{action_url}}">View invoice</a></p>', ['platform_name', 'account_name', 'invoice_number', 'invoice_total', 'action_url']],
+            'payment_received' => ['Payment received by {{platform_name}}', '<h1>Thank you</h1><p>We received {{payment_amount}} for {{account_name}}.</p><p><a href="{{action_url}}">View billing</a></p>', ['platform_name', 'account_name', 'payment_amount', 'action_url']],
+            'payment_failed' => ['Payment failed for {{account_name}}', '<h1>Payment failed</h1><p>We could not process {{payment_amount}} for {{account_name}}.</p><p><a href="{{action_url}}">Update payment method or retry</a></p>', ['account_name', 'payment_amount', 'action_url']],
+            'trial_ending' => ['Your {{platform_name}} trial is ending', '<h1>Trial ending soon</h1><p>The trial for {{workspace_name}} is ending soon.</p><p><a href="{{action_url}}">Review subscription</a></p>', ['platform_name', 'workspace_name', 'action_url']],
+            'subscription_cancelled' => ['Subscription cancelled for {{workspace_name}}', '<h1>Cancellation confirmed</h1><p>The subscription for {{workspace_name}} has been cancelled.</p><p><a href="{{action_url}}">View subscription</a></p>', ['workspace_name', 'action_url']],
+            'subscription_renewal' => ['Subscription renewal for {{workspace_name}}', '<h1>Subscription renewal</h1><p>The subscription for {{workspace_name}} is approaching its renewal date.</p><p><a href="{{action_url}}">Review subscription</a></p>', ['workspace_name', 'action_url']],
+            'workspace_suspended' => ['Action required for {{workspace_name}}', '<h1>Workspace suspended</h1><p>{{workspace_name}} has been suspended. Open the customer portal for details and support.</p><p><a href="{{action_url}}">View workspace</a></p>', ['workspace_name', 'action_url']],
+            'support_update' => ['Update on ticket {{ticket_number}}', '<h1>Support ticket updated</h1><p>Hello {{customer_name}}, there is a new update on {{ticket_number}}.</p><p><a href="{{action_url}}">View ticket</a></p>', ['customer_name', 'ticket_number', 'action_url']],
+        ];
+
+        foreach ($templates as $key => [$subject, $body, $variables]) {
+            NotificationTemplate::firstOrCreate(
+                ['key' => $key],
+                ['channel' => 'email', 'language' => 'en', 'status' => 'active', 'subject' => $subject, 'body' => $body, 'variables' => $variables]
+            );
         }
     }
 }

@@ -9,9 +9,9 @@ import Textarea from '@/Components/UI/Textarea';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 
-export default function Create({ tenants = [], administrators = [] }) {
+export default function Create({ tenants = [], administrators = [], selectedTenantId = null }) {
     const { data, setData, post, processing, errors } = useForm({
-        tenant_id: tenants[0]?.id || '',
+        tenant_id: selectedTenantId || tenants[0]?.id || '',
         subject: '',
         description: '',
         priority: 'normal',

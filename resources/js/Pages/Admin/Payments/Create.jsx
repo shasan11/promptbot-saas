@@ -11,10 +11,14 @@ import { Head, useForm } from '@inertiajs/react';
 
 const providers = ['manual', 'bank_transfer', 'stripe', 'paypal', 'khalti', 'esewa'];
 
-export default function Create({ payment = null, tenants = [], invoices = [], subscriptions = [], defaults = {} }) {
+export default function Create({ payment = null, accounts = [], tenants = [], invoices = [], subscriptions = [], defaults = {}, billingModeSupport = 'both' }) {
     const editing = Boolean(payment);
-    const initialTenant = payment?.tenant_id || tenants[0]?.id || '';
+    const initialAccount = payment?.customer_account_id || accounts[0]?.id || '';
+    const initialTenant = payment?.tenant_id || (billingModeSupport === 'per_service'
+        ? tenants.find((tenant) => String(tenant.customer_account_id) === String(initialAccount))?.id || ''
+        : '');
     const { data, setData, post, put, processing, errors } = useForm({
+        customer_account_id: initialAccount,
         tenant_id: initialTenant,
         invoice_id: payment?.invoice_id || '',
         subscription_id: payment?.subscription_id || '',
@@ -27,12 +31,25 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
         failure_reason: payment?.failure_reason || '',
     });
 
-    const tenantInvoices = invoices.filter((invoice) => invoice.tenant_id === data.tenant_id || invoice.id === payment?.invoice_id);
-    const tenantSubscriptions = subscriptions.filter((subscription) => subscription.tenant_id === data.tenant_id || subscription.id === payment?.subscription_id);
+    const accountTenants = tenants.filter((tenant) => String(tenant.customer_account_id) === String(data.customer_account_id));
+    const accountInvoices = invoices.filter((invoice) => String(invoice.customer_account_id) === String(data.customer_account_id)
+        && (!data.tenant_id || !invoice.tenant_id || invoice.tenant_id === data.tenant_id || invoice.id === payment?.invoice_id));
+    const tenantSubscriptions = subscriptions.filter((subscription) => String(subscription.customer_account_id) === String(data.customer_account_id)
+        && (subscription.tenant_id === data.tenant_id || subscription.id === payment?.subscription_id));
+    const selectedAccount = accounts.find((account) => String(account.id) === String(data.customer_account_id));
     const selectedTenant = tenants.find((tenant) => tenant.id === data.tenant_id);
-    const selectedInvoice = tenantInvoices.find((invoice) => invoice.id === data.invoice_id);
+    const selectedInvoice = accountInvoices.find((invoice) => invoice.id === data.invoice_id);
     const currencyMismatch = selectedInvoice && selectedInvoice.currency && selectedInvoice.currency !== data.currency;
 
+    const changeAccount = (accountId) => setData({
+        ...data,
+        customer_account_id: accountId,
+        tenant_id: billingModeSupport === 'per_service'
+            ? tenants.find((tenant) => String(tenant.customer_account_id) === String(accountId))?.id || ''
+            : '',
+        invoice_id: '',
+        subscription_id: '',
+    });
     const changeTenant = (tenantId) => setData({ ...data, tenant_id: tenantId, invoice_id: '', subscription_id: '' });
 
     const submit = (event) => {
@@ -45,7 +62,7 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
             header={(
                 <PageHeader
                     title={editing ? 'Edit payment' : 'Record payment'}
-                    subtitle="Link a payment to its tenant, invoice, or subscription and track its settlement state."
+                    subtitle="Record account-level or workspace-level settlement and link it to an invoice or subscription."
                     actions={<Button href={editing ? route('superadmin.billing.payments.show', payment.id) : route('superadmin.billing.payments.index')} variant="secondary">Back</Button>}
                 />
             )}
@@ -53,12 +70,18 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
             <Head title={editing ? 'Edit payment' : 'Record payment'} />
 
             <form onSubmit={submit} className="mx-auto max-w-4xl space-y-6">
-                <SectionCard title="1. Tenant and linkage" description="Select who this payment belongs to, and optionally the invoice or subscription it settles.">
+                <SectionCard title="1. Account and linkage" description="Select the commercial account, then optionally narrow the payment to a workspace, invoice, or subscription.">
                     <div className="grid gap-5 md:grid-cols-2">
-                        <FormField id="tenant_id" label="Tenant" required error={errors.tenant_id}>
+                        <FormField id="customer_account_id" label="Customer account" required error={errors.customer_account_id}>
+                            <Select id="customer_account_id" value={data.customer_account_id} error={!!errors.customer_account_id} onChange={(event) => changeAccount(event.target.value)}>
+                                <option value="">Select account</option>
+                                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.account_number}</option>)}
+                            </Select>
+                        </FormField>
+                        <FormField id="tenant_id" label="Workspace" optional={billingModeSupport === 'both'} required={billingModeSupport === 'per_service'} error={errors.tenant_id} hint={billingModeSupport === 'both' ? 'Leave blank for an account-level payment.' : 'A workspace is required by the billing policy.'}>
                             <Select id="tenant_id" value={data.tenant_id} error={!!errors.tenant_id} onChange={(event) => changeTenant(event.target.value)}>
-                                <option value="">Select tenant</option>
-                                {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
+                                {billingModeSupport === 'both' && <option value="">Account level</option>}
+                                {accountTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
                             </Select>
                         </FormField>
                         <FormField id="provider" label="Provider" required error={errors.provider}>
@@ -66,10 +89,10 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
                                 {providers.map((provider) => <option key={provider} value={provider}>{provider.replaceAll('_', ' ')}</option>)}
                             </Select>
                         </FormField>
-                        <FormField id="invoice_id" label="Invoice" optional error={errors.invoice_id} hint="Only invoices belonging to the selected tenant are shown.">
+                        <FormField id="invoice_id" label="Invoice" optional error={errors.invoice_id} hint="Account invoices and eligible workspace invoices are shown.">
                             <Select id="invoice_id" value={data.invoice_id} onChange={(event) => setData('invoice_id', event.target.value)}>
                                 <option value="">No invoice</option>
-                                {tenantInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · {invoice.currency} {invoice.total} · {invoice.status}</option>)}
+                                {accountInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · {invoice.currency} {invoice.total} · {invoice.status}</option>)}
                             </Select>
                         </FormField>
                         <FormField id="subscription_id" label="Subscription" optional error={errors.subscription_id} hint="Link recurring or manual subscription payments.">
@@ -120,7 +143,8 @@ export default function Create({ payment = null, tenants = [], invoices = [], su
 
                 <SectionCard title="3. Review" description="Confirm the record before saving.">
                     <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                        <div><dt className="text-slate-500">Tenant</dt><dd className="font-medium text-slate-900">{selectedTenant?.company_name || '—'}</dd></div>
+                        <div><dt className="text-slate-500">Customer account</dt><dd className="font-medium text-slate-900">{selectedAccount?.name || '—'}</dd></div>
+                        <div><dt className="text-slate-500">Workspace</dt><dd className="font-medium text-slate-900">{selectedTenant?.company_name || 'Account level'}</dd></div>
                         <div><dt className="text-slate-500">Amount</dt><dd className="font-mono font-medium text-slate-900">{data.currency} {Number(data.amount || 0).toFixed(2)}</dd></div>
                         <div><dt className="text-slate-500">Provider</dt><dd className="font-medium capitalize text-slate-900">{data.provider.replaceAll('_', ' ')}</dd></div>
                         <div><dt className="text-slate-500">Status</dt><dd className="font-medium capitalize text-slate-900">{data.status}</dd></div>

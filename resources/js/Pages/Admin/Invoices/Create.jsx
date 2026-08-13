@@ -13,10 +13,13 @@ const totalItems = (items) => items.reduce((sum, item) => sum + (Number(item.qua
 const taxFor = (items, rate) => Math.round(totalItems(items) * (Number(rate) || 0)) / 100;
 const money = (value) => (Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '0.00');
 
-export default function Create({ tenants = [], defaults = {} }) {
-    const initialItems = [{ description: '', quantity: 1, unit_amount: 0 }];
+export default function Create({ tenants = [], accounts = [], defaults = {}, selectedTenantId = null, selectedAccountId = null, billingModeSupport = 'both' }) {
+    const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId);
+    const initialAccountId = selectedAccountId || selectedTenant?.customer_account_id || accounts[0]?.id || '';
+    const initialItems = [{ tenant_id: selectedTenantId || '', description: '', quantity: 1, unit_amount: 0 }];
     const { data, setData, post, processing, errors } = useForm({
-        tenant_id: tenants[0]?.id || '',
+        customer_account_id: initialAccountId,
+        tenant_id: selectedTenantId || (billingModeSupport === 'per_service' ? tenants.find((tenant) => String(tenant.customer_account_id) === String(initialAccountId))?.id || '' : ''),
         status: 'open',
         currency: defaults.currency || 'USD',
         issued_on: new Date().toISOString().slice(0, 10),
@@ -28,11 +31,19 @@ export default function Create({ tenants = [], defaults = {} }) {
 
     const replaceItems = (items) => setData({ ...data, items, tax_total: taxFor(items, data.tax_rate) });
     const updateItem = (index, key, value) => replaceItems(data.items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
-    const addItem = () => replaceItems([...data.items, { description: '', quantity: 1, unit_amount: 0 }]);
+    const accountTenants = tenants.filter((tenant) => String(tenant.customer_account_id) === String(data.customer_account_id));
+    const addItem = () => replaceItems([...data.items, { tenant_id: data.tenant_id || '', description: '', quantity: 1, unit_amount: 0 }]);
     const removeItem = (index) => replaceItems(data.items.filter((_, itemIndex) => itemIndex !== index));
     const subtotal = totalItems(data.items);
     const total = subtotal + (Number(data.tax_total) || 0);
     const updateTaxRate = (rate) => setData({ ...data, tax_rate: rate, tax_total: taxFor(data.items, rate) });
+    const changeAccount = (accountId) => {
+        const tenantId = billingModeSupport === 'per_service'
+            ? tenants.find((tenant) => String(tenant.customer_account_id) === String(accountId))?.id || ''
+            : '';
+        setData({ ...data, customer_account_id: accountId, tenant_id: tenantId, items: data.items.map((item) => ({ ...item, tenant_id: tenantId })) });
+    };
+    const changeTenant = (tenantId) => setData({ ...data, tenant_id: tenantId, items: data.items.map((item) => ({ ...item, tenant_id: tenantId })) });
     const errorCount = Object.keys(errors).length;
 
     const submit = (event) => {
@@ -45,7 +56,7 @@ export default function Create({ tenants = [], defaults = {} }) {
             header={(
                 <PageHeader
                     title="Create invoice"
-                    subtitle={`Issue a tenant invoice using the configured ${defaults.prefix || 'INV'} numbering sequence.`}
+                    subtitle={`Issue a service-specific or consolidated account invoice using the configured ${defaults.prefix || 'INV'} sequence.`}
                     actions={<Button href={route('superadmin.billing.invoices.index')} variant="secondary">Back to invoices</Button>}
                 />
             )}
@@ -60,10 +71,16 @@ export default function Create({ tenants = [], defaults = {} }) {
                 <div className="space-y-6">
                     <SectionCard title="Invoice details">
                         <div className="grid gap-5 md:grid-cols-2">
-                            <FormField id="tenant_id" label="Tenant" required error={errors.tenant_id}>
-                                <Select id="tenant_id" value={data.tenant_id} error={!!errors.tenant_id} onChange={(event) => setData('tenant_id', event.target.value)}>
-                                    <option value="">Select tenant</option>
-                                    {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
+                            <FormField id="customer_account_id" label="Customer account" required error={errors.customer_account_id}>
+                                <Select id="customer_account_id" value={data.customer_account_id} error={!!errors.customer_account_id} onChange={(event) => changeAccount(event.target.value)}>
+                                    <option value="">Select account</option>
+                                    {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.account_number}</option>)}
+                                </Select>
+                            </FormField>
+                            <FormField id="tenant_id" label="Invoice scope" optional error={errors.tenant_id} hint="Leave blank for one consolidated account invoice.">
+                                <Select id="tenant_id" value={data.tenant_id} error={!!errors.tenant_id} onChange={(event) => changeTenant(event.target.value)}>
+                                    {billingModeSupport === 'both' && <option value="">Consolidated account invoice</option>}
+                                    {accountTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
                                 </Select>
                             </FormField>
                             <FormField id="status" label="Status" required error={errors.status} hint={data.status === 'draft' ? 'Draft invoices are not visible to the tenant yet.' : 'Open invoices are ready to be sent and paid.'}>
@@ -94,7 +111,13 @@ export default function Create({ tenants = [], defaults = {} }) {
                     >
                         <div className="space-y-3">
                             {data.items.map((item, index) => (
-                                <div key={index} className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_90px_140px_auto] md:items-start">
+                                <div key={index} className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 md:grid-cols-[180px_1fr_90px_140px_auto] md:items-start">
+                                    <FormField label="Workspace" error={errors[`items.${index}.tenant_id`]}>
+                                        <Select value={item.tenant_id || ''} error={!!errors[`items.${index}.tenant_id`]} onChange={(event) => updateItem(index, 'tenant_id', event.target.value)} disabled={!!data.tenant_id}>
+                                            <option value="">Account-level line</option>
+                                            {accountTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.company_name}</option>)}
+                                        </Select>
+                                    </FormField>
                                     <FormField label="Description" error={errors[`items.${index}.description`]}>
                                         <Input value={item.description} error={!!errors[`items.${index}.description`]} onChange={(event) => updateItem(index, 'description', event.target.value)} />
                                     </FormField>

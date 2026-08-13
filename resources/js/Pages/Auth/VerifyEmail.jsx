@@ -3,14 +3,14 @@ import Button from '@/Components/UI/Button';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 
-export default function VerifyEmail({ status }) {
+export default function VerifyEmail({ status, sendRoute = 'verification.send', logoutRoute = 'logout' }) {
     const { auth } = usePage().props;
     const { post, processing } = useForm({});
 
     const submit = (event) => {
         event.preventDefault();
 
-        post(route('verification.send'));
+        post(route(sendRoute));
     };
 
     return (
@@ -33,7 +33,7 @@ export default function VerifyEmail({ status }) {
                 </Button>
 
                 <Link
-                    href={route('logout')}
+                    href={route(logoutRoute)}
                     method="post"
                     as="button"
                     className="text-sm font-medium text-slate-500 hover:text-slate-800"

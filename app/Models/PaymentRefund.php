@@ -12,6 +12,7 @@ class PaymentRefund extends Model
 
     protected $fillable = [
         'payment_id',
+        'idempotency_key',
         'amount',
         'status',
         'reason',

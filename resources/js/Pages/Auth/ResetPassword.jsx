@@ -4,7 +4,7 @@ import Input from '@/Components/UI/Input';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
 
-export default function ResetPassword({ token, email }) {
+export default function ResetPassword({ token, email, passwordStoreRoute = 'password.store' }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         token,
         email,
@@ -15,7 +15,7 @@ export default function ResetPassword({ token, email }) {
     const submit = (event) => {
         event.preventDefault();
 
-        post(route('password.store'), {
+        post(route(passwordStoreRoute), {
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };

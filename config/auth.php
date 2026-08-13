@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CentralUser;
+use App\Models\PortalUser;
 use App\Models\User;
 
 return [
@@ -44,6 +45,11 @@ return [
             'provider' => 'central_users',
         ],
 
+        'portal' => [
+            'driver' => 'session',
+            'provider' => 'portal_users',
+        ],
+
         'tenant' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -71,6 +77,11 @@ return [
         'central_users' => [
             'driver' => 'eloquent',
             'model' => CentralUser::class,
+        ],
+
+        'portal_users' => [
+            'driver' => 'eloquent',
+            'model' => PortalUser::class,
         ],
 
         'users' => [
@@ -107,6 +118,13 @@ return [
         'central_users' => [
             'provider' => 'central_users',
             'table' => 'central_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'portal_users' => [
+            'provider' => 'portal_users',
+            'table' => 'portal_password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],

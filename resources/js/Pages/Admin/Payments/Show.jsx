@@ -22,7 +22,7 @@ export default function Show({ payment, refundableAmount = 0 }) {
     const canManage = auth?.permissions?.includes('payments.manage');
     const canEdit = canManage && Number(payment.refunded_amount || 0) === 0;
     const canRefund = canManage && ['paid', 'partially_refunded'].includes(payment.status) && refundableAmount > 0;
-    const { data, setData, post, processing, errors, reset } = useForm({ amount: '', reason: '', provider_reference: '' });
+    const { data, setData, post, processing, errors, reset } = useForm({ amount: '', reason: '', provider_reference: '', idempotency_key: crypto.randomUUID() });
     const [confirmOpen, setConfirmOpen] = useState(false);
     const remainingAfterRefund = Math.max(0, refundableAmount - Number(data.amount || 0));
 
@@ -35,7 +35,10 @@ export default function Show({ payment, refundableAmount = 0 }) {
     const submitRefund = () => {
         post(route('superadmin.billing.payments.refund', payment.id), {
             preserveScroll: true,
-            onSuccess: () => reset(),
+            onSuccess: () => {
+                reset('amount', 'reason', 'provider_reference');
+                setData('idempotency_key', crypto.randomUUID());
+            },
         });
         setConfirmOpen(false);
     };

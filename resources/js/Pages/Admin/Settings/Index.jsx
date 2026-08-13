@@ -54,6 +54,9 @@ function ImageField({ field, file, removeChecked, disabled, onFile, onRemoveTogg
 }
 
 function FieldControl({ field, value, disabled, onChange }) {
+    if (field.type === 'checkbox') {
+        return <label className="mt-2 flex items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"><input type="checkbox" disabled={disabled} checked={!!value} onChange={(event) => onChange(event.target.checked)} className="rounded border-slate-300" />Enabled</label>;
+    }
     if (field.type === 'select') {
         return (
             <Select disabled={disabled} value={value ?? ''} onChange={(event) => onChange(event.target.value)}>

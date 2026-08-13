@@ -14,7 +14,8 @@ class PaymentUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['sometimes', 'required', 'string', 'exists:tenants,id'],
+            'customer_account_id' => ['sometimes', 'required', 'integer', 'exists:customer_accounts,id'],
+            'tenant_id' => ['sometimes', 'nullable', 'string', 'exists:tenants,id'],
             'invoice_id' => ['sometimes', 'nullable', 'uuid', 'exists:invoices,id'],
             'subscription_id' => ['sometimes', 'nullable', 'integer', 'exists:subscriptions,id'],
             'provider' => ['sometimes', 'required', 'in:manual,bank_transfer,stripe,paypal,khalti,esewa'],

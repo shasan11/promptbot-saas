@@ -16,15 +16,23 @@ class Subscription extends Model
 
     protected $fillable = [
         'tenant_id',
+        'customer_account_id',
         'public_uuid',
         'plan_id',
+        'pending_plan_id',
+        'coupon_id',
         'status',
         'billing_interval',
+        'pending_billing_interval',
+        'pending_change_effective_at',
         'starts_at',
         'trial_ends_at',
         'current_period_starts_at',
         'current_period_ends_at',
         'cancelled_at',
+        'cancel_at',
+        'cancellation_reason',
+        'cancellation_feedback',
         'grace_ends_at',
         'external_provider',
         'external_id',
@@ -42,6 +50,8 @@ class Subscription extends Model
             'current_period_starts_at' => 'datetime',
             'current_period_ends_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'cancel_at' => 'datetime',
+            'pending_change_effective_at' => 'datetime',
             'grace_ends_at' => 'datetime',
             'metadata' => 'array',
         ];
@@ -55,6 +65,23 @@ class Subscription extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function customerAccount(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAccount::class);
+    }
+
+    public function pendingPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'pending_plan_id');
+    }
+
+    public function coupon(): BelongsTo { return $this->belongsTo(Coupon::class); }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(SubscriptionEvent::class)->latest('effective_at');
     }
 
     public function payments(): HasMany

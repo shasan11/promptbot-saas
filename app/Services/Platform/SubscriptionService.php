@@ -15,12 +15,14 @@ use App\Models\Tenant;
  */
 class SubscriptionService
 {
+    public function __construct(private readonly PlatformSettingsService $settings) {}
+
     /**
      * Create the tenant's first subscription right after provisioning
      * succeeds. Idempotent: a tenant that already has a subscription (e.g.
      * a retried provisioning run) is left untouched.
      */
-    public function createInitialSubscription(Tenant $tenant, ?Plan $plan = null): ?Subscription
+    public function createInitialSubscription(Tenant $tenant, ?Plan $plan = null, string $billingInterval = 'monthly'): ?Subscription
     {
         if ($tenant->subscriptions()->exists()) {
             return $tenant->subscriptions()->latest()->first();
@@ -33,14 +35,17 @@ class SubscriptionService
         }
 
         $now = now();
-        $onTrial = $plan->trial_days > 0;
-        $periodEnd = $onTrial ? $now->copy()->addDays($plan->trial_days) : $now->copy()->addMonth();
+        $trialDays = (int) ($plan->trial_days ?: $this->settings->get('trials', 'default_trial_days', 0));
+        $onTrial = $trialDays > 0;
+        $billingInterval = in_array($billingInterval, ['monthly', 'yearly'], true) ? $billingInterval : 'monthly';
+        $periodEnd = $onTrial ? $now->copy()->addDays($trialDays) : ($billingInterval === 'yearly' ? $now->copy()->addYear() : $now->copy()->addMonth());
 
         $subscription = Subscription::create([
             'tenant_id' => $tenant->id,
+            'customer_account_id' => $tenant->customer_account_id,
             'plan_id' => $plan->id,
             'status' => $onTrial ? SubscriptionStatus::Trial : SubscriptionStatus::Active,
-            'billing_interval' => 'monthly',
+            'billing_interval' => $billingInterval,
             'starts_at' => $now,
             'trial_ends_at' => $onTrial ? $periodEnd : null,
             'current_period_starts_at' => $now,

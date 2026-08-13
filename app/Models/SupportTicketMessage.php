@@ -13,14 +13,24 @@ class SupportTicketMessage extends Model
     protected $fillable = [
         'support_ticket_id',
         'central_user_id',
+        'portal_user_id',
         'body',
         'is_internal',
         'attachment_path',
+        'attachment_name',
+        'attachment_mime',
+        'attachment_size',
     ];
 
     protected $casts = [
         'is_internal' => 'boolean',
+        'attachment_size' => 'integer',
     ];
+
+    protected $hidden = ['attachment_path'];
+    protected $appends = ['has_attachment'];
+
+    public function getHasAttachmentAttribute(): bool { return filled($this->attachment_path); }
 
     public function ticket(): BelongsTo
     {
@@ -30,5 +40,10 @@ class SupportTicketMessage extends Model
     public function centralUser(): BelongsTo
     {
         return $this->belongsTo(CentralUser::class);
+    }
+
+    public function portalUser(): BelongsTo
+    {
+        return $this->belongsTo(PortalUser::class);
     }
 }

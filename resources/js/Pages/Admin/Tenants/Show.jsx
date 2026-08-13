@@ -7,6 +7,7 @@ import DangerConfirmDialog from '@/Components/UI/DangerConfirmDialog';
 import DescriptionList from '@/Components/UI/DescriptionList';
 import EmptyState from '@/Components/UI/EmptyState';
 import Tabs from '@/Components/UI/Tabs';
+import UsageMetrics from '@/Components/UsageMetrics';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ExternalLink, Inbox } from 'lucide-react';
@@ -18,7 +19,7 @@ function tenantUrl(domain) {
     return `${window.location.protocol}//${domain}${port}`;
 }
 
-export default function Show({ tenant }) {
+export default function Show({ tenant, usage, activities = [] }) {
     const routeKey = tenant.public_uuid || tenant.id;
     const [tab, setTab] = useState('overview');
     const [dangerAction, setDangerAction] = useState(null);
@@ -30,9 +31,14 @@ export default function Show({ tenant }) {
 
     const tabs = [
         { value: 'overview', label: 'Overview' },
-        { value: 'billing', label: 'Billing & limits' },
-        { value: 'infrastructure', label: 'Infrastructure' },
+        { value: 'subscription', label: 'Subscription' },
+        { value: 'features', label: 'Features' },
+        { value: 'billing', label: 'Billing' },
+        { value: 'usage', label: 'Usage' },
+        { value: 'provisioning', label: 'Provisioning' },
+        { value: 'domains', label: 'Domains' },
         { value: 'activity', label: 'Activity' },
+        { value: 'support', label: 'Support' },
     ];
 
     return (
@@ -87,9 +93,9 @@ export default function Show({ tenant }) {
                     </SectionCard>
                 )}
 
-                {tab === 'billing' && (
+                {['subscription', 'features', 'billing', 'usage'].includes(tab) && (
                     <>
-                        <SectionCard title="Subscriptions" description="Current and historical tenant subscription records.">
+                        {tab === 'subscription' && <SectionCard title="Subscriptions" description="Current and historical tenant subscription records.">
                             {(tenant.subscriptions || []).length ? (
                                 <div className="space-y-3">
                                     {tenant.subscriptions.map((subscription) => (
@@ -109,9 +115,9 @@ export default function Show({ tenant }) {
                                     ))}
                                 </div>
                             ) : <EmptyState icon={Inbox} title="No subscriptions yet" />}
-                        </SectionCard>
+                        </SectionCard>}
 
-                        <SectionCard title="Plan features" description="Capabilities included with the tenant's current plan.">
+                        {tab === 'features' && <SectionCard title="Plan features" description="Capabilities included with the tenant's current plan.">
                             {tenant.plan?.features?.length ? (
                                 <div className="grid gap-3 md:grid-cols-2">
                                     {tenant.plan.features.map((feature) => (
@@ -122,13 +128,19 @@ export default function Show({ tenant }) {
                                     ))}
                                 </div>
                             ) : <EmptyState icon={Inbox} title="No plan features attached" />}
-                        </SectionCard>
+                        </SectionCard>}
+
+                        {tab === 'usage' && <SectionCard title="Usage" description="Real counters from this tenant database compared with the attached plan limits.">
+                            <UsageMetrics usage={usage} />
+                        </SectionCard>}
+
+                        {tab === 'billing' && <><SectionCard title="Invoices">{(tenant.invoices || []).length ? <div className="divide-y">{tenant.invoices.map(invoice => <Link key={invoice.id} href={route('superadmin.billing.invoices.show', invoice.id)} className="grid gap-3 py-3 text-sm sm:grid-cols-[1fr_auto_auto]"><span className="font-mono font-semibold">{invoice.number}</span><span>{invoice.currency} {Number(invoice.total).toFixed(2)}</span><StatusBadge status={invoice.status} /></Link>)}</div> : <EmptyState icon={Inbox} title="No invoices" />}</SectionCard><SectionCard title="Payments">{(tenant.payments || []).length ? <div className="divide-y">{tenant.payments.map(payment => <Link key={payment.id} href={route('superadmin.billing.payments.show', payment.id)} className="grid gap-3 py-3 text-sm sm:grid-cols-[1fr_auto_auto]"><span className="font-mono font-semibold">{payment.provider_reference || payment.id.slice(0, 8)}</span><span>{payment.currency} {Number(payment.amount).toFixed(2)}</span><StatusBadge status={payment.status} /></Link>)}</div> : <EmptyState icon={Inbox} title="No payments" />}</SectionCard></>}
                     </>
                 )}
 
-                {tab === 'infrastructure' && (
+                {['provisioning', 'domains'].includes(tab) && (
                     <>
-                        <SectionCard title="Database" description="Connection metadata only. Secrets stay hidden.">
+                        {tab === 'provisioning' && <SectionCard title="Database" description="Connection metadata only. Secrets stay hidden.">
                             <DescriptionList
                                 columns={3}
                                 items={[
@@ -140,9 +152,9 @@ export default function Show({ tenant }) {
                                     { label: 'Created by app', value: tenant.database_created_by_app ? 'Yes' : 'No' },
                                 ]}
                             />
-                        </SectionCard>
+                        </SectionCard>}
 
-                        <SectionCard title="Domains" description="Tenant hostnames routed through Stancl tenancy.">
+                        {tab === 'domains' && <SectionCard title="Domains" description="Tenant hostnames routed through Stancl tenancy.">
                             {(tenant.domains || []).length ? (
                                 <div className="grid gap-3 md:grid-cols-2">
                                     {tenant.domains.map((domain) => (
@@ -164,9 +176,9 @@ export default function Show({ tenant }) {
                                     ))}
                                 </div>
                             ) : <EmptyState icon={Inbox} title="No domains attached" />}
-                        </SectionCard>
+                        </SectionCard>}
 
-                        <SectionCard title="Health" description="Central-only health checks for this tenant record.">
+                        {tab === 'provisioning' && <SectionCard title="Health" description="Central-only health checks for this tenant record.">
                             <DescriptionList
                                 columns={3}
                                 items={[
@@ -178,11 +190,11 @@ export default function Show({ tenant }) {
                             {tenant.last_provisioning_error && (
                                 <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{tenant.last_provisioning_error}</p>
                             )}
-                        </SectionCard>
+                        </SectionCard>}
                     </>
                 )}
 
-                {tab === 'activity' && (
+                {tab === 'provisioning' && (
                     <SectionCard title="Provisioning logs" description="Latest provisioning and operation events.">
                         <div className="space-y-3">
                             {(tenant.provisioning_logs || []).length ? tenant.provisioning_logs.map((log) => (
@@ -197,6 +209,8 @@ export default function Show({ tenant }) {
                         </div>
                     </SectionCard>
                 )}
+                {tab === 'activity' && <SectionCard title="Service activity">{activities.length ? <div className="space-y-3">{activities.map(item => <div key={item.id} className="border-l-2 border-indigo-200 pl-3"><p className="text-sm font-medium">{item.description || item.event}</p><p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p></div>)}</div> : <EmptyState icon={Inbox} title="No service activity" />}</SectionCard>}
+                {tab === 'support' && <SectionCard title="Support cases">{(tenant.support_tickets || []).length ? <div className="divide-y">{tenant.support_tickets.map(ticket => <Link key={ticket.id} href={route('superadmin.tickets.show', ticket.public_uuid || ticket.id)} className="grid gap-3 py-3 text-sm sm:grid-cols-[auto_1fr_auto]"><span className="font-mono">{ticket.number}</span><span className="font-semibold">{ticket.subject}</span><StatusBadge status={ticket.status} /></Link>)}</div> : <EmptyState icon={Inbox} title="No support cases" />}</SectionCard>}
             </div>
 
             <section className="mt-8 rounded-lg border border-rose-200 bg-rose-50/40 shadow-soft">
@@ -205,9 +219,9 @@ export default function Show({ tenant }) {
                     <p className="mt-0.5 text-xs text-rose-700/80">Infrastructure and access-affecting operations for this tenant.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 p-5">
-                    <Button variant="secondary" onClick={() => action('retry')}>Retry provisioning</Button>
-                    <Button variant="secondary" onClick={() => action('migrate')}>Run migrations</Button>
-                    <Button variant="secondary" onClick={() => action('seed')}>Run seeders</Button>
+                    <Button variant="secondary" onClick={() => setDangerAction('retry')}>Retry provisioning</Button>
+                    <Button variant="secondary" onClick={() => setDangerAction('migrate')}>Run migrations</Button>
+                    <Button variant="secondary" onClick={() => setDangerAction('seed')}>Run seeders</Button>
                     {tenant.status === 'suspended' ? (
                         <Button variant="brand" onClick={() => setDangerAction('activate')}>Reactivate tenant</Button>
                     ) : (
@@ -223,9 +237,10 @@ export default function Show({ tenant }) {
                 consequence="Tenant users will immediately lose access to their workspace and API."
                 affected={primaryDomain?.domain}
                 reversible
+                reasonRequired
                 confirmLabel="Suspend tenant"
                 onCancel={() => setDangerAction(null)}
-                onConfirm={() => { action('suspend', { reason: 'Suspended from superadmin danger zone' }); setDangerAction(null); }}
+                onConfirm={(reason) => { action('suspend', { reason }); setDangerAction(null); }}
             />
 
             <DangerConfirmDialog
@@ -234,10 +249,24 @@ export default function Show({ tenant }) {
                 consequence="Tenant users will regain access to their workspace immediately."
                 affected={primaryDomain?.domain}
                 reversible
+                reasonRequired
                 confirmLabel="Reactivate tenant"
                 onCancel={() => setDangerAction(null)}
-                onConfirm={() => { action('activate', { reason: 'Reactivated from superadmin danger zone' }); setDangerAction(null); }}
+                onConfirm={(reason) => { action('activate', { reason }); setDangerAction(null); }}
             />
+
+            {['retry', 'migrate', 'seed'].map((operation) => <DangerConfirmDialog
+                key={operation}
+                open={dangerAction === operation}
+                title={`${operation === 'retry' ? 'Retry provisioning for' : operation === 'migrate' ? 'Run migrations for' : 'Run seeders for'} ${tenant.company_name}`}
+                consequence={operation === 'retry' ? 'Provisioning will resume against the existing workspace.' : operation === 'migrate' ? 'Pending tenant database migrations will execute immediately.' : 'The tenant database seeder will execute immediately.'}
+                affected={primaryDomain?.domain || tenant.slug}
+                reversible={operation === 'retry'}
+                reasonRequired
+                confirmLabel={operation === 'retry' ? 'Retry provisioning' : operation === 'migrate' ? 'Run migrations' : 'Run seeders'}
+                onCancel={() => setDangerAction(null)}
+                onConfirm={(reason) => { action(operation, { reason }); setDangerAction(null); }}
+            />)}
 
             <DangerConfirmDialog
                 open={dangerAction === 'delete'}
@@ -245,9 +274,10 @@ export default function Show({ tenant }) {
                 consequence="This removes the tenant record, its database connection metadata, and all associated billing history from the platform."
                 affected={tenant.slug}
                 confirmation={tenant.slug}
+                reasonRequired
                 confirmLabel="Delete tenant"
                 onCancel={() => setDangerAction(null)}
-                onConfirm={() => { router.delete(route('superadmin.tenants.destroy', routeKey)); setDangerAction(null); }}
+                onConfirm={(reason) => { router.delete(route('superadmin.tenants.destroy', routeKey), { data: { reason } }); setDangerAction(null); }}
             />
         </AuthenticatedLayout>
     );

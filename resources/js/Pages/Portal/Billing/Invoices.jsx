@@ -1,0 +1,7 @@
+import Money from '@/Components/Portal/Money';
+import Panel from '@/Components/Portal/Panel';
+import StatusPill from '@/Components/Portal/StatusPill';
+import PortalLayout from '@/Layouts/PortalLayout';
+import { Link } from '@inertiajs/react';
+
+export default function Invoices({ invoices }) { return <PortalLayout title="Invoices"><Panel><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">{['Invoice','Date','Service','Amount','Status','Due',''].map((h, i) => <th key={i} className="px-3 py-3">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{invoices.data.map((invoice) => <tr key={invoice.id}><td className="px-3 py-4 font-semibold">{invoice.number}</td><td className="px-3 py-4">{invoice.issued_on || 'Draft'}</td><td className="px-3 py-4">{invoice.tenant?.company_name || `${invoice.items_count} services`}</td><td className="px-3 py-4 font-semibold"><Money value={invoice.total} currency={invoice.currency} /></td><td className="px-3 py-4"><StatusPill value={invoice.status} /></td><td className="px-3 py-4">{invoice.due_on || '—'}</td><td className="px-3 py-4 text-right"><Link href={route('portal.billing.invoices.show', invoice.id)} className="font-semibold text-indigo-600">View</Link></td></tr>)}</tbody></table>{!invoices.data.length && <p className="py-12 text-center text-sm text-slate-500">No invoices yet. Your invoices will appear here.</p>}</div></Panel></PortalLayout>; }

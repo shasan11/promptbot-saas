@@ -41,7 +41,7 @@ export default function Index({ plans }) {
                                     <Link href={route('superadmin.plans.show', plan.public_uuid || plan.id)} className="text-base font-bold text-slate-900 hover:text-brand-700">{plan.name}</Link>
                                     <p className="mt-0.5 font-mono text-xs text-slate-400">{plan.slug}</p>
                                 </div>
-                                <Badge tone={plan.is_active ? 'brand' : 'neutral'}>{plan.is_active ? 'Active' : 'Inactive'}</Badge>
+                                <div className="flex flex-wrap gap-1"><Badge tone={plan.is_active ? 'brand' : 'neutral'}>{plan.is_active ? 'Active' : 'Inactive'}</Badge><Badge tone={plan.is_public ? 'success' : 'neutral'}>{plan.is_public ? 'Public' : 'Private'}</Badge></div>
                             </div>
 
                             <div className="mt-5">

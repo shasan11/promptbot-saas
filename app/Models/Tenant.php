@@ -17,6 +17,15 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     use HasDomains;
     use HasPublicUuid;
 
+    protected static function booted(): void
+    {
+        static::created(function (Tenant $tenant): void {
+            if (! $tenant->customer_account_id && \Illuminate\Support\Facades\Schema::hasTable('customer_accounts')) {
+                app(\App\Services\Platform\LegacyCustomerAccountResolver::class)->resolve($tenant);
+            }
+        });
+    }
+
     protected $casts = [
         'data' => 'array',
         'status' => TenantStatus::class,
@@ -35,6 +44,11 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function customerAccount(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAccount::class);
     }
 
     public function subscriptions(): HasMany
@@ -77,7 +91,9 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id',
             'public_uuid',
-            'company_name',
+            'customer_account_id',
+        'company_name',
+        'region',
             'slug',
             'status',
             'plan_id',

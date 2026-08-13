@@ -9,9 +9,11 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Models\CustomerAccount;
 use App\Services\Platform\AuditLogService;
 use App\Services\Platform\InvoiceService;
 use App\Services\Platform\PlatformSettingsService;
+use App\Services\Platform\PortalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +45,7 @@ class PaymentController extends Controller
 
         return Inertia::render('Admin/Payments/Index', [
             'payments' => $payments,
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'company_name']),
             'filters' => $request->only(['search', 'status', 'provider', 'tenant_id']),
             'stats' => [
                 'currency' => $currency,
@@ -63,7 +65,8 @@ class PaymentController extends Controller
     public function store(
         PaymentStoreRequest $request,
         InvoiceService $invoices,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        PortalNotificationService $notifications,
     ): RedirectResponse {
         $data = $this->normalize($request->validated());
         $this->validateRelationships($data);
@@ -76,6 +79,7 @@ class PaymentController extends Controller
             'tenant_id' => $payment->tenant_id,
             'new_values' => $payment->only(['invoice_id', 'subscription_id', 'provider', 'provider_reference', 'status', 'amount', 'currency']),
         ]);
+        $this->notifyPayment($payment, $notifications);
 
         return redirect()->route('superadmin.billing.payments.show', $payment)->with('status', 'Payment recorded.');
     }
@@ -111,13 +115,15 @@ class PaymentController extends Controller
         PaymentUpdateRequest $request,
         Payment $payment,
         InvoiceService $invoices,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        PortalNotificationService $notifications,
     ): RedirectResponse {
         if ((float) $payment->refunded_amount > 0) {
             return back()->with('error', 'A payment with refunds cannot be edited. Record an adjusting payment instead.');
         }
 
         $oldInvoiceId = $payment->invoice_id;
+        $oldStatus = $payment->status;
         $data = $this->normalize($request->validated(), $payment);
         $this->validateRelationships([...$payment->toArray(), ...$data]);
         $oldValues = $payment->only(array_keys($data));
@@ -133,6 +139,9 @@ class PaymentController extends Controller
             'old_values' => $oldValues,
             'new_values' => $data,
         ]);
+        if ($oldStatus !== $payment->fresh()->status) {
+            $this->notifyPayment($payment->fresh(), $notifications);
+        }
 
         return redirect()->route('superadmin.billing.payments.show', $payment)->with('status', 'Payment updated.');
     }
@@ -149,7 +158,12 @@ class PaymentController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:2000'],
             'provider_reference' => ['nullable', 'string', 'max:255'],
+            'idempotency_key' => ['required', 'uuid'],
         ]);
+        $idempotencyKey = hash('sha256', $payment->getKey().'|'.$validated['idempotency_key']);
+        if ($payment->refunds()->where('idempotency_key', $idempotencyKey)->exists()) {
+            return back()->with('status', 'This refund request was already recorded.');
+        }
 
         if (! in_array($payment->status, ['paid', 'partially_refunded'], true)) {
             throw ValidationException::withMessages([
@@ -163,8 +177,10 @@ class PaymentController extends Controller
             ]);
         }
 
-        $refund = DB::transaction(function () use ($request, $payment, $validated) {
+        [$refund, $created] = DB::transaction(function () use ($request, $payment, $validated, $idempotencyKey) {
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $existing = $lockedPayment->refunds()->where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) return [$existing, false];
             $remaining = $lockedPayment->refundableAmount();
 
             if ((float) $validated['amount'] > $remaining) {
@@ -174,6 +190,7 @@ class PaymentController extends Controller
             }
 
             $refund = $lockedPayment->refunds()->create([
+                'idempotency_key' => $idempotencyKey,
                 'amount' => $validated['amount'],
                 'status' => 'completed',
                 'reason' => $validated['reason'],
@@ -188,8 +205,10 @@ class PaymentController extends Controller
                 'status' => $refundedAmount >= (float) $lockedPayment->amount ? 'refunded' : 'partially_refunded',
             ]);
 
-            return $refund;
+            return [$refund, true];
         });
+
+        if (! $created) return back()->with('status', 'This refund request was already recorded.');
 
         $this->syncInvoiceSettlement($payment->invoice_id, $invoices);
 
@@ -206,13 +225,15 @@ class PaymentController extends Controller
     private function formData(PlatformSettingsService $settings): array
     {
         return [
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
-            'invoices' => Invoice::query()->with('tenant:id,company_name')->latest('issued_on')->get(['id', 'tenant_id', 'number', 'status', 'total', 'currency']),
-            'subscriptions' => Subscription::query()->with(['tenant:id,company_name', 'plan:id,name'])->latest()->get(['id', 'tenant_id', 'plan_id', 'status']),
+            'accounts' => CustomerAccount::query()->where('status', '!=', 'closed')->orderBy('name')->limit(500)->get(['id', 'name', 'account_number']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'customer_account_id', 'company_name']),
+            'invoices' => Invoice::query()->with('tenant:id,company_name')->latest('issued_on')->limit(1000)->get(['id', 'customer_account_id', 'tenant_id', 'number', 'status', 'total', 'currency']),
+            'subscriptions' => Subscription::query()->with(['tenant:id,company_name', 'plan:id,name'])->latest()->limit(1000)->get(['id', 'customer_account_id', 'tenant_id', 'plan_id', 'status']),
             'defaults' => [
                 'provider' => $settings->get('payment', 'default_gateway', 'manual'),
                 'currency' => strtoupper((string) $settings->get('general', 'default_currency', 'USD')),
             ],
+            'billingModeSupport' => (string) $settings->get('billing', 'billing_mode_support', 'both'),
         ];
     }
 
@@ -242,10 +263,21 @@ class PaymentController extends Controller
 
     private function validateRelationships(array $data): void
     {
+        $accountId = (int) ($data['customer_account_id'] ?? 0);
+        if (! $accountId) throw ValidationException::withMessages(['customer_account_id' => 'Select a customer account.']);
+        if (app(PlatformSettingsService::class)->get('billing', 'billing_mode_support', 'both') === 'per_service' && empty($data['tenant_id'])) {
+            $purchaseInvoice = ! empty($data['invoice_id']) && Invoice::query()->whereKey($data['invoice_id'])
+                ->whereHas('items', fn ($items) => $items->where('metadata->workspace_purchase', true))->exists();
+            if (! $purchaseInvoice) throw ValidationException::withMessages(['tenant_id' => 'A workspace is required by the billing policy.']);
+        }
+        if (! empty($data['tenant_id']) && ! Tenant::query()->whereKey($data['tenant_id'])->where('customer_account_id', $accountId)->exists()) {
+            throw ValidationException::withMessages(['tenant_id' => 'The selected workspace does not belong to this account.']);
+        }
         if (! empty($data['invoice_id'])) {
             $validInvoice = Invoice::query()
                 ->whereKey($data['invoice_id'])
-                ->where('tenant_id', $data['tenant_id'])
+                ->where('customer_account_id', $accountId)
+                ->when(! empty($data['tenant_id']), fn ($query) => $query->where(fn ($scope) => $scope->whereNull('tenant_id')->orWhere('tenant_id', $data['tenant_id'])))
                 ->exists();
 
             if (! $validInvoice) {
@@ -258,6 +290,7 @@ class PaymentController extends Controller
         if (! empty($data['subscription_id'])) {
             $validSubscription = Subscription::query()
                 ->whereKey($data['subscription_id'])
+                ->where('customer_account_id', $accountId)
                 ->where('tenant_id', $data['tenant_id'])
                 ->exists();
 
@@ -293,5 +326,21 @@ class PaymentController extends Controller
         } elseif ($invoice->status === 'paid') {
             $invoices->reopen($invoice);
         }
+    }
+
+    private function notifyPayment(Payment $payment, PortalNotificationService $notifications): void
+    {
+        if (! $payment->customer_account_id || ! in_array($payment->status, ['paid', 'failed'], true)) return;
+        $paid = $payment->status === 'paid';
+        $notifications->capability(
+            $payment->customer_account_id,
+            'can_manage_billing',
+            $paid ? 'billing.payment_received' : 'billing.payment_failed',
+            $paid ? 'Payment received' : 'Payment failed',
+            "{$payment->currency} ".number_format((float) $payment->amount, 2).($paid ? ' was received.' : ' could not be processed.'),
+            route('portal.billing.payments', absolute: false),
+            data: ['payment_id' => $payment->getKey(), 'payment_amount' => $payment->currency.' '.number_format((float) $payment->amount, 2)],
+            tenantId: $payment->tenant_id,
+        );
     }
 }

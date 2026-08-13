@@ -4,11 +4,17 @@ use App\Http\Middleware\EnforceTenantLimit;
 use App\Http\Middleware\EnsureCentralDomain;
 use App\Http\Middleware\EnsureCentralUserIsActive;
 use App\Http\Middleware\EnsureCentralUserPasswordIsValid;
+use App\Http\Middleware\EnsureCentralTwoFactor;
+use App\Http\Middleware\EnsurePortalUserIsActive;
+use App\Http\Middleware\EnsurePortalEmailIsVerified;
 use App\Http\Middleware\EnsureInstallerIsOpen;
 use App\Http\Middleware\EnsureTenancyIsInitialized;
 use App\Http\Middleware\EnsureTenantIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RequireTenantFeature;
+use App\Http\Middleware\ResolveActiveCustomerAccount;
+use App\Http\Middleware\TrackPortalSession;
+use App\Http\Middleware\EnsureCustomerPortalEnabled;
 use App\Http\Middleware\AuthenticateDeveloperApiKey;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'widget/api/*',
             'channels/email/*/inbound',
+            'billing/webhooks/*',
         ]);
 
         $middleware->web(append: [
@@ -49,6 +56,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'central.domain' => EnsureCentralDomain::class,
             'central.active' => EnsureCentralUserIsActive::class,
             'central.password' => EnsureCentralUserPasswordIsValid::class,
+            'central.2fa' => EnsureCentralTwoFactor::class,
+            'portal.active' => EnsurePortalUserIsActive::class,
+            'portal.verified' => EnsurePortalEmailIsVerified::class,
+            'portal.account' => ResolveActiveCustomerAccount::class,
+            'portal.session' => TrackPortalSession::class,
+            'portal.enabled' => EnsureCustomerPortalEnabled::class,
             'installer.open' => EnsureInstallerIsOpen::class,
             'tenant.active' => EnsureTenantIsActive::class,
             'tenant.initialized' => EnsureTenancyIsInitialized::class,
@@ -62,7 +75,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // that tenant's own login page, never the central admin login.
         $middleware->redirectGuestsTo(fn (Request $request) => tenancy()->initialized
             ? route('tenant.login')
-            : route('login'));
+            : ($request->is('account*') ? route('portal.login') : route('login')));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TenantCouldNotBeIdentifiedOnDomainException $exception, Request $request) {

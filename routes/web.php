@@ -3,9 +3,8 @@
 use App\Http\Controllers\Installer\TenancyInstallerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicWebsiteController;
-use App\Models\Domain;
+use App\Http\Controllers\PaymentWebhookController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 
 Route::middleware(['central.domain', 'installer.open', 'throttle:30,1'])
     ->prefix('install/tenancy')->name('install.tenancy.')->group(function (): void {
@@ -19,16 +18,14 @@ Route::middleware(['central.domain', 'installer.open', 'throttle:20,1'])->group(
     Route::post('/install', [TenancyInstallerController::class, 'complete'])->name('install.complete');
 });
 
-Route::get('/', function (Request $request, PublicWebsiteController $controller) {
-    $host = strtolower($request->getHost());
-    if (in_array($host, config('tenancy.central_domains', []), true)) return $controller->show($request);
-    abort_unless(Domain::where('domain', $host)->exists(), 404);
-    return redirect('/dashboard');
-})->name('central.home');
+Route::get('/', [PublicWebsiteController::class, 'home'])->name('central.home');
 
 Route::middleware('central.domain')->group(function (): void {
 
-    Route::get('/central-dashboard', fn () => redirect()->route('superadmin.dashboard'))
+    Route::post('/billing/webhooks/{provider}', PaymentWebhookController::class)
+        ->middleware('throttle:120,1')->name('billing.webhooks.receive');
+
+    Route::redirect('/central-dashboard', '/superadmin/dashboard')
         ->middleware(['auth:central', 'central.active', 'verified'])
         ->name('dashboard');
 
@@ -39,6 +36,14 @@ Route::middleware('central.domain')->group(function (): void {
     });
 
     require __DIR__.'/auth.php';
+    require __DIR__.'/portal.php';
+
+    Route::get('/sitemap.xml', [PublicWebsiteController::class, 'sitemap'])->name('website.sitemap');
+    Route::get('/robots.txt', [PublicWebsiteController::class, 'robots'])->name('website.robots');
+    Route::get('/website-preview/{page}', [PublicWebsiteController::class, 'preview'])->middleware('signed')->name('website.preview');
+    Route::get('/blog', [PublicWebsiteController::class, 'blog'])->name('website.blog');
+    Route::get('/blog/{slug}', [PublicWebsiteController::class, 'post'])->name('website.blog.show');
+    Route::post('/forms/{form}', [PublicWebsiteController::class, 'submitForm'])->middleware('throttle:10,1')->name('website.forms.submit');
 
     // Catch-all for published CMS pages. Registered last so it never shadows
     // an explicit named route above (login, profile, verify-email, etc.).

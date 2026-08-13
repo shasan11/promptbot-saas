@@ -37,6 +37,9 @@ class CentralUser extends Authenticatable
         'locked_until',
         'password_expires_at',
         'two_factor_required',
+        'two_factor_enabled',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -47,6 +50,8 @@ class CentralUser extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -65,6 +70,9 @@ class CentralUser extends Authenticatable
             'locked_until' => 'datetime',
             'password_expires_at' => 'datetime',
             'two_factor_required' => 'boolean',
+            'two_factor_enabled' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Setting;
 use App\Services\Platform\PlatformSettingsService;
+use App\Models\PortalNotification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -18,9 +19,14 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $guard = tenancy()->initialized ? 'tenant' : 'central';
-        $user = tenancy()->initialized ? $request->user('tenant') : $request->user('central');
-        $permissions = $user ? $user->getAllPermissions()->pluck('name')->values()->all() : [];
+        $guard = tenancy()->initialized
+            ? 'tenant'
+            : ($request->user('portal') ? 'portal' : 'central');
+        $user = $request->user($guard);
+        $permissions = $user && method_exists($user, 'getAllPermissions')
+            ? $user->getAllPermissions()->pluck('name')->values()->all()
+            : [];
+        $activeAccount = $request->attributes->get('customerAccount');
 
         return [
             ...parent::share($request),
@@ -29,7 +35,28 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
                 'permissions' => $permissions,
             ],
-            'platform' => fn () => app(PlatformSettingsService::class)->publicBranding(),
+            'portal' => fn () => $guard === 'portal' ? [
+                'activeAccount' => $activeAccount,
+                'accounts' => $user->accounts()->orderBy('name')->get(['customer_accounts.id', 'public_uuid', 'name', 'status']),
+                'membership' => $activeAccount?->pivot,
+                'unreadNotifications' => $activeAccount ? PortalNotification::where('customer_account_id', $activeAccount->id)
+                    ->where(fn ($query) => $query->whereNull('portal_user_id')->orWhere('portal_user_id', $user->id))->whereNull('read_at')->count() : 0,
+                'features' => [
+                    'workspaceCreation' => filter_var(app(PlatformSettingsService::class)->get('customer_portal', 'allow_workspace_creation', true), FILTER_VALIDATE_BOOL),
+                    'memberInvitations' => filter_var(app(PlatformSettingsService::class)->get('customer_portal', 'allow_member_invitations', true), FILTER_VALIDATE_BOOL),
+                    'support' => filter_var(app(PlatformSettingsService::class)->get('customer_portal', 'support_tickets_enabled', app(PlatformSettingsService::class)->get('customer_portal', 'allow_support_tickets', true)), FILTER_VALIDATE_BOOL),
+                    'planChanges' => filter_var(app(PlatformSettingsService::class)->get('customer_portal', 'allow_plan_changes', true), FILTER_VALIDATE_BOOL),
+                    'cancellations' => filter_var(app(PlatformSettingsService::class)->get('customer_portal', 'allow_cancellations', true), FILTER_VALIDATE_BOOL),
+                ],
+            ] : null,
+            'platform' => function (): array {
+                $settings = app(PlatformSettingsService::class);
+                return [
+                    ...$settings->publicBranding(),
+                    'maintenanceBanner' => filter_var($settings->get('maintenance', 'banner_enabled', false), FILTER_VALIDATE_BOOL)
+                        ? (string) $settings->get('maintenance', 'banner_message', '') : null,
+                ];
+            },
             'tenant' => fn () => tenancy()->initialized ? [
                 'id' => tenant('id'),
                 'companyName' => Setting::query()->where('key', 'general.workspace_name')->value('value')['value'] ?? tenant('company_name'),

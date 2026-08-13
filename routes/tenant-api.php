@@ -5,16 +5,14 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 use App\Http\Controllers\Tenant\Api\V1\ConnectionUsageController;
 use App\Http\Controllers\Tenant\Api\V1\ResourceController;
+use App\Http\Controllers\Tenant\Api\TenantStatusController;
 
 Route::middleware([
     InitializeTenancyByDomain::class,
     PreventAccessFromCentralDomains::class,
     'tenant.active',
 ])->group(function (): void {
-    Route::get('/tenant', fn () => [
-        'tenant_id' => tenant('id'),
-        'status' => tenant('status')?->value ?? tenant('status'),
-    ]);
+    Route::get('/tenant', TenantStatusController::class);
     Route::prefix('v1')->middleware('throttle:120,1')->group(function (): void {
         Route::get('contacts', [ResourceController::class, 'contacts'])->middleware('developer.key:contacts.read');
         Route::get('conversations', [ResourceController::class, 'conversations'])->middleware('developer.key:conversations.read');

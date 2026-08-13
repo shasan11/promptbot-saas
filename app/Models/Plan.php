@@ -29,6 +29,7 @@ class Plan extends Model
         'currency',
         'trial_days',
         'is_active',
+        'is_public',
         'sort_order',
         'is_recommended',
         'user_limit',
@@ -48,6 +49,7 @@ class Plan extends Model
             'monthly_price' => 'decimal:2',
             'annual_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'is_public' => 'boolean',
             'is_recommended' => 'boolean',
             'resource_limits' => 'array',
         ];

@@ -81,6 +81,8 @@ class PlatformSettingsService
             'mail.reply_to.address' => $email['reply_to_address'] ?? null,
             'mail.reply_to.name' => $email['reply_to_name'] ?? null,
             'platform.support_email' => $general['support_email'] ?? null,
+            'platform.billing_email' => $general['billing_email'] ?? null,
+            'platform.legal_company_name' => $general['legal_company_name'] ?? ($branding['company_name'] ?? null),
             'platform.default_currency' => strtoupper((string) ($general['default_currency'] ?? 'USD')),
             'platform.payment' => $payment,
             'platform.branding' => $branding,

@@ -7,13 +7,19 @@ use App\Http\Requests\Admin\SupportTicketStoreRequest;
 use App\Http\Requests\Admin\SupportTicketUpdateRequest;
 use App\Models\CentralUser;
 use App\Models\SupportTicket;
+use App\Models\SupportTicketMessage;
+use App\Models\CustomerAccountActivity;
 use App\Models\Tenant;
 use App\Services\Platform\AuditLogService;
+use App\Services\Platform\PortalNotificationService;
+use App\Services\Platform\SupportAttachmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupportTicketController extends Controller
 {
@@ -41,7 +47,7 @@ class SupportTicketController extends Controller
 
         return Inertia::render('Admin/Tickets/Index', [
             'tickets' => $tickets,
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'company_name']),
             'administrators' => CentralUser::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
             'filters' => $request->only(['search', 'status', 'priority', 'tenant_id', 'assigned_to']),
             'stats' => [
@@ -53,9 +59,9 @@ class SupportTicketController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('Admin/Tickets/Create', $this->formData());
+        return Inertia::render('Admin/Tickets/Create', [...$this->formData(), 'selectedTenantId' => $request->string('tenant_id')->toString() ?: null]);
     }
 
     public function store(SupportTicketStoreRequest $request, AuditLogService $auditLog): RedirectResponse
@@ -86,6 +92,7 @@ class SupportTicketController extends Controller
                 'assignee:id,name,email',
                 'creator:id,name,email',
                 'messages.centralUser:id,name,email',
+                'messages.portalUser:id,name,email',
             ]),
             'administrators' => CentralUser::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
         ]);
@@ -123,20 +130,21 @@ class SupportTicketController extends Controller
         return back()->with('status', 'Ticket updated.');
     }
 
-    public function addMessage(Request $request, SupportTicket $ticket, AuditLogService $auditLog): RedirectResponse
+    public function addMessage(Request $request, SupportTicket $ticket, AuditLogService $auditLog, PortalNotificationService $notifications, SupportAttachmentService $attachments): RedirectResponse
     {
         abort_unless($request->user('central')?->can('support.manage'), 403);
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:10000'],
             'is_internal' => ['sometimes', 'boolean'],
+            'attachment' => SupportAttachmentService::RULES,
         ]);
 
-        $message = $ticket->messages()->create([
+        $message = $attachments->createMessage($ticket, [
             'central_user_id' => $request->user('central')?->id,
             'body' => $validated['body'],
             'is_internal' => (bool) ($validated['is_internal'] ?? false),
-        ]);
+        ], $request->file('attachment'));
 
         $ticket->update(['last_activity_at' => now()]);
 
@@ -144,14 +152,36 @@ class SupportTicketController extends Controller
             'tenant_id' => $ticket->tenant_id,
             'new_values' => ['message_id' => $message->id, 'is_internal' => $message->is_internal],
         ]);
+        if ($ticket->customer_account_id) CustomerAccountActivity::create([
+            'customer_account_id' => $ticket->customer_account_id, 'tenant_id' => $ticket->tenant_id,
+            'actor_type' => $request->user('central')::class, 'actor_id' => (string) $request->user('central')->getKey(),
+            'event' => $message->is_internal ? 'support.internal_note_added' : 'support.platform_replied',
+            'subject_type' => SupportTicket::class, 'subject_id' => (string) $ticket->getKey(),
+            'description' => $message->is_internal ? "An internal note was added to {$ticket->number}." : "Platform support replied to {$ticket->number}.",
+            'is_customer_visible' => ! $message->is_internal,
+        ]);
+        if (! $message->is_internal && $ticket->customer_account_id) {
+            $notifications->capability($ticket->customer_account_id, 'can_manage_support', 'support.reply', "Reply on {$ticket->number}", $ticket->subject, route('portal.support.show', $ticket, false), ['ticket_id' => $ticket->getKey(), 'ticket_number' => $ticket->number], $ticket->tenant_id);
+        }
 
         return back()->with('status', $message->is_internal ? 'Internal note added.' : 'Reply added.');
+    }
+
+    public function downloadAttachment(Request $request, SupportTicket $ticket, SupportTicketMessage $message): StreamedResponse
+    {
+        abort_unless($request->user('central')?->can('support.view'), 403);
+        abort_unless($message->support_ticket_id === $ticket->getKey() && $message->attachment_path, 404);
+        abort_unless(Storage::disk('local')->exists($message->attachment_path), 404);
+        return Storage::disk('local')->download($message->attachment_path, $message->attachment_name ?: 'support-attachment', [
+            'Content-Type' => $message->attachment_mime ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function formData(): array
     {
         return [
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'company_name']),
             'administrators' => CentralUser::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
         ];
     }

@@ -14,6 +14,8 @@ class SupportTicket extends Model
     protected $fillable = [
         'number',
         'tenant_id',
+        'customer_account_id',
+        'portal_user_id',
         'subject',
         'description',
         'status',
@@ -39,6 +41,16 @@ class SupportTicket extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function customerAccount(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAccount::class);
+    }
+
+    public function portalUser(): BelongsTo
+    {
+        return $this->belongsTo(PortalUser::class);
     }
 
     public function assignee(): BelongsTo

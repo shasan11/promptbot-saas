@@ -26,7 +26,7 @@ export default function Show({ ticket, administrators = [] }) {
         requester_email: ticket.requester_email || '',
         sla_due_at: ticket.sla_due_at ? ticket.sla_due_at.slice(0, 16) : '',
     });
-    const messageForm = useForm({ body: '', is_internal: false });
+    const messageForm = useForm({ body: '', is_internal: false, attachment: null });
 
     const updateTicket = (event) => {
         event.preventDefault();
@@ -36,8 +36,9 @@ export default function Show({ ticket, administrators = [] }) {
     const addMessage = (event) => {
         event.preventDefault();
         messageForm.post(route('superadmin.tickets.messages.store', ticket.id), {
+            forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => messageForm.reset('body'),
+            onSuccess: () => messageForm.reset('body', 'attachment'),
         });
     };
 
@@ -90,6 +91,7 @@ export default function Show({ ticket, administrators = [] }) {
                                         <time className="text-xs text-slate-500">{new Date(message.created_at).toLocaleString()}</time>
                                     </div>
                                     <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{message.body}</p>
+                                    {message.has_attachment && <a href={route('superadmin.tickets.attachments.download', [ticket.id, message.id])} className="mt-3 inline-block rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-indigo-700">Download {message.attachment_name || 'attachment'}{message.attachment_size ? ` · ${Math.ceil(message.attachment_size / 1024)} KB` : ''}</a>}
                                 </article>
                             )) : <EmptyState icon={MessagesSquare} title="No replies or notes yet" />}
                         </div>
@@ -98,6 +100,9 @@ export default function Show({ ticket, administrators = [] }) {
                             <form onSubmit={addMessage} className="mt-6 border-t border-slate-100 pt-6">
                                 <FormField label="Compose" error={messageForm.errors.body}>
                                     <Textarea rows={5} placeholder="Write a customer-visible reply or an internal note" value={messageForm.data.body} error={!!messageForm.errors.body} onChange={(event) => messageForm.setData('body', event.target.value)} />
+                                </FormField>
+                                <FormField label="Attachment" error={messageForm.errors.attachment}>
+                                    <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv" onChange={(event) => messageForm.setData('attachment', event.target.files[0] || null)} className="block w-full text-sm" />
                                 </FormField>
                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                     <div className="inline-flex rounded-md border border-slate-200 p-0.5" role="radiogroup" aria-label="Message type">

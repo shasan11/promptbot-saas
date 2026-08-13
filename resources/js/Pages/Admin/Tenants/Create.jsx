@@ -44,9 +44,12 @@ const getSubdomainPrefix = (domain = '', baseDomain = '') => {
 
 export default function Create({
     plans = [],
+    accounts = [],
     tenant = null,
     provisioningMode = 'manual',
     tenantBaseDomain = '',
+    selectedAccountId = null,
+    defaultRegion = '',
 }) {
     const editing = Boolean(tenant);
     const baseDomain = cleanBaseDomain(tenantBaseDomain);
@@ -62,7 +65,9 @@ export default function Create({
         processing,
         errors,
     } = useForm({
+        customer_account_id: tenant?.customer_account_id || selectedAccountId || accounts[0]?.id || '',
         company_name: tenant?.company_name || '',
+        region: tenant?.region || defaultRegion,
         subdomain: getSubdomainPrefix(primaryDomain?.domain, baseDomain),
         owner_name: '',
         owner_email: '',
@@ -151,12 +156,17 @@ export default function Create({
                     description="Choose the company name and the address users will use to open this workspace."
                 >
                     <div className="grid gap-5 md:grid-cols-2">
+                        <FormField id="customer_account_id" label="Customer account" required error={errors.customer_account_id} className="md:col-span-2">
+                            <Select id="customer_account_id" value={data.customer_account_id} error={!!errors.customer_account_id} onChange={(event) => setData('customer_account_id', event.target.value)}>
+                                <option value="">Select a customer account</option>
+                                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.account_number}</option>)}
+                            </Select>
+                        </FormField>
                         <FormField
                             id="company_name"
                             label="Company name"
                             required
                             error={errors.company_name}
-                            className="md:col-span-2"
                         >
                             <Input
                                 id="company_name"
@@ -164,6 +174,21 @@ export default function Create({
                                 error={!!errors.company_name}
                                 placeholder="Acme Corporation"
                                 onChange={(event) => setData('company_name', event.target.value)}
+                            />
+                        </FormField>
+                        <FormField
+                            id="region"
+                            label="Provisioning region"
+                            optional
+                            error={errors.region}
+                            hint="Used for placement and operational reporting."
+                        >
+                            <Input
+                                id="region"
+                                value={data.region}
+                                error={!!errors.region}
+                                placeholder="us-east-1"
+                                onChange={(event) => setData('region', event.target.value)}
                             />
                         </FormField>
 

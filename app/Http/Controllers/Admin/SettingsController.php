@@ -253,7 +253,9 @@ class SettingsController extends Controller
                 'fields' => [
                     'platform_name' => ['label' => 'Platform name', 'rules' => ['sometimes', 'required', 'string', 'max:255']],
                     'platform_url' => ['label' => 'Platform URL', 'type' => 'url', 'rules' => ['sometimes', 'nullable', 'url', 'max:255'], 'placeholder' => 'https://app.example.com'],
+                    'legal_company_name' => ['label' => 'Company / legal name', 'rules' => ['sometimes', 'nullable', 'string', 'max:255']],
                     'support_email' => ['label' => 'Support email', 'type' => 'email', 'rules' => ['sometimes', 'nullable', 'email', 'max:255']],
+                    'billing_email' => ['label' => 'Billing email', 'type' => 'email', 'rules' => ['sometimes', 'nullable', 'email', 'max:255']],
                     'timezone' => ['label' => 'Default timezone', 'type' => 'select', 'rules' => ['sometimes', 'required', 'timezone'], 'options' => $this->timezoneOptions()],
                     'default_locale' => ['label' => 'Default locale', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:'.implode(',', array_keys(self::LOCALES))], 'options' => $this->mapOptions(self::LOCALES)],
                     'default_currency' => ['label' => 'Default currency', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:'.implode(',', array_keys(self::CURRENCIES))], 'options' => $this->mapOptions(self::CURRENCIES, true)],
@@ -272,6 +274,17 @@ class SettingsController extends Controller
                     'login_attempt_limit' => ['label' => 'Login attempt limit', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:3', 'max:20']],
                     'lockout_duration_minutes' => ['label' => 'Lockout duration (minutes)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:1', 'max:1440']],
                     'password_expiry_days' => ['label' => 'Password expiry (days)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:365']],
+                ],
+            ],
+            'localization' => [
+                'title' => 'Localization',
+                'description' => 'Regional defaults used in the customer portal, invoices, and operational reports.',
+                'fields' => [
+                    'timezone' => ['label' => 'Default timezone', 'type' => 'select', 'rules' => ['sometimes', 'required', 'timezone'], 'options' => $this->timezoneOptions()],
+                    'locale' => ['label' => 'Default language', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:'.implode(',', array_keys(self::LOCALES))], 'options' => $this->mapOptions(self::LOCALES)],
+                    'country' => ['label' => 'Default country code', 'rules' => ['sometimes', 'nullable', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/']],
+                    'date_format' => ['label' => 'Date format', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:Y-m-d,d/m/Y,m/d/Y,d M Y'], 'options' => $this->mapOptions(['Y-m-d' => '2026-08-12', 'd/m/Y' => '12/08/2026', 'm/d/Y' => '08/12/2026', 'd M Y' => '12 Aug 2026'])],
+                    'currency' => ['label' => 'Default currency', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:'.implode(',', array_keys(self::CURRENCIES))], 'options' => $this->mapOptions(self::CURRENCIES, true)],
                 ],
             ],
             'email' => [
@@ -320,6 +333,90 @@ class SettingsController extends Controller
                     'gateway_public_key' => ['label' => 'Gateway public key', 'rules' => ['sometimes', 'nullable', 'string', 'max:2048']],
                     'gateway_secret_key' => ['label' => 'Gateway secret key', 'type' => 'password', 'sensitive' => true, 'rules' => ['sometimes', 'nullable', 'string', 'max:4096']],
                     'gateway_webhook_secret' => ['label' => 'Webhook signing secret', 'type' => 'password', 'sensitive' => true, 'rules' => ['sometimes', 'nullable', 'string', 'max:4096']],
+                ],
+            ],
+            'billing' => [
+                'title' => 'Billing Policy',
+                'description' => 'Account billing modes, payment terms, grace periods, proration, and cancellation policy.',
+                'fields' => [
+                    'invoice_number_start' => ['label' => 'Next invoice sequence baseline', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:1', 'max:999999999']],
+                    'payment_terms_days' => ['label' => 'Payment terms (days)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:365']],
+                    'grace_period_days' => ['label' => 'Failed-payment grace period (days)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:365']],
+                    'billing_mode_support' => ['label' => 'Billing modes', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:per_service,both'], 'options' => [['value' => 'per_service', 'label' => 'Per-service only'], ['value' => 'both', 'label' => 'Per-service and consolidated']]],
+                    'proration_policy' => ['label' => 'Proration policy', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:none,immediate,next_invoice'], 'options' => [['value' => 'none', 'label' => 'No proration'], ['value' => 'immediate', 'label' => 'Immediate adjustment'], ['value' => 'next_invoice', 'label' => 'Adjust next invoice']]],
+                    'plan_change_policy' => ['label' => 'Default plan-change timing', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:immediate,period_end,customer_choice'], 'options' => [['value' => 'immediate', 'label' => 'Immediate'], ['value' => 'period_end', 'label' => 'At period end'], ['value' => 'customer_choice', 'label' => 'Let eligible customer choose']]],
+                    'allow_immediate_cancellation' => ['label' => 'Allow immediate cancellation', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                ],
+            ],
+            'tax' => [
+                'title' => 'Tax',
+                'description' => 'Default platform tax behavior. Historical invoices keep their issued tax snapshots.',
+                'fields' => [
+                    'enabled' => ['label' => 'Tax calculation', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'default_rate' => ['label' => 'Default tax rate (%)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100']],
+                    'prices_include_tax' => ['label' => 'Plan prices include tax', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'tax_label' => ['label' => 'Tax label', 'rules' => ['sometimes', 'required', 'string', 'max:50']],
+                ],
+            ],
+            'registration' => [
+                'title' => 'Registration',
+                'description' => 'Public signup, verification, payment gates, plan eligibility, and account workspace limits.',
+                'fields' => [
+                    'mode' => ['label' => 'Customer registration', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:enabled,disabled,invitation_only'], 'options' => [['value' => 'enabled', 'label' => 'Enabled'], ['value' => 'disabled', 'label' => 'Disabled'], ['value' => 'invitation_only', 'label' => 'Invitation only']]],
+                    'email_verification_required' => ['label' => 'Require email verification', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'require_payment_before_provisioning' => ['label' => 'Require payment before provisioning', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'allowed_plan_ids' => ['label' => 'Allowed public plan IDs', 'placeholder' => 'Leave blank for all public plans; otherwise comma-separated numeric IDs', 'rules' => ['sometimes', 'nullable', 'regex:/^\s*\d+(\s*,\s*\d+)*\s*$/']],
+                    'maximum_workspaces_per_account' => ['label' => 'Maximum workspaces per account (0 = unlimited)', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:10000']],
+                ],
+            ],
+            'trials' => [
+                'title' => 'Trials',
+                'description' => 'Default trial duration and customer reminders.',
+                'fields' => [
+                    'default_trial_days' => ['label' => 'Default trial days', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:365']],
+                    'trial_ending_notice_days' => ['label' => 'Trial-ending notice days', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:1', 'max:30']],
+                    'allow_trial_without_payment_method' => ['label' => 'Allow trial without payment method', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                ],
+            ],
+            'tenant_provisioning' => [
+                'title' => 'Tenant Provisioning',
+                'description' => 'Defaults and operational retry behavior for new customer workspaces.',
+                'fields' => [
+                    'mode' => ['label' => 'Provisioning mode', 'type' => 'select', 'rules' => ['sometimes', 'required', 'in:manual,mysql,cpanel'], 'options' => [['value' => 'manual', 'label' => 'Manual database'], ['value' => 'mysql', 'label' => 'MySQL administrator'], ['value' => 'cpanel', 'label' => 'cPanel API']]],
+                    'default_region' => ['label' => 'Default region', 'rules' => ['sometimes', 'nullable', 'string', 'max:100']],
+                    'automatic_retry_count' => ['label' => 'Automatic retry count', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:0', 'max:10']],
+                    'customer_can_retry' => ['label' => 'Allow customer-requested retry', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                ],
+            ],
+            'notifications' => [
+                'title' => 'Notifications',
+                'description' => 'Platform event delivery and reminder defaults.',
+                'fields' => [
+                    'billing_events_enabled' => ['label' => 'Billing event notifications', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'workspace_events_enabled' => ['label' => 'Workspace event notifications', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'support_events_enabled' => ['label' => 'Support reply notifications', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'renewal_notice_days' => ['label' => 'Renewal notice days', 'type' => 'number', 'rules' => ['sometimes', 'required', 'integer', 'min:1', 'max:30']],
+                ],
+            ],
+            'customer_portal' => [
+                'title' => 'Customer Portal',
+                'description' => 'Control customer-facing account, service, billing, member, and support capabilities.',
+                'fields' => [
+                    'enabled' => ['label' => 'Customer portal', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'allow_workspace_creation' => ['label' => 'Allow workspace creation', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'allow_plan_changes' => ['label' => 'Allow plan changes', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'allow_cancellations' => ['label' => 'Allow cancellations', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'allow_member_invitations' => ['label' => 'Allow member invitations', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'support_tickets_enabled' => ['label' => 'Support tickets', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                ],
+            ],
+            'maintenance' => [
+                'title' => 'Maintenance',
+                'description' => 'Customer-safe maintenance banners and operational access controls.',
+                'fields' => [
+                    'banner_enabled' => ['label' => 'Maintenance banner', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'banner_message' => ['label' => 'Banner message', 'type' => 'textarea', 'rules' => ['sometimes', 'nullable', 'string', 'max:2000']],
+                    'block_new_provisioning' => ['label' => 'Pause new provisioning', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
                 ],
             ],
             'branding' => [

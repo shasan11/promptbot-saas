@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\InvoiceStoreRequest;
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Models\CustomerAccount;
 use App\Services\Platform\AuditLogService;
 use App\Services\Platform\InvoiceService;
 use App\Services\Platform\PlatformSettingsService;
@@ -28,20 +29,25 @@ class InvoiceController extends Controller
 
         return Inertia::render('Admin/Invoices/Index', [
             'invoices' => $invoices,
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'company_name']),
             'filters' => $request->only(['status', 'tenant_id']),
         ]);
     }
 
-    public function create(PlatformSettingsService $settings): Response
+    public function create(Request $request, PlatformSettingsService $settings): Response
     {
         return Inertia::render('Admin/Invoices/Create', [
-            'tenants' => Tenant::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'tenants' => Tenant::query()->orderBy('company_name')->limit(1000)->get(['id', 'customer_account_id', 'company_name']),
+            'accounts' => CustomerAccount::query()->where('status', '!=', 'closed')->orderBy('name')->limit(500)->get(['id', 'name', 'account_number']),
             'defaults' => [
                 'currency' => strtoupper((string) $settings->get('general', 'default_currency', 'USD')),
-                'taxRate' => (float) $settings->get('payment', 'tax_rate', 0),
+                'taxRate' => filter_var($settings->get('tax', 'enabled', true), FILTER_VALIDATE_BOOL)
+                    ? (float) $settings->get('tax', 'default_rate', $settings->get('payment', 'tax_rate', 0)) : 0,
                 'prefix' => (string) $settings->get('payment', 'invoice_prefix', 'INV'),
             ],
+            'selectedTenantId' => $request->string('tenant_id')->toString() ?: null,
+            'selectedAccountId' => $request->integer('account_id') ?: null,
+            'billingModeSupport' => (string) $settings->get('billing', 'billing_mode_support', 'both'),
         ]);
     }
 

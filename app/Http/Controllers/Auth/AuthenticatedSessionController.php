@@ -34,6 +34,14 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+        $user = Auth::guard('central')->user();
+        if ($user?->two_factor_enabled) {
+            $request->session()->put('central.two_factor_user_id', $user->id);
+            $request->session()->put('central.two_factor_remember', $request->boolean('remember'));
+            Auth::guard('central')->logout();
+            return redirect()->route('two-factor.challenge');
+        }
+        $request->session()->put('central.two_factor_confirmed', true);
         app(AuditLogService::class)->record('platform_admin.login');
 
         return redirect()->intended(route('superadmin.dashboard', absolute: false));

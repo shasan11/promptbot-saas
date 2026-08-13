@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use Illuminate\Support\Facades\Route;
 
 // Central administrator accounts are invite-only: there is intentionally no
@@ -23,6 +24,11 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('superadmin/login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('superadmin/two-factor-challenge', [TwoFactorChallengeController::class, 'create'])
+        ->name('two-factor.challenge');
+    Route::post('superadmin/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])
+        ->middleware('throttle:6,1')->name('two-factor.store');
 
     Route::get('superadmin/forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

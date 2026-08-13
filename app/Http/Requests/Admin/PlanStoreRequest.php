@@ -22,6 +22,7 @@ class PlanStoreRequest extends FormRequest
             'currency' => ['required', 'string', 'size:3'],
             'trial_days' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'is_public' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer'],
             'is_recommended' => ['required', 'boolean'],
             'user_limit' => ['nullable', 'integer', 'min:0'],

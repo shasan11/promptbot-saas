@@ -7,7 +7,7 @@ import EmptyState from '@/Components/UI/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle, ArrowRight, Building2, CreditCard, Headphones, Inbox, ReceiptText, Wallet,
+    AlertTriangle, ArrowRight, Building2, CreditCard, Headphones, Inbox, ReceiptText, Wallet, Users,
 } from 'lucide-react';
 
 const money = (value) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -19,7 +19,7 @@ function greeting() {
     return 'Good evening';
 }
 
-export default function Dashboard({ currency = 'USD', stats = {}, recentTenants = [], subscriptionsByStatus = [], recentPayments = [], urgentTickets = [] }) {
+export default function Dashboard({ currency = 'USD', stats = {}, recentAccounts = [], recentTenants = [], subscriptionsByStatus = [], recentPayments = [], urgentTickets = [] }) {
     const { auth } = usePage().props;
     const firstName = auth?.user?.name?.split(' ')[0];
     const needsAttention = (stats.outstandingInvoices ?? 0) + urgentTickets.length;
@@ -42,6 +42,12 @@ export default function Dashboard({ currency = 'USD', stats = {}, recentTenants 
             dataIndex: 'domains',
             render: (domains = []) => domains.find((domain) => domain.is_primary)?.domain || domains[0]?.domain || '—',
         },
+    ];
+    const accountColumns = [
+        { title: 'Customer', dataIndex: 'name', render: (value, account) => <Link className="font-semibold text-slate-900 hover:text-brand-700" href={route('superadmin.customers.accounts.show', account.public_uuid)}>{value}</Link> },
+        { title: 'Owner', dataIndex: ['owner', 'name'], render: (value) => value || 'Unassigned' },
+        { title: 'Services', dataIndex: 'tenants_count' },
+        { title: 'Status', dataIndex: 'status', render: (status) => <StatusBadge status={status} /> },
     ];
 
     const paymentColumns = [
@@ -76,23 +82,27 @@ export default function Dashboard({ currency = 'USD', stats = {}, recentTenants 
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">{greeting()}{firstName ? `, ${firstName}` : ''}</p>
                         <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-white sm:text-3xl">Command center</h1>
-                        <p className="mt-1.5 max-w-xl text-sm text-slate-300">Live tenant, billing, and support operations across the platform.</p>
+                        <p className="mt-1.5 max-w-xl text-sm text-slate-300">Live customer, service, revenue, billing, and support operations across the platform.</p>
                     </div>
-                    <Button href={route('superadmin.tenants.create')} variant="brand" icon={ArrowRight} className="shrink-0">Provision a tenant</Button>
+                    <Button href={route('superadmin.services.create')} variant="brand" icon={ArrowRight} className="shrink-0">Create service</Button>
                 </div>
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard title="Active tenants" value={stats.activeTenants ?? 0} tone="emerald" icon={Building2} />
+                <StatCard title="Customer accounts" value={stats.customerAccounts ?? 0} tone="blue" icon={Users} />
+                <StatCard title="Active services" value={stats.activeTenants ?? 0} tone="emerald" icon={Building2} />
                 <StatCard title="Active subscriptions" value={stats.activeSubscriptions ?? 0} tone="blue" icon={Wallet} />
-                <StatCard title={`Net collected (${currency})`} value={money(stats.netCollected)} tone="emerald" icon={CreditCard} />
-                <StatCard title="Open tickets" value={stats.openTickets ?? 0} tone={stats.openTickets ? 'amber' : 'slate'} icon={Headphones} />
+                <StatCard title={`MRR (${currency})`} value={money(stats.mrr)} tone="emerald" icon={CreditCard} />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-md border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600 shadow-soft">
                 <span><span className="font-semibold text-slate-900">{stats.tenants ?? 0}</span> total tenants</span>
+                <span><span className="font-semibold text-slate-900">{money(stats.arr)}</span> ARR</span>
+                <span><span className="font-semibold text-slate-900">{money(stats.revenueThisMonth)}</span> revenue this month</span>
                 <span><span className="font-semibold text-slate-900">{stats.plans ?? 0}</span> active plans</span>
                 <span><span className="font-semibold text-slate-900">{stats.outstandingInvoices ?? 0}</span> outstanding invoices</span>
+                <span><span className="font-semibold text-slate-900">{stats.failedPayments ?? 0}</span> failed payments</span>
+                <span><span className="font-semibold text-slate-900">{stats.trialsEndingSoon ?? 0}</span> trials ending soon</span>
             </div>
 
             {needsAttention > 0 && (
@@ -134,13 +144,13 @@ export default function Dashboard({ currency = 'USD', stats = {}, recentTenants 
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_320px]">
                 <SectionCard
-                    title="Recent tenants"
-                    actions={<Button href={route('superadmin.tenants.index')} variant="ghost" size="sm">View all</Button>}
+                    title="Recent customer accounts"
+                    actions={<Button href={route('superadmin.customers.accounts.index')} variant="ghost" size="sm">View all</Button>}
                 >
-                    {recentTenants.length ? (
-                        <DataTable rowKey="id" columns={tenantColumns} dataSource={recentTenants} />
+                    {recentAccounts.length ? (
+                        <DataTable rowKey="id" columns={accountColumns} dataSource={recentAccounts} />
                     ) : (
-                        <EmptyState icon={Building2} title="No tenants yet" description="Provision your first tenant to see activity here." action={<Button href={route('superadmin.tenants.create')} variant="brand" size="sm">Provision tenant</Button>} />
+                        <EmptyState icon={Building2} title="No customer accounts yet" description="Customer registrations and migrated services will appear here." />
                     )}
                 </SectionCard>
 

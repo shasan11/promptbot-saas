@@ -25,6 +25,7 @@ use App\Http\Controllers\Tenant\Admin\Connections\PermissionController;
 use App\Http\Controllers\Tenant\Admin\Connections\SyncRunController;
 use App\Http\Controllers\Tenant\Admin\Connections\WebhookEventController;
 use App\Http\Controllers\Tenant\Admin\DashboardController as TenantAdminDashboardController;
+use App\Http\Controllers\LegacyPathRedirectController;
 use App\Http\Controllers\Tenant\Admin\Customer\CompanyController;
 use App\Http\Controllers\Tenant\Admin\Customer\ContactController;
 use App\Http\Controllers\Tenant\Admin\Customer\CustomerImportController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\Tenant\Admin\Inbox\AttachmentController;
 use App\Http\Controllers\Tenant\Admin\Inbox\ConversationController;
 use App\Http\Controllers\Tenant\Channel\InboundEmailController;
 use App\Http\Controllers\Tenant\Widget\WebChatController;
+use App\Http\Controllers\Tenant\Widget\WidgetCorsController;
 use App\Http\Controllers\Tenant\Admin\Ticket\TicketController;
 use App\Http\Controllers\Tenant\Admin\Ticket\TicketSettingsController;
 use App\Http\Controllers\Tenant\Admin\Task\TaskController;
@@ -62,7 +64,6 @@ use App\Http\Controllers\Tenant\Auth\TenantAuthenticatedSessionController;
 use App\Http\Controllers\Tenant\Connections\InboundWebhookController;
 use App\Http\Controllers\Tenant\InvitationAcceptController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -106,7 +107,7 @@ Route::middleware([
     Route::post('/widget/api/{key}/session', [WebChatController::class, 'session'])->middleware('throttle:20,1')->name('tenant.widget.session');
     Route::get('/widget/api/{key}/messages', [WebChatController::class, 'poll'])->middleware('throttle:120,1')->name('tenant.widget.messages.poll');
     Route::post('/widget/api/{key}/messages', [WebChatController::class, 'messages'])->middleware('throttle:60,1')->name('tenant.widget.messages.store');
-    Route::options('/widget/api/{key}/{path?}', fn (Request $request) => response('', 204)->withHeaders(['Access-Control-Allow-Origin' => $request->header('Origin', '*'), 'Access-Control-Allow-Headers' => 'Authorization, Content-Type', 'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS', 'Vary' => 'Origin']))->where('path', '.*');
+    Route::options('/widget/api/{key}/{path?}', WidgetCorsController::class)->where('path', '.*');
     Route::post('/channels/email/{channel}/inbound', InboundEmailController::class)->middleware('throttle:120,1')->name('tenant.channels.email.inbound');
     Route::get('/help', [PublicSupportController::class, 'help'])->middleware('throttle:120,1')->name('tenant.help');
     Route::get('/forms/{slug}', [PublicSupportController::class, 'form'])->middleware('throttle:120,1')->name('tenant.forms.show');
@@ -199,10 +200,10 @@ Route::middleware([
         Route::post('developer/webhooks', [GovernanceController::class, 'createWebhook'])->name('governance.webhooks.store');
         Route::post('developer/retention', [GovernanceController::class, 'saveRetention'])->name('governance.retention.store');
         Route::post('developer/privacy', [GovernanceController::class, 'createPrivacy'])->name('governance.privacy.store');
-        Route::get('quality', fn(Request $request, QualityWorkforceController $controller) => $controller->index($request, 'quality'))->name('quality.index');
+        Route::get('quality', [QualityWorkforceController::class, 'quality'])->name('quality.index');
         Route::post('quality/scorecards', [QualityWorkforceController::class, 'storeScorecard'])->name('quality.scorecards.store');
         Route::post('quality/reviews', [QualityWorkforceController::class, 'storeReview'])->name('quality.reviews.store');
-        Route::get('workforce', fn(Request $request, QualityWorkforceController $controller) => $controller->index($request, 'workforce'))->name('workforce.index');
+        Route::get('workforce', [QualityWorkforceController::class, 'workforce'])->name('workforce.index');
         Route::post('workforce/shifts', [QualityWorkforceController::class, 'storeShift'])->name('workforce.shifts.store');
         Route::post('workforce/time-off', [QualityWorkforceController::class, 'requestTimeOff'])->name('workforce.time-off.store');
 
@@ -405,7 +406,7 @@ Route::middleware([
 
     Route::redirect('/tenant/admin', '/dashboard');
     Route::redirect('/tenant/admin/dashboard', '/dashboard');
-    Route::get('/tenant/admin/{path}', fn (string $path) => redirect('/'.$path))
+    Route::get('/tenant/admin/{path}', [LegacyPathRedirectController::class, 'tenant'])
         ->where('path', '.*');
 
     Route::redirect('/tenant/dashboard', '/dashboard')
