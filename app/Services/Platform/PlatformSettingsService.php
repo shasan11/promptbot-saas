@@ -117,7 +117,15 @@ class PlatformSettingsService
         $this->loaded = true;
 
         try {
-            if (! Schema::hasTable('platform_settings')) {
+            // PlatformSetting pins itself to the central connection (it is
+            // central-only data, read from tenant context too — e.g. the AI
+            // module's tenant-facing features), so the existence check must
+            // run against that same connection rather than whatever is
+            // "default" — the tenant's own database during tenancy()->initialize(),
+            // which has no platform_settings table at all.
+            $centralConnection = config('tenancy.database.central_connection', 'central');
+
+            if (! Schema::connection($centralConnection)->hasTable('platform_settings')) {
                 return;
             }
 

@@ -24,6 +24,7 @@ class ChannelRequest extends FormRequest
             'widget.launcher_position' => ['nullable', 'in:left,right'], 'widget.welcome_message' => ['nullable', 'string', 'max:500'], 'widget.offline_message' => ['nullable', 'string', 'max:500'],
             'widget.supported_languages' => ['nullable', 'array'], 'widget.supported_languages.*' => ['string', 'max:12'], 'widget.allowed_origins' => ['nullable', 'array'], 'widget.allowed_origins.*' => ['url:http,https'],
             'widget.privacy_url' => ['nullable', 'url:http,https'], 'widget.terms_url' => ['nullable', 'url:http,https'], 'widget.allow_attachments' => ['boolean'], 'widget.require_email' => ['boolean'], 'widget.require_name' => ['boolean'],
+            'widget.ai_auto_reply_enabled' => ['boolean'], 'widget.knowledge_base_id' => ['nullable', 'exists:knowledge_bases,id'],
         ];
     }
 }

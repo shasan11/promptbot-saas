@@ -1,5 +1,12 @@
 <?php
 
+use App\Http\Controllers\Admin\AI\AIFeatureController;
+use App\Http\Controllers\Admin\AI\AILogController;
+use App\Http\Controllers\Admin\AI\AIModelAssignmentController;
+use App\Http\Controllers\Admin\AI\AIModelController;
+use App\Http\Controllers\Admin\AI\AIOverviewController;
+use App\Http\Controllers\Admin\AI\AIProviderController;
+use App\Http\Controllers\Admin\AI\AISettingsController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\CustomerAccountController;
 use App\Http\Controllers\Admin\PortalUserController;
@@ -217,4 +224,37 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         ->middlewareFor(['create', 'store'], 'permission:tenants.create')
         ->middlewareFor(['edit', 'update'], 'permission:tenants.update')
         ->middlewareFor('destroy', 'permission:tenants.delete');
+
+    Route::prefix('ai')->name('ai.')->group(function (): void {
+        Route::get('/', AIOverviewController::class)->name('overview')->middleware('permission:ai.view');
+
+        Route::resource('providers', AIProviderController::class)
+            ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
+            ->middlewareFor(['index', 'create', 'edit'], 'permission:ai.providers.view')
+            ->middlewareFor(['store', 'update', 'destroy'], 'permission:ai.providers.manage');
+        Route::post('providers/{provider}/test', [AIProviderController::class, 'test'])->name('providers.test')->middleware('permission:ai.providers.manage');
+        Route::post('providers/{provider}/toggle', [AIProviderController::class, 'toggle'])->name('providers.toggle')->middleware('permission:ai.providers.manage');
+        Route::delete('providers/{provider}/key', [AIProviderController::class, 'removeKey'])->name('providers.key.remove')->middleware('permission:ai.providers.manage');
+
+        Route::resource('models', AIModelController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->middlewareFor('index', 'permission:ai.models.view')
+            ->middlewareFor(['store', 'update', 'destroy'], 'permission:ai.models.manage');
+        Route::post('models/{model}/toggle', [AIModelController::class, 'toggle'])->name('models.toggle')->middleware('permission:ai.models.manage');
+
+        Route::prefix('assignments')->name('assignments.')->group(function (): void {
+            Route::get('/', [AIModelAssignmentController::class, 'index'])->name('index')->middleware('permission:ai.models.view');
+            Route::post('/', [AIModelAssignmentController::class, 'store'])->name('store')->middleware('permission:ai.models.manage');
+            Route::put('/{assignment}', [AIModelAssignmentController::class, 'update'])->name('update')->middleware('permission:ai.models.manage');
+            Route::delete('/{assignment}', [AIModelAssignmentController::class, 'destroy'])->name('destroy')->middleware('permission:ai.models.manage');
+        });
+
+        Route::get('features', [AIFeatureController::class, 'edit'])->name('features.index')->middleware('permission:ai.settings.view');
+        Route::put('features', [AIFeatureController::class, 'update'])->name('features.update')->middleware('permission:ai.features.manage');
+
+        Route::get('logs', [AILogController::class, 'index'])->name('logs.index')->middleware('permission:ai.usage.view');
+
+        Route::get('settings', [AISettingsController::class, 'edit'])->name('settings.index')->middleware('permission:ai.settings.view');
+        Route::put('settings', [AISettingsController::class, 'update'])->name('settings.update')->middleware('permission:ai.settings.manage');
+    });
 });

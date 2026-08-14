@@ -68,6 +68,11 @@ class PlatformAuthorizationSeeder extends Seeder
             'maintenance.manage',
         ];
 
+        // AI & LLM permissions/settings are seeded by AISeeder so the AI module's
+        // seed data can be re-run or reasoned about independently of the rest of
+        // platform authorization.
+        $permissions = array_merge($permissions, AISeeder::permissions());
+
         $permissionModels = collect($permissions)->mapWithKeys(fn (string $permission) => [
             $permission => PlatformPermission::firstOrCreate(
                 ['name' => $permission, 'guard_name' => 'central'],
@@ -107,6 +112,7 @@ class PlatformAuthorizationSeeder extends Seeder
                 'dashboard.view', 'customers.view', 'customers.manage', 'tenants.view', 'tenants.create',
                 'tenants.update', 'tenants.suspend', 'usage.view', 'operations.view', 'integrations.view',
                 'integrations.manage', 'maintenance.manage', 'audit_logs.view', 'login_attempts.view',
+                ...AISeeder::operationsManagerPermissions(),
             ],
             'Auditor' => array_values(array_filter($permissions, fn (string $permission) => str_ends_with($permission, '.view'))),
         ];

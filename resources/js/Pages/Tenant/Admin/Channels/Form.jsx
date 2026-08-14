@@ -27,7 +27,7 @@ function ErrorSummary({ errors }) {
     );
 }
 
-export default function Form({ channel, selectedType, catalog, teams, users, businessHours, hasCredentials }) {
+export default function Form({ channel, selectedType, catalog, teams, users, businessHours, hasCredentials, knowledgeBases = [] }) {
     const editing = Boolean(channel);
     const email = channel?.email_settings || {};
     const widget = channel?.web_chat_widget || {};
@@ -61,6 +61,8 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
             allow_attachments: widget.allow_attachments ?? true,
             require_email: widget.require_email ?? true,
             require_name: widget.require_name ?? true,
+            ai_auto_reply_enabled: widget.ai_auto_reply_enabled ?? false,
+            knowledge_base_id: widget.knowledge_base_id || '',
         },
     });
 
@@ -169,6 +171,22 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
                         <div className="flex flex-wrap gap-5 md:col-span-2">
                             {[['require_name', 'Require name'], ['require_email', 'Require email'], ['allow_attachments', 'Allow attachments']].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={form.data.widget[key]} onChange={(event) => setNested('widget', key, event.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />{label}</label>)}
                         </div>
+                    </section>
+                )}
+
+                {form.data.type === 'web_chat' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">AI auto-reply</h2>
+                            <p className="mt-1 text-xs text-slate-500">When enabled, visitor messages are answered automatically from the selected knowledge base, grounded only in its content, before a human agent ever sees them. Requires AI and Knowledge Answers to be enabled by your platform administrator.</p>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 md:col-span-2"><input type="checkbox" checked={form.data.widget.ai_auto_reply_enabled} onChange={(event) => setNested('widget', 'ai_auto_reply_enabled', event.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />Automatically answer with AI</label>
+                        <FormField label="Knowledge base" hint="Required for AI auto-reply to run." error={form.errors['widget.knowledge_base_id']}>
+                            <Select value={form.data.widget.knowledge_base_id} onChange={(event) => setNested('widget', 'knowledge_base_id', event.target.value)}>
+                                <option value="">Select a knowledge base…</option>
+                                {knowledgeBases.map((base) => <option key={base.id} value={base.id}>{base.name}</option>)}
+                            </Select>
+                        </FormField>
                     </section>
                 )}
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Channel\ChannelRequest;
 use App\Models\BusinessHourPolicy;
 use App\Models\Channel\Channel;
+use App\Models\Knowledge\KnowledgeBase;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Channels\ChannelManager;
@@ -111,6 +112,6 @@ class ChannelController extends Controller
 
     private function formData(): array
     {
-        return ['catalog' => $this->manager->catalog(), 'teams' => Team::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'users' => User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'businessHours' => BusinessHourPolicy::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'hasCredentials' => false];
+        return ['catalog' => $this->manager->catalog(), 'teams' => Team::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'users' => User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'businessHours' => BusinessHourPolicy::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'hasCredentials' => false, 'knowledgeBases' => KnowledgeBase::query()->orderBy('name')->get(['id', 'name'])];
     }
 }

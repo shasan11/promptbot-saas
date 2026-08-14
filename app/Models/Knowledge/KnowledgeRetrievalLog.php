@@ -24,6 +24,8 @@ class KnowledgeRetrievalLog extends Model
 
     public const CHANNEL_INBOX = 'inbox';
 
+    public const CHANNEL_WIDGET = 'widget';
+
     protected $fillable = [
         'knowledge_base_id', 'channel', 'actor_type', 'user_id', 'agent_key',
         'query', 'query_hash', 'language', 'retrieval_mode',

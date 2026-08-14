@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Inbox\Conversation;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\AI\Exceptions\AIException;
 use App\Services\Inbox\ConversationService;
+use App\Services\Inbox\InboxAIService;
 use App\Services\Sla\SlaService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -17,7 +20,11 @@ use Inertia\Response;
 
 class ConversationController extends Controller
 {
-    public function __construct(private readonly ConversationService $service, private readonly SlaService $sla) {}
+    public function __construct(
+        private readonly ConversationService $service,
+        private readonly SlaService $sla,
+        private readonly InboxAIService $ai,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -71,5 +78,27 @@ class ConversationController extends Controller
     public function follow(Request $request, Conversation $conversation): RedirectResponse
     {
         Gate::authorize('view', $conversation); $conversation->followers()->toggle($request->user('tenant')->id); return back()->with('status','Follower preference updated.');
+    }
+
+    public function draftReply(Conversation $conversation): JsonResponse
+    {
+        Gate::authorize('reply', $conversation);
+
+        try {
+            return response()->json($this->ai->draftReply($conversation->load('contact')));
+        } catch (AIException $exception) {
+            return response()->json(['message' => $exception->operatorMessage()], 422);
+        }
+    }
+
+    public function summarize(Conversation $conversation): JsonResponse
+    {
+        Gate::authorize('view', $conversation);
+
+        try {
+            return response()->json($this->ai->summarize($conversation));
+        } catch (AIException $exception) {
+            return response()->json(['message' => $exception->operatorMessage()], 422);
+        }
     }
 }

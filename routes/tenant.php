@@ -167,6 +167,8 @@ Route::middleware([
             Route::put('{conversation}', [ConversationController::class, 'update'])->name('update');
             Route::post('{conversation}/assign', [ConversationController::class, 'assign'])->name('assign');
             Route::post('{conversation}/follow', [ConversationController::class, 'follow'])->name('follow');
+            Route::post('{conversation}/ai/draft-reply', [ConversationController::class, 'draftReply'])->name('ai.draft-reply');
+            Route::post('{conversation}/ai/summarize', [ConversationController::class, 'summarize'])->name('ai.summarize');
             Route::post('messages/{message}/attachments', [AttachmentController::class, 'store'])->name('attachments.store');
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download'])->middleware('signed')->name('attachments.download');
         });

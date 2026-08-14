@@ -216,10 +216,14 @@ export default function RetrievalPlayground({ bases, collections, modes, default
                             ) : (
                                 <>
                                     {result.answer_preview && (
-                                        <SectionCard title="Answer preview" description={result.answer_preview.note}>
+                                        <SectionCard
+                                            title={result.answer_preview.generated_by === 'ai' ? 'AI-generated answer' : 'Extractive answer preview'}
+                                            description={result.answer_preview.note}
+                                        >
                                             <p className="text-sm leading-6 text-slate-700">{result.answer_preview.answer}</p>
                                             <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                                 Confidence: {result.answer_preview.confidence}
+                                                {result.answer_preview.generated_by === 'ai' && result.answer_preview.model && ` · Model: ${result.answer_preview.model}`}
                                             </p>
                                         </SectionCard>
                                     )}

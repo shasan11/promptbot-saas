@@ -9,6 +9,7 @@ use App\Http\Requests\Tenant\Knowledge\RetrievalTestRequest;
 use App\Models\Knowledge\KnowledgeBase;
 use App\Services\Knowledge\Data\RetrievalHit;
 use App\Services\Knowledge\Data\RetrievalQuery;
+use App\Services\Knowledge\KnowledgeAnswerService;
 use App\Services\Knowledge\KnowledgeRetrievalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -50,7 +51,7 @@ class PlaygroundController extends Controller
         ]);
     }
 
-    public function retrieve(RetrievalTestRequest $request, KnowledgeRetrievalService $retrieval): JsonResponse
+    public function retrieve(RetrievalTestRequest $request, KnowledgeRetrievalService $retrieval, KnowledgeAnswerService $answers): JsonResponse
     {
         abort_unless($this->actor()->can('knowledge.retrieval.test'), 403);
 
@@ -134,7 +135,7 @@ class PlaygroundController extends Controller
         ];
 
         if ($request->boolean('generate_answer')) {
-            $payload['answer_preview'] = $this->answerPreview($outcome->hits);
+            $payload['answer_preview'] = $answers->answer($outcome, $query->query);
         }
 
         // Debug output exposes discarded candidates, threshold decisions and the
@@ -155,44 +156,5 @@ class PlaygroundController extends Controller
         }
 
         return response()->json($payload);
-    }
-
-    /** @param  array<int, RetrievalHit>  $hits */
-    private function answerPreview(array $hits): array
-    {
-        if ($hits === []) {
-            return [
-                'answer' => 'I could not find enough matching knowledge to answer this safely.',
-                'confidence' => 'low',
-                'sources_used' => [],
-            ];
-        }
-
-        $sentences = [];
-        $sources = [];
-
-        foreach (array_slice($hits, 0, 3) as $index => $hit) {
-            $citation = $hit->chunk->citation();
-            $sourceLabel = $citation['document_title'] ?? $citation['url'] ?? $citation['faq_question'] ?? 'Knowledge source';
-            $sources[] = array_merge($citation, ['rank' => $index + 1, 'score' => round($hit->finalScore, 5)]);
-
-            $text = trim(preg_replace('/\s+/', ' ', $hit->chunk->content) ?? '');
-            $firstSentence = preg_split('/(?<=[.!?])\s+/', $text, 2)[0] ?? $text;
-
-            if ($firstSentence !== '') {
-                $sentences[] = rtrim($firstSentence, '.').' ['.($index + 1).']';
-            }
-        }
-
-        $topScore = $hits[0]->finalScore;
-
-        return [
-            'answer' => $sentences
-                ? implode(' ', $sentences)
-                : 'The retrieved sources matched, but there was no concise text to preview.',
-            'confidence' => $topScore >= 0.75 ? 'high' : ($topScore >= 0.45 ? 'medium' : 'low'),
-            'sources_used' => $sources,
-            'note' => 'Preview is grounded only in retrieved excerpts and does not call a chat model.',
-        ];
     }
 }

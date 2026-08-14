@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             CentralUserSeeder::class,
             PlatformAuthorizationSeeder::class,
+            AISeeder::class,
             DefaultCustomerAccountSeeder::class,
             FeatureSeeder::class,
             PlanSeeder::class,

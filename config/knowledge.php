@@ -142,6 +142,17 @@ return [
                 'dimensions' => 384,
                 'cost_per_million_tokens' => 0.0,
             ],
+            // Delegates to the Superadmin-configured AI & LLM module. Model,
+            // dimensions, and cost are resolved dynamically at call time from
+            // whichever embedding model is assigned to the knowledge_embedding
+            // purpose, since they depend on runtime Superadmin configuration
+            // rather than a static value here.
+            'ai_manager' => [
+                'driver' => 'ai_manager',
+                'model' => null,
+                'dimensions' => null,
+                'cost_per_million_tokens' => null,
+            ],
         ],
     ],
 

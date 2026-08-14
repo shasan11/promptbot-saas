@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Models\Concerns\UsesCentralConnection;
 use Illuminate\Database\Eloquent\Model;
 
 class PlatformSetting extends Model
 {
     use HasUuid;
+    use UsesCentralConnection;
 
     protected $fillable = [
         'group',

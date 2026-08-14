@@ -7,6 +7,7 @@ use App\Models\Channel\WebChatWidget;
 use App\Models\Customer\Contact;
 use App\Models\Inbox\Conversation;
 use App\Models\Inbox\WebChatVisitor;
+use App\Services\Channels\WebChatAutoReplyService;
 use App\Services\Inbox\ConversationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,10 +32,11 @@ class WebChatController extends Controller
         return $this->cors($request,response()->json(['token'=>$token,'visitor'=>$contact->public_uuid],201));
     }
 
-    public function messages(Request $request, string $key, ConversationService $service): JsonResponse
+    public function messages(Request $request, string $key, ConversationService $service, WebChatAutoReplyService $autoReply): JsonResponse
     {
         $widget=$this->widget($request,$key); $visitor=$this->visitor($request,$widget); $data=$request->validate(['body'=>['required','string','max:10000'],'client_id'=>['required','string','max:120']]);
         $message=$service->receive($widget->channel,$visitor->contact,['body'=>$data['body'],'external_id'=>'widget:'.$data['client_id'],'message_type'=>'text']); $visitor->update(['last_seen_at'=>now()]);
+        $autoReply->maybeReply($widget, $message->conversation, $data['body']);
         return $this->cors($request,response()->json(['message'=>['id'=>$message->public_uuid,'body'=>$message->body,'direction'=>$message->direction,'sentAt'=>$message->sent_at]],201));
     }
 

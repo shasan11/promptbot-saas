@@ -4,6 +4,9 @@ namespace App\Services\Knowledge\Embedding;
 
 use App\Contracts\Knowledge\EmbeddingProviderInterface;
 use App\Models\Knowledge\KnowledgeBase;
+use App\Services\AI\AIFeatureManager;
+use App\Services\AI\AIManager;
+use App\Services\AI\AIModelResolver;
 use InvalidArgumentException;
 
 /**
@@ -17,6 +20,8 @@ class EmbeddingProviderFactory
 {
     /** @var array<string, EmbeddingProviderInterface> */
     private array $resolved = [];
+
+    public function __construct(private readonly AIFeatureManager $features) {}
 
     public function forKnowledgeBase(KnowledgeBase $base): EmbeddingProviderInterface
     {
@@ -45,6 +50,7 @@ class EmbeddingProviderFactory
 
         return $this->resolved[$cacheKey] ??= match ($config['driver']) {
             'local' => new LocalHashEmbeddingProvider((int) $config['dimensions'], (string) $config['model']),
+            'ai_manager' => new AiManagerEmbeddingProvider(app(AIManager::class), app(AIFeatureManager::class), app(AIModelResolver::class)),
             default => throw new InvalidArgumentException("Unsupported embedding driver [{$config['driver']}]."),
         };
     }
@@ -65,13 +71,19 @@ class EmbeddingProviderFactory
                 'model' => $config['model'],
                 'dimensions' => $config['dimensions'],
                 'cost_per_million_tokens' => $config['cost_per_million_tokens'] ?? 0,
-                'configured' => $config['driver'] === 'local',
+                'configured' => match ($config['driver']) {
+                    'local' => true,
+                    'ai_manager' => $this->features->isEnabled('knowledge_embeddings'),
+                    default => false,
+                },
                 'label' => match ($key) {
                     'local' => 'Built-in (offline)',
+                    'ai_manager' => 'AI Provider (Superadmin-configured)',
                     default => ucfirst((string) $key),
                 },
                 'description' => match ($key) {
                     'local' => 'Deterministic offline token matching. Requires no API key, external service, or usage billing.',
+                    'ai_manager' => 'Uses the LLM provider configured by your platform in Superadmin → AI & LLM. Requires the platform owner to enable AI and the Knowledge Embeddings feature toggle.',
                     default => '',
                 },
             ];
