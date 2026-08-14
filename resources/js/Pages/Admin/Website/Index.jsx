@@ -9,7 +9,7 @@ import Input from '@/Components/UI/Input';
 import Tabs from '@/Components/UI/Tabs';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ExternalLink, FileText, GripVertical, Plus } from 'lucide-react';
+import { BarChart3, Check, ExternalLink, FileText, Globe2, GripVertical, Image, LayoutTemplate, Palette, Plus, Search, Sparkles, Type } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 function PagesTab({ pages }) {
@@ -169,65 +169,157 @@ function LinkListEditor({ title, description, items, fields, storeRoute, updateR
     );
 }
 
+const themePresets = [
+    { name: 'Emerald', colors: ['#064E3B', '#475569', '#059669'] },
+    { name: 'Ocean', colors: ['#0C4A6E', '#475569', '#0284C7'] },
+    { name: 'Indigo', colors: ['#312E81', '#475569', '#4F46E5'] },
+    { name: 'Rose', colors: ['#881337', '#475569', '#E11D48'] },
+];
+
+function SettingsPanel({ icon: Icon, title, description, children }) {
+    return <section className="rounded-xl border border-slate-200 bg-white shadow-soft">
+        <div className="flex gap-3 border-b border-slate-100 px-5 py-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><Icon className="h-4 w-4" /></span>
+            <div><h3 className="font-semibold text-slate-950">{title}</h3><p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p></div>
+        </div>
+        <div className="p-5">{children}</div>
+    </section>;
+}
+
+function ColorControl({ label, hint, value, onChange, error }) {
+    const display = /^#[0-9a-f]{6}$/i.test(value || '') ? value : '#000000';
+    return <FormField label={label} hint={hint} error={error}>
+        <div className="flex rounded-lg border border-slate-300 bg-white p-1 shadow-soft focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-100">
+            <label className="relative h-10 w-12 shrink-0 cursor-pointer overflow-hidden rounded-md border border-slate-200" style={{ backgroundColor: display }}>
+                <input aria-label={`${label} color picker`} type="color" value={display} onChange={event => onChange(event.target.value.toUpperCase())} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+            </label>
+            <input aria-label={`${label} hex value`} value={value || ''} onChange={event => onChange(event.target.value.toUpperCase())} placeholder="#059669" className="min-w-0 flex-1 border-0 bg-transparent px-3 font-mono text-sm uppercase focus:ring-0" />
+        </div>
+    </FormField>;
+}
+
+function ChoiceCards({ value, onChange, options }) {
+    return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{options.map(option => {
+        const active = value === option.value;
+        return <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`rounded-lg border px-3 py-2.5 text-left transition ${active ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+            <span className={`block text-sm font-semibold ${active ? 'text-emerald-800' : 'text-slate-800'}`}>{option.label}</span>
+            {option.hint && <span className="mt-0.5 block text-[11px] text-slate-500">{option.hint}</span>}
+        </button>;
+    })}</div>;
+}
+
 function SettingsTab({ settings }) {
-    const { data, setData, put, processing, errors, recentlySuccessful } = useForm(settings);
+    const { data, setData, post, processing, errors, recentlySuccessful, transform } = useForm({ ...settings, logo_file: null, logo_dark_file: null, favicon_file: null });
+    const [section, setSection] = useState('brand');
 
     const submit = (event) => {
         event.preventDefault();
-        put(route('superadmin.website.settings.update'), { preserveScroll: true });
+        transform(payload => ({ ...payload, _method: 'put' }));
+        post(route('superadmin.website.settings.update'), { preserveScroll: true, forceFormData: true });
     };
 
-    const fields = [
-        { key: 'site_name', label: 'Site name' },
-        { key: 'logo_url', label: 'Logo URL' },
-        { key: 'logo_dark_url', label: 'Dark logo URL' },
-        { key: 'favicon_url', label: 'Favicon URL' },
-        { key: 'primary_color', label: 'Primary color (hex)' },
-        { key: 'secondary_color', label: 'Secondary color (hex)' },
-        { key: 'accent_color', label: 'Accent color (hex)' },
-        { key: 'footer_description', label: 'Footer description' },
-        { key: 'copyright_text', label: 'Copyright text (year is added automatically)' },
-        { key: 'heading_font', label: 'Heading font', type: 'select', options: ['', 'Inter', 'Manrope', 'Poppins', 'Roboto', 'system-ui'].map(value => ({ value, label: value || 'Default heading font' })) },
-        { key: 'body_font', label: 'Body font', type: 'select', options: ['', 'Inter', 'Manrope', 'Poppins', 'Roboto', 'system-ui'].map(value => ({ value, label: value || 'Default body font' })) },
-        { key: 'button_radius', label: 'Button radius', type: 'select', options: ['', '0', '4px', '8px', '12px', '9999px'].map(value => ({ value, label: value || 'Default button radius' })) },
-        { key: 'card_radius', label: 'Card radius', type: 'select', options: ['', '0', '8px', '12px', '16px', '24px'].map(value => ({ value, label: value || 'Default card radius' })) },
-        { key: 'container_width', label: 'Container width', type: 'select', options: ['', '1024px', '1152px', '1280px', '1440px'].map(value => ({ value, label: value || 'Default container width' })) },
-        { key: 'contact_email', label: 'Contact email' },
-        { key: 'social_twitter', label: 'Twitter/X URL' },
-        { key: 'social_linkedin', label: 'LinkedIn URL' },
-        { key: 'default_meta_title_format', label: 'Default title format' },
-        { key: 'default_description', label: 'Default meta description' },
-        { key: 'default_og_image', label: 'Default Open Graph image' },
-        { key: 'twitter_card_type', label: 'Twitter card type', type: 'select', options: [{ value: '', label: 'Default (large image)' }, { value: 'summary', label: 'Summary' }, { value: 'summary_large_image', label: 'Summary with large image' }] },
-        { key: 'canonical_base_url', label: 'Canonical base URL' },
-        { key: 'google_verification', label: 'Google verification' },
-        { key: 'bing_verification', label: 'Bing verification' },
-        { key: 'google_analytics_id', label: 'Google Analytics ID' },
-        { key: 'google_tag_manager_id', label: 'Google Tag Manager ID' },
-        { key: 'meta_pixel_id', label: 'Meta Pixel ID' },
+    const nav = [
+        { value: 'brand', label: 'Brand assets', hint: 'Name, logos and favicon', icon: Image },
+        { value: 'theme', label: 'Colors & style', hint: 'Palette, type and shapes', icon: Palette },
+        { value: 'content', label: 'Footer & contact', hint: 'Public contact information', icon: Globe2 },
+        { value: 'seo', label: 'SEO & tracking', hint: 'Search and analytics', icon: Search },
     ];
 
+    const primary = /^#[0-9a-f]{6}$/i.test(data.primary_color || '') ? data.primary_color : '#064E3B';
+    const accent = /^#[0-9a-f]{6}$/i.test(data.accent_color || '') ? data.accent_color : '#059669';
+    const field = (key, label, hint, props = {}) => <FormField id={key} label={label} hint={hint} error={errors[key]}><Input id={key} value={data[key] || ''} onChange={event => setData(key, event.target.value)} {...props} /></FormField>;
+
     return (
-        <SectionCard title="Site settings" description="Used by the public site's header, footer, and metadata.">
-            <form onSubmit={submit}>
-                <div className="grid gap-5 md:grid-cols-2">
-                    {fields.map((field) => (
-                        <FormField key={field.key} id={field.key} label={field.label} error={errors[field.key]}>
-                            <FieldControl field={field} value={data[field.key]} onChange={(value) => setData(field.key, value)} />
-                        </FormField>
-                    ))}
+        <form onSubmit={submit} className="space-y-5">
+            <div className="overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-950 to-emerald-800 p-5 text-white shadow-soft">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><Sparkles className="h-5 w-5" /></span><div><h2 className="font-semibold">Make the website feel like your brand</h2><p className="mt-1 max-w-2xl text-sm text-emerald-100">Choose a section and save once to apply the changes across the public website and every account screen.</p></div></div>
+                    <a href="/" target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15">Open website <ExternalLink className="h-4 w-4" /></a>
                 </div>
-                {data.primary_color && (
-                    <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-                        Preview: <span className="h-5 w-5 rounded border border-slate-200" style={{ backgroundColor: data.primary_color }} /> {data.primary_color}
-                    </div>
-                )}
-                <div className="mt-5 flex items-center justify-end gap-3">
-                    {recentlySuccessful && <span className="text-xs font-semibold text-brand-700">Saved</span>}
-                    <Button type="submit" variant="brand" loading={processing}>Save settings</Button>
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
+                <nav aria-label="Customization sections" className="h-fit rounded-xl border border-slate-200 bg-white p-2 shadow-soft xl:sticky xl:top-5">
+                    {nav.map(item => <button key={item.value} type="button" onClick={() => setSection(item.value)} className={`flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition ${section === item.value ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-slate-50'}`}>
+                        <item.icon className={`mt-0.5 h-4 w-4 shrink-0 ${section === item.value ? 'text-emerald-700' : 'text-slate-400'}`} />
+                        <span><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block text-[11px] text-slate-500">{item.hint}</span></span>
+                    </button>)}
+                </nav>
+
+                <div className="space-y-5">
+                    {section === 'brand' && <SettingsPanel icon={Image} title="Brand assets" description="These are used across the public website and account screens.">
+                        <div className="space-y-5">
+                            {field('site_name', 'Website name', 'Shown in page titles and whenever a logo cannot load.', { required: true })}
+                            <div className="grid gap-4 sm:grid-cols-3">{[
+                                ['logo_file', 'logo_url', 'Light-background logo', 'Your normal full logo.'],
+                                ['logo_dark_file', 'logo_dark_url', 'Dark-background logo', 'A light logo for dark surfaces.'],
+                                ['favicon_file', 'favicon_url', 'Browser icon', 'A square PNG, ICO or WEBP.'],
+                            ].map(([fileKey, urlKey, label, hint]) => <label key={fileKey} className="group rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                                <span className="flex h-16 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-2">{data[fileKey] ? <span className="truncate text-xs font-semibold text-emerald-700">{data[fileKey].name}</span> : data[urlKey] ? <img src={data[urlKey]} alt="" className="max-h-full max-w-full object-contain" /> : <Image className="h-6 w-6 text-slate-300" />}</span>
+                                <span className="mt-3 block text-sm font-semibold text-slate-900">{label}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{hint}</span>
+                                <input type="file" accept={fileKey === 'favicon_file' ? 'image/png,image/x-icon,image/vnd.microsoft.icon,image/webp' : 'image/png,image/jpeg,image/webp'} onChange={event => setData(fileKey, event.target.files?.[0] || null)} className="mt-3 block w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-2 file:py-1.5 file:font-semibold file:text-emerald-700" />
+                                {errors[fileKey] && <span className="mt-2 block text-xs text-rose-600">{errors[fileKey]}</span>}
+                            </label>)}</div>
+                        </div>
+                    </SettingsPanel>}
+
+                    {section === 'theme' && <>
+                        <SettingsPanel icon={Palette} title="Color palette" description="Start with a preset or fine-tune each color.">
+                            <div className="grid gap-2 sm:grid-cols-2">{themePresets.map(preset => {
+                                const active = preset.colors[0].toLowerCase() === primary.toLowerCase() && preset.colors[2].toLowerCase() === accent.toLowerCase();
+                                return <button key={preset.name} type="button" onClick={() => { setData('primary_color', preset.colors[0]); setData('secondary_color', preset.colors[1]); setData('accent_color', preset.colors[2]); }} className={`flex items-center justify-between rounded-lg border p-3 text-left transition ${active ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600' : 'border-slate-200 hover:border-slate-300'}`}>
+                                    <span><span className="block text-sm font-semibold text-slate-900">{preset.name}</span><span className="mt-1 flex gap-1">{preset.colors.map(color => <i key={color} className="h-4 w-4 rounded-full border border-white shadow" style={{ backgroundColor: color }} />)}</span></span>{active && <Check className="h-4 w-4 text-emerald-700" />}
+                                </button>;
+                            })}</div>
+                            <div className="mt-5 grid gap-5 sm:grid-cols-3">
+                                <ColorControl label="Primary" hint="Headings and dark brand areas." value={data.primary_color} onChange={value => setData('primary_color', value)} error={errors.primary_color} />
+                                <ColorControl label="Secondary" hint="Supporting text and details." value={data.secondary_color} onChange={value => setData('secondary_color', value)} error={errors.secondary_color} />
+                                <ColorControl label="Accent" hint="Buttons, links and focus states." value={data.accent_color} onChange={value => setData('accent_color', value)} error={errors.accent_color} />
+                            </div>
+                        </SettingsPanel>
+                        <SettingsPanel icon={Type} title="Typography" description="Pick clear, web-friendly typefaces for headings and body copy.">
+                            <div className="grid gap-5 sm:grid-cols-2">{[['heading_font', 'Heading font'], ['body_font', 'Body font']].map(([key, label]) => <FormField key={key} label={label} error={errors[key]}><select value={data[key] || ''} onChange={event => setData(key, event.target.value)} className="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-600 focus:ring-emerald-600"><option value="">Use website default</option>{['Inter','Manrope','Poppins','Roboto','system-ui'].map(font => <option key={font}>{font}</option>)}</select></FormField>)}</div>
+                        </SettingsPanel>
+                        <SettingsPanel icon={LayoutTemplate} title="Shape & layout" description="Friendly choices instead of raw CSS values.">
+                            <div className="space-y-5">
+                                <FormField label="Button shape"><ChoiceCards value={data.button_radius || ''} onChange={value => setData('button_radius', value)} options={[{value:'4px',label:'Subtle'},{value:'8px',label:'Soft'},{value:'12px',label:'Rounded'},{value:'9999px',label:'Pill'}]} /></FormField>
+                                <FormField label="Card shape"><ChoiceCards value={data.card_radius || ''} onChange={value => setData('card_radius', value)} options={[{value:'8px',label:'Subtle'},{value:'12px',label:'Soft'},{value:'16px',label:'Rounded'},{value:'24px',label:'Extra round'}]} /></FormField>
+                                <FormField label="Content width"><ChoiceCards value={data.container_width || ''} onChange={value => setData('container_width', value)} options={[{value:'1024px',label:'Compact',hint:'Focused reading'},{value:'1152px',label:'Balanced',hint:'Most websites'},{value:'1280px',label:'Wide',hint:'More visual space'},{value:'1440px',label:'Extra wide',hint:'Large screens'}]} /></FormField>
+                            </div>
+                        </SettingsPanel>
+                    </>}
+
+                    {section === 'content' && <SettingsPanel icon={Globe2} title="Footer & contact" description="Keep the information visitors use to trust and contact you in one place.">
+                        <div className="space-y-5">
+                            <FormField id="footer_description" label="Short company description" hint="One or two clear sentences work best." error={errors.footer_description}><textarea id="footer_description" rows="3" value={data.footer_description || ''} onChange={event => setData('footer_description', event.target.value)} className="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-600 focus:ring-emerald-600" /></FormField>
+                            <div className="grid gap-5 sm:grid-cols-2">{field('copyright_text', 'Copyright name', 'The current year is added automatically.', { placeholder: data.site_name || 'PromptBot' })}{field('contact_email', 'Public contact email', 'Shown to visitors who need help.', { type: 'email', placeholder: 'hello@example.com' })}</div>
+                            <div className="grid gap-5 sm:grid-cols-2">{field('social_twitter', 'X / Twitter profile', null, { placeholder: 'https://x.com/yourbrand' })}{field('social_linkedin', 'LinkedIn profile', null, { placeholder: 'https://linkedin.com/company/yourbrand' })}</div>
+                        </div>
+                    </SettingsPanel>}
+
+                    {section === 'seo' && <>
+                        <SettingsPanel icon={Search} title="Search appearance" description="Control how the website appears in search results and social shares.">
+                            <div className="space-y-5">
+                                {field('default_meta_title_format', 'Page title format', 'Use {title} and {site_name} as placeholders.', { placeholder: '{title} · {site_name}' })}
+                                <FormField id="default_description" label="Default search description" hint="Aim for one useful sentence, around 150 characters." error={errors.default_description}><textarea id="default_description" rows="3" value={data.default_description || ''} onChange={event => setData('default_description', event.target.value)} className="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-600 focus:ring-emerald-600" /></FormField>
+                                <div className="grid gap-5 sm:grid-cols-2">{field('canonical_base_url', 'Website address', null, { placeholder: 'https://example.com' })}{field('default_og_image', 'Social sharing image', 'Recommended size: 1200 × 630 px.', { placeholder: '/images/social-card.jpg' })}</div>
+                                <FormField label="Social card style"><select value={data.twitter_card_type || ''} onChange={event => setData('twitter_card_type', event.target.value)} className="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-600 focus:ring-emerald-600"><option value="">Large image (recommended)</option><option value="summary_large_image">Large image</option><option value="summary">Compact summary</option></select></FormField>
+                            </div>
+                        </SettingsPanel>
+                        <SettingsPanel icon={BarChart3} title="Verification & analytics" description="Optional IDs for search consoles and visitor analytics.">
+                            <div className="grid gap-5 sm:grid-cols-2">{field('google_verification', 'Google verification code')}{field('bing_verification', 'Bing verification code')}{field('google_analytics_id', 'Google Analytics ID', null, { placeholder: 'G-XXXXXXXXXX' })}{field('google_tag_manager_id', 'Google Tag Manager ID', null, { placeholder: 'GTM-XXXXXXX' })}{field('meta_pixel_id', 'Meta Pixel ID')}</div>
+                            <FormField id="robots_content" label="Robots.txt additions" hint="Advanced: leave empty unless you know which crawlers you need to control." error={errors.robots_content} className="mt-5"><textarea id="robots_content" rows="4" value={data.robots_content || ''} onChange={event => setData('robots_content', event.target.value)} className="w-full rounded-lg border-slate-300 font-mono text-xs focus:border-emerald-600 focus:ring-emerald-600" /></FormField>
+                        </SettingsPanel>
+                    </>}
                 </div>
-            </form>
-        </SectionCard>
+
+            </div>
+
+            <div className="sticky bottom-3 z-20 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+                <div>{recentlySuccessful ? <span className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><Check className="h-4 w-4" />Changes saved and applied</span> : <span className="text-xs text-slate-500">Save once to apply changes across the website and account screens.</span>}</div>
+                <Button type="submit" variant="brand" loading={processing}>{processing ? 'Saving…' : 'Save changes'}</Button>
+            </div>
+        </form>
     );
 }
 

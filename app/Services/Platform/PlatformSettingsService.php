@@ -41,6 +41,7 @@ class PlatformSettingsService
         $mail = $this->group('mail');
         $payment = $this->group('payment');
         $branding = $this->group('branding');
+        $customerPortal = $this->group('customer_portal');
         $encryption = filled($mail['smtp_encryption'] ?? null) ? $mail['smtp_encryption'] : null;
 
         if (filled($general['platform_name'] ?? null)) {
@@ -86,6 +87,9 @@ class PlatformSettingsService
             'platform.default_currency' => strtoupper((string) ($general['default_currency'] ?? 'USD')),
             'platform.payment' => $payment,
             'platform.branding' => $branding,
+            'services.google.client_id' => $customerPortal['google_client_id'] ?? config('services.google.client_id'),
+            'services.google.client_secret' => $customerPortal['google_client_secret'] ?? config('services.google.client_secret'),
+            'services.google.redirect' => $customerPortal['google_redirect_uri'] ?? config('services.google.redirect'),
         ]);
     }
 

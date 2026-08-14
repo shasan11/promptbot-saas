@@ -3,6 +3,7 @@ import KnowledgeStatusBadge from '@/Components/Knowledge/KnowledgeStatusBadge';
 import SourceTypeBadge from '@/Components/Knowledge/SourceTypeBadge';
 import Pagination from '@/Components/Superadmin/Pagination';
 import { SectionCard } from '@/Components/UI/Card';
+import Button from '@/Components/UI/Button';
 import EmptyState from '@/Components/UI/EmptyState';
 import FormField from '@/Components/UI/FormField';
 import Input from '@/Components/UI/Input';
@@ -42,14 +43,9 @@ export default function WebsitesIndex({ sources, pages, bases, syncFrequencies, 
             title="Websites"
             description="Index content from your public website so agents can answer from it — and keep it in sync as pages change."
             actions={can?.create && bases.length > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800"
-                >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Add website
-                </button>
+                <Button type="button" variant="brand" size="md" icon={Plus} onClick={() => setOpen(true)}>
+                    Add website content
+                </Button>
             )}
         >
             <SectionCard title="Website sources" className="mb-6">
@@ -78,9 +74,7 @@ export default function WebsitesIndex({ sources, pages, bases, syncFrequencies, 
                         title="No websites indexed"
                         description="Add your help centre or documentation site and PromptBot will discover its pages, index them, and re-check them on a schedule."
                         action={can?.create && bases.length > 0 && (
-                            <button type="button" onClick={() => setOpen(true)} className="rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800">
-                                Add website
-                            </button>
+                            <Button type="button" variant="brand" icon={Plus} onClick={() => setOpen(true)}>Add website content</Button>
                         )}
                     />
                 )}

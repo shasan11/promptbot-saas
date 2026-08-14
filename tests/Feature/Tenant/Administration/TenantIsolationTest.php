@@ -3,12 +3,13 @@
 namespace Tests\Feature\Tenant\Administration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\InteractsWithPlatformPermissions;
 use Tests\Concerns\InteractsWithTenancy;
 use Tests\TestCase;
 
 class TenantIsolationTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithPlatformPermissions, InteractsWithTenancy, RefreshDatabase;
 
     protected function tearDown(): void
     {
@@ -35,5 +36,19 @@ class TenantIsolationTest extends TestCase
         $names = collect($response->viewData('page')['props']['users']['data'])->pluck('name')->all();
         $this->assertContains('Alice From A', $names);
         $this->assertNotContains('Bob From B', $names);
+    }
+
+    public function test_central_permission_cache_cannot_make_a_tenant_owner_unauthorized(): void
+    {
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $owner = $this->createTenantUser($tenant, ['name' => 'Tenant Owner'], 'Tenant Owner');
+
+        // Prime Spatie with central-guard permissions in this PHP process.
+        $platformOwner = $this->platformOwner();
+        $this->assertTrue($platformOwner->can('dashboard.view'));
+
+        $this->actingAs($owner, 'tenant')
+            ->get("http://{$domain}/administration/users")
+            ->assertOk();
     }
 }

@@ -2,6 +2,7 @@ import KnowledgeShell from '@/Components/Knowledge/KnowledgeShell';
 import KnowledgeStatusBadge from '@/Components/Knowledge/KnowledgeStatusBadge';
 import Pagination from '@/Components/Superadmin/Pagination';
 import EmptyState from '@/Components/UI/EmptyState';
+import Button from '@/Components/UI/Button';
 import { FilterBar } from '@/Components/UI/FilterBar';
 import FormField from '@/Components/UI/FormField';
 import Input from '@/Components/UI/Input';
@@ -34,10 +35,7 @@ export default function FaqsIndex({ faqs, filters, bases, categories, statuses, 
             title="FAQs"
             description="Short, structured answers to the questions customers actually ask. These are the highest-quality knowledge you can give an agent."
             actions={can?.create && bases.length > 0 && (
-                <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Add FAQ
-                </button>
+                <Button type="button" variant="brand" size="md" icon={Plus} onClick={() => setOpen(true)}>Add FAQ</Button>
             )}
         >
             <FilterBar className="mb-4">
@@ -68,7 +66,7 @@ export default function FaqsIndex({ faqs, filters, bases, categories, statuses, 
                     title={Object.values(filters).some(Boolean) ? 'No FAQs match those filters' : 'No FAQs yet'}
                     description="Write a question and its answer, publish it, and your agents will use it straight away."
                     action={can?.create && bases.length > 0 && (
-                        <button type="button" onClick={() => setOpen(true)} className="rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800">Add FAQ</button>
+                        <Button type="button" variant="brand" icon={Plus} onClick={() => setOpen(true)}>Add FAQ</Button>
                     )}
                 />
             ) : (

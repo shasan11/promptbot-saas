@@ -50,8 +50,23 @@ class ConnectionController extends Controller
             }
         }
 
+        $summaryQuery = Connection::query();
+
         return Inertia::render('Tenant/Admin/Connections/Connections/Index', [
             'connections' => $query->paginate(15)->withQueryString(),
+            'summary' => [
+                'total' => (clone $summaryQuery)->count(),
+                'active' => (clone $summaryQuery)->where('status', ConnectionStatus::Active->value)->count(),
+                'healthy' => (clone $summaryQuery)->where('health_status', ConnectionHealth::Healthy->value)->count(),
+                'needsAttention' => (clone $summaryQuery)->whereIn('health_status', [
+                    ConnectionHealth::Degraded->value,
+                    ConnectionHealth::NeedsAttention->value,
+                    ConnectionHealth::AuthenticationExpired->value,
+                    ConnectionHealth::RateLimited->value,
+                    ConnectionHealth::Disconnected->value,
+                    ConnectionHealth::Error->value,
+                ])->count(),
+            ],
             'filters' => $request->only(['search', 'status', 'health_status', 'connection_type', 'auth_type']),
             'statusOptions' => array_map(fn ($case) => $case->value, ConnectionStatus::cases()),
             'healthOptions' => array_map(fn ($case) => $case->value, ConnectionHealth::cases()),

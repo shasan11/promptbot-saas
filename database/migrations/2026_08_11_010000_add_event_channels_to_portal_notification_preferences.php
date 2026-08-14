@@ -8,13 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('portal_notification_preferences', function (Blueprint $table): void {
-            $table->json('event_channels')->nullable()->after('product_email');
-        });
+        if (Schema::hasTable('portal_notification_preferences')
+            && ! Schema::hasColumn('portal_notification_preferences', 'event_channels')) {
+            Schema::table('portal_notification_preferences', function (Blueprint $table): void {
+                $table->json('event_channels')->nullable()->after('product_email');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('portal_notification_preferences', fn (Blueprint $table) => $table->dropColumn('event_channels'));
+        if (Schema::hasTable('portal_notification_preferences')
+            && Schema::hasColumn('portal_notification_preferences', 'event_channels')) {
+            Schema::table('portal_notification_preferences', fn (Blueprint $table) => $table->dropColumn('event_channels'));
+        }
     }
 };

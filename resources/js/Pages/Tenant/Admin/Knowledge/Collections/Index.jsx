@@ -1,6 +1,8 @@
 import KnowledgeShell from '@/Components/Knowledge/KnowledgeShell';
 import { SectionCard } from '@/Components/UI/Card';
 import EmptyState from '@/Components/UI/EmptyState';
+import Button from '@/Components/UI/Button';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
 import { FilterBar } from '@/Components/UI/FilterBar';
 import FormField from '@/Components/UI/FormField';
 import Input from '@/Components/UI/Input';
@@ -13,6 +15,7 @@ import { useState } from 'react';
 
 export default function CollectionsIndex({ collections, bases, filters, maxDepth, can }) {
     const [open, setOpen] = useState(false);
+    const [deleting, setDeleting] = useState(null);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         knowledge_base: filters.knowledge_base || bases[0]?.uuid || '',
@@ -29,10 +32,7 @@ export default function CollectionsIndex({ collections, bases, filters, maxDepth
             title="Collections"
             description={`Group related documents inside a knowledge base. Access granted on a collection cascades to everything nested beneath it. Up to ${maxDepth} levels deep.`}
             actions={can?.create && bases.length > 0 && (
-                <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    New collection
-                </button>
+                <Button type="button" variant="brand" size="md" icon={Plus} onClick={() => setOpen(true)}>New collection</Button>
             )}
         >
             <FilterBar className="mb-4">
@@ -55,7 +55,7 @@ export default function CollectionsIndex({ collections, bases, filters, maxDepth
                     title="No collections yet"
                     description="Collections are optional. Create them when a knowledge base grows large enough that agents should only see part of it."
                     action={can?.create && bases.length > 0 && (
-                        <button type="button" onClick={() => setOpen(true)} className="rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800">New collection</button>
+                        <Button type="button" variant="brand" icon={Plus} onClick={() => setOpen(true)}>New collection</Button>
                     )}
                 />
             ) : (
@@ -74,11 +74,7 @@ export default function CollectionsIndex({ collections, bases, filters, maxDepth
                                 {can?.create && (
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            if (window.confirm(`Delete "${collection.name}"? Its documents move to the knowledge base root and stay searchable.`)) {
-                                                router.delete(route('tenant.admin.knowledge.collections.destroy', collection.uuid), { preserveScroll: true });
-                                            }
-                                        }}
+                                        onClick={() => setDeleting(collection)}
                                         aria-label={`Delete ${collection.name}`}
                                         className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                     >
@@ -125,6 +121,9 @@ export default function CollectionsIndex({ collections, bases, filters, maxDepth
                     </div>
                 </form>
             </Modal>
+            <ConfirmDialog open={Boolean(deleting)} title={deleting ? `Delete ${deleting.name}?` : 'Delete collection?'} confirmLabel="Delete collection" variant="danger" onCancel={() => setDeleting(null)} onConfirm={() => deleting && router.delete(route('tenant.admin.knowledge.collections.destroy', deleting.uuid), { preserveScroll: true, onFinish: () => setDeleting(null) })}>
+                Documents in this collection will move to the knowledge base root and remain searchable.
+            </ConfirmDialog>
         </KnowledgeShell>
     );
 }

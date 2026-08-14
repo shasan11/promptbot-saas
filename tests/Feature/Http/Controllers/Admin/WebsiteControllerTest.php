@@ -5,7 +5,10 @@ namespace Tests\Feature\Http\Controllers\Admin;
 use App\Models\WebsiteFooterLink;
 use App\Models\WebsiteNavigationItem;
 use App\Models\WebsitePage;
+use App\Models\WebsiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\InteractsWithPlatformPermissions;
 use Tests\TestCase;
 
@@ -113,5 +116,23 @@ class WebsiteControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('website_settings', ['group' => 'general', 'key' => 'site_name']);
+    }
+
+    public function test_admin_can_upload_website_logos_directly(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->centralAdminWithPermissions(['website.manage']), 'central')
+            ->put(route('superadmin.website.settings.update'), [
+                'site_name' => 'Acme',
+                'logo_file' => UploadedFile::fake()->image('logo.png', 480, 120),
+                'logo_dark_file' => UploadedFile::fake()->image('logo-dark.webp', 480, 120),
+                'favicon_file' => UploadedFile::fake()->image('favicon.png', 64, 64),
+            ])->assertRedirect();
+
+        foreach (['logo_url', 'logo_dark_url', 'favicon_url'] as $key) {
+            $url = data_get(WebsiteSetting::where('key', $key)->firstOrFail()->value, 'value');
+            $this->assertStringContainsString('/storage/website/branding/', $url);
+        }
     }
 }

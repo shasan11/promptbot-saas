@@ -11,9 +11,9 @@ class WebsiteSection extends Model
     use HasUuid;
 
     public const TYPES = [
-        'hero', 'logo_cloud', 'feature_grid', 'feature_list', 'feature_showcase', 'image_text',
+        'announcement', 'hero', 'logo_cloud', 'feature_grid', 'feature_list', 'feature_showcase', 'image_text',
         'stats', 'testimonials', 'pricing', 'comparison_table', 'integrations', 'how_it_works',
-        'faq', 'cta', 'newsletter', 'contact_form', 'video', 'gallery', 'rich_text', 'spacer', 'custom_html',
+        'faq', 'cta', 'newsletter', 'resources', 'contact_form', 'video', 'gallery', 'rich_text', 'spacer', 'custom_html',
     ];
 
     protected $fillable = [

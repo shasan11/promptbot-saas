@@ -12,7 +12,7 @@ export default function Index({ accounts, filters }) {
     const [search, setSearch] = useState(filters.search || '');
     const apply = (next = {}) => router.get(route('superadmin.customers.accounts.index'), { ...filters, search, ...next }, { preserveState: true });
     const columns = [
-        { title: 'Account', dataIndex: 'name', render: (value, account) => <div><Link href={route('superadmin.customers.accounts.show', account.public_uuid)} className="font-semibold text-slate-900 hover:text-indigo-600">{value}</Link><p className="text-xs text-slate-500">{account.account_number}</p></div> },
+        { title: 'Account', dataIndex: 'name', render: (value, account) => <div><div className="flex flex-wrap items-center gap-2"><Link href={route('superadmin.customers.accounts.show', account.public_uuid)} className="font-semibold text-slate-900 hover:text-indigo-600">{value}</Link>{(account.metadata?.system_default || account.account_number === 'ACC-DEFAULT') && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Protected default</span>}</div><p className="text-xs text-slate-500">{account.account_number}</p></div> },
         { title: 'Owner', dataIndex: ['owner', 'name'], render: (value, account) => <div>{value || 'Unassigned'}<p className="text-xs text-slate-500">{account.owner?.email}</p></div> },
         { title: 'Services', dataIndex: 'tenants_count' },
         { title: 'MRR', dataIndex: 'mrr', render: (value, account) => <Money value={value} currency={account.default_currency} /> },

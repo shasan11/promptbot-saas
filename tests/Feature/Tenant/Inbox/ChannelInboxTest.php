@@ -60,11 +60,54 @@ class ChannelInboxTest extends TestCase
 
         tenancy()->initialize($tenant); $widget=Channel::where('type','web_chat')->firstOrFail()->webChatWidget; tenancy()->end();
         $headers=['Origin'=>'https://shop.example.test'];
+        $this->withHeaders([
+            'Origin' => 'https://shop.example.test',
+            'Access-Control-Request-Method' => 'POST',
+            'Access-Control-Request-Headers' => 'authorization,content-type',
+        ])->options("http://{$domain}/widget/api/{$widget->public_key}/session")
+            ->assertNoContent()
+            ->assertHeader('Access-Control-Allow-Origin', 'https://shop.example.test');
         $session=$this->withHeaders($headers)->postJson("http://{$domain}/widget/api/{$widget->public_key}/session",['name'=>'Chat Visitor','email'=>'visitor@example.test','locale'=>'en'])->assertCreated()->json();
         $this->withHeaders(array_merge($headers,['Authorization'=>'Bearer '.$session['token']]))->postJson("http://{$domain}/widget/api/{$widget->public_key}/messages",['body'=>'Hello from the widget','client_id'=>'client-1'])->assertCreated();
 
         tenancy()->initialize($tenant);
         $this->assertTrue(Conversation::whereHas('contact',fn($q)=>$q->where('email','visitor@example.test'))->exists());
         tenancy()->end();
+    }
+
+    public function test_web_chat_without_allowed_origins_accepts_any_embedding_origin(): void
+    {
+        [$tenant, $domain] = $this->createTenantWithDomain();
+        $admin = $this->createTenantUser($tenant, ['name' => 'Widget Admin'], 'Tenant Administrator');
+
+        $this->actingAs($admin, 'tenant')->post("http://{$domain}/channels", [
+            'type' => 'web_chat', 'name' => 'Open Website Chat', 'status' => 'active',
+            'team_id' => null, 'default_assignee_id' => null, 'business_hours_policy_id' => null,
+            'auto_reply_enabled' => false, 'signature' => '',
+            'widget' => [
+                'widget_name' => 'Open Chat', 'primary_color' => '#2563eb', 'launcher_position' => 'right',
+                'welcome_message' => 'Welcome', 'offline_message' => 'Offline', 'supported_languages' => ['en'],
+                'allowed_origins' => [], 'privacy_url' => null, 'terms_url' => null,
+                'allow_attachments' => true, 'require_email' => true, 'require_name' => true,
+            ],
+        ])->assertRedirect();
+
+        tenancy()->initialize($tenant);
+        $widget = Channel::where('type', 'web_chat')->firstOrFail()->webChatWidget;
+        tenancy()->end();
+
+        $origin = 'https://any-customer-site.example';
+        $this->withHeaders([
+            'Origin' => $origin,
+            'Access-Control-Request-Method' => 'POST',
+            'Access-Control-Request-Headers' => 'content-type',
+        ])->options("http://{$domain}/widget/api/{$widget->public_key}/session")
+            ->assertNoContent()
+            ->assertHeader('Access-Control-Allow-Origin', $origin);
+
+        $this->withHeader('Origin', $origin)
+            ->getJson("http://{$domain}/widget/api/{$widget->public_key}/config")
+            ->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', $origin);
     }
 }

@@ -7,7 +7,7 @@ import Input from '@/Components/UI/Input';
 import Select from '@/Components/UI/Select';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { AlertTriangle, Globe2 } from 'lucide-react';
+import { AlertTriangle, Clock3, Globe2, Play, ServerCog } from 'lucide-react';
 
 const cleanBaseDomain = (domain = '') => domain
     .trim()
@@ -49,7 +49,9 @@ export default function Create({
     provisioningMode = 'manual',
     tenantBaseDomain = '',
     selectedAccountId = null,
+    defaultAccountId = null,
     defaultRegion = '',
+    queue = { available: false, connection: 'sync', driver: 'sync' },
 }) {
     const editing = Boolean(tenant);
     const baseDomain = cleanBaseDomain(tenantBaseDomain);
@@ -65,7 +67,9 @@ export default function Create({
         processing,
         errors,
     } = useForm({
-        customer_account_id: tenant?.customer_account_id || selectedAccountId || accounts[0]?.id || '',
+        customer_account_id: tenant?.customer_account_id === defaultAccountId
+            ? ''
+            : (tenant?.customer_account_id || selectedAccountId || ''),
         company_name: tenant?.company_name || '',
         region: tenant?.region || defaultRegion,
         subdomain: getSubdomainPrefix(primaryDomain?.domain, baseDomain),
@@ -74,6 +78,7 @@ export default function Create({
         owner_password: '',
         plan_id: tenant?.plan_id || plans[0]?.id || '',
         provisioning_mode: provisioningMode,
+        execution_mode: queue.available ? 'queue' : 'immediate',
         database_host: '127.0.0.1',
         database_port: 3306,
         database_name: '',
@@ -156,10 +161,10 @@ export default function Create({
                     description="Choose the company name and the address users will use to open this workspace."
                 >
                     <div className="grid gap-5 md:grid-cols-2">
-                        <FormField id="customer_account_id" label="Customer account" required error={errors.customer_account_id} className="md:col-span-2">
+                        <FormField id="customer_account_id" label="Customer account" optional error={errors.customer_account_id} hint="Leave this on Default Account when the tenant does not belong to a specific customer." className="md:col-span-2">
                             <Select id="customer_account_id" value={data.customer_account_id} error={!!errors.customer_account_id} onChange={(event) => setData('customer_account_id', event.target.value)}>
-                                <option value="">Select a customer account</option>
-                                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.account_number}</option>)}
+                                <option value="">Default Account (automatic)</option>
+                                {accounts.filter((account) => account.id !== defaultAccountId).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.account_number}</option>)}
                             </Select>
                         </FormField>
                         <FormField
@@ -249,6 +254,73 @@ export default function Create({
                         </FormField>
                     </div>
                 </SectionCard>
+
+                {!editing && (
+                    <SectionCard
+                        title="Provisioning execution"
+                        description="Choose whether Laravel processes the tenant in the background or during this browser request."
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <label className={`relative flex gap-3 rounded-xl border p-4 transition ${data.execution_mode === 'queue' ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-100' : 'border-slate-200 bg-white hover:border-slate-300'} ${queue.available ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                                <input
+                                    type="radio"
+                                    name="execution_mode"
+                                    value="queue"
+                                    checked={data.execution_mode === 'queue'}
+                                    disabled={!queue.available}
+                                    onChange={(event) => setData('execution_mode', event.target.value)}
+                                    className="mt-1 border-slate-300 text-brand-600 focus:ring-brand-500"
+                                />
+                                <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
+                                <span>
+                                    <span className="block text-sm font-semibold text-slate-900">Laravel Queue</span>
+                                    <span className="mt-1 block text-xs leading-5 text-slate-600">Recommended. Returns immediately and provisions in the background without a browser timeout.</span>
+                                    <span className="mt-2 inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">{queue.available ? `${queue.driver} queue configured` : 'Queue unavailable'}</span>
+                                </span>
+                            </label>
+
+                            <label className={`flex cursor-pointer gap-3 rounded-xl border p-4 transition ${data.execution_mode === 'immediate' ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                                <input
+                                    type="radio"
+                                    name="execution_mode"
+                                    value="immediate"
+                                    checked={data.execution_mode === 'immediate'}
+                                    onChange={(event) => setData('execution_mode', event.target.value)}
+                                    className="mt-1 border-slate-300 text-brand-600 focus:ring-brand-500"
+                                />
+                                <Play className="mt-0.5 h-5 w-5 shrink-0 text-slate-700" />
+                                <span>
+                                    <span className="block text-sm font-semibold text-slate-900">Provision immediately</span>
+                                    <span className="mt-1 block text-xs leading-5 text-slate-600">Runs migrations and seeders in this request. Use this when a queue worker cannot be run.</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        {errors.execution_mode && <p className="mt-3 text-sm font-medium text-rose-600">{errors.execution_mode}</p>}
+
+                        {!queue.available ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                                <div className="flex gap-3">
+                                    <ServerCog className="mt-0.5 h-5 w-5 shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="font-semibold">Enable Laravel Queue for background provisioning</p>
+                                        <p className="mt-1 text-xs leading-5 text-amber-800">{queue.reason || 'A background queue connection is not available.'}</p>
+                                        <div className="mt-3 space-y-2">
+                                            <code className="block overflow-x-auto rounded-lg bg-amber-950 px-3 py-2 text-xs text-amber-50">{queue.enableEnvironment}</code>
+                                            <code className="block overflow-x-auto rounded-lg bg-amber-950 px-3 py-2 text-xs text-amber-50">php artisan migrate --force</code>
+                                            <code className="block overflow-x-auto rounded-lg bg-amber-950 px-3 py-2 text-xs text-amber-50">{queue.workerCommand}</code>
+                                        </div>
+                                        <p className="mt-2 text-xs text-amber-800">Then run <code>php artisan optimize:clear</code> and reload this page.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                                <span className="font-semibold">Queue configured.</span> Keep this worker running: <code className="ml-1 break-all font-semibold">{queue.workerCommand}</code>
+                            </div>
+                        )}
+                    </SectionCard>
+                )}
 
                 {!editing && (
                     <SectionCard

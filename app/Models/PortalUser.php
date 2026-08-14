@@ -4,14 +4,15 @@ namespace App\Models;
 
 use App\Enums\PortalUserStatus;
 use App\Models\Concerns\HasPublicUuid;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use App\Notifications\Portal\ResetPasswordNotification;
 use App\Notifications\Portal\VerifyEmailNotification;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
 class PortalUser extends Authenticatable implements MustVerifyEmail
 {
@@ -52,6 +53,11 @@ class PortalUser extends Authenticatable implements MustVerifyEmail
         $id = $account instanceof CustomerAccount ? $account->getKey() : $account;
 
         return $this->accounts()->whereKey($id)->exists();
+    }
+
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(PortalSocialAccount::class);
     }
 
     public function sendEmailVerificationNotification(): void

@@ -18,7 +18,7 @@ class TenantUpdateRequest extends FormRequest
         $domainId = $tenant?->domains()->where('is_primary', true)->value('id');
 
         return [
-            'customer_account_id' => ['sometimes', 'required', 'exists:customer_accounts,id'],
+            'customer_account_id' => ['sometimes', 'nullable', 'exists:customer_accounts,id'],
             'company_name' => ['sometimes', 'required', 'string', 'max:255'],
             'region' => ['sometimes', 'nullable', 'string', 'max:100'],
             'subdomain' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('domains', 'domain')->ignore($domainId)],

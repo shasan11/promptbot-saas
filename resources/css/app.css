@@ -9,6 +9,16 @@
     --color-text: #0F172A;
     --color-text-muted: #64748B;
     --focus-ring: #059669;
+    --brand-50: 236 253 245;
+    --brand-100: 209 250 229;
+    --brand-200: 167 243 208;
+    --brand-300: 110 231 183;
+    --brand-400: 52 211 153;
+    --brand-500: 16 185 129;
+    --brand-600: 5 150 105;
+    --brand-700: 4 120 87;
+    --brand-800: 6 95 70;
+    --brand-900: 6 78 59;
 }
 
 @layer base {
@@ -29,4 +39,101 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+.sa-sidebar-scroll {
+    scrollbar-color: transparent transparent;
+    scrollbar-width: thin;
+}
+
+.sa-sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sa-sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sa-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+}
+
+.sa-sidebar-shell:hover .sa-sidebar-scroll {
+    scrollbar-color: rgba(148, 163, 184, .42) transparent;
+}
+
+.sa-sidebar-shell:hover .sa-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, .42);
+}
+
+.sa-sidebar-shell:hover .sa-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(167, 243, 208, .7);
+}
+
+.auth-theme {
+    font-family: var(--auth-body-font), ui-sans-serif, system-ui, sans-serif;
+}
+
+.auth-theme-glow {
+    background:
+        radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--auth-accent) 11%, transparent), transparent 30%),
+        radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--auth-primary) 8%, transparent), transparent 32%);
+}
+
+.auth-card {
+    border-radius: var(--auth-card-radius);
+}
+
+.auth-theme-bar {
+    background: linear-gradient(90deg, var(--auth-primary), var(--auth-accent));
+}
+
+.auth-theme h1,
+.auth-theme h2,
+.auth-theme h3 {
+    color: var(--auth-primary);
+    font-family: var(--auth-heading-font), ui-sans-serif, system-ui, sans-serif;
+}
+
+.auth-theme a:not([data-auth-neutral]) {
+    color: var(--auth-accent) !important;
+}
+
+.auth-theme .text-indigo-500,
+.auth-theme .text-indigo-600,
+.auth-theme .text-indigo-700 {
+    color: var(--auth-accent) !important;
+}
+
+.auth-theme .bg-indigo-600 {
+    background-color: var(--auth-accent) !important;
+}
+
+.auth-theme .bg-indigo-100 {
+    background-color: color-mix(in srgb, var(--auth-accent) 14%, white) !important;
+}
+
+.auth-theme input:not([type="checkbox"]):not([type="radio"]):focus,
+.auth-theme select:focus,
+.auth-theme textarea:focus {
+    border-color: var(--auth-accent) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-accent) 24%, transparent) !important;
+}
+
+.auth-theme input[type="checkbox"],
+.auth-theme input[type="radio"] {
+    accent-color: var(--auth-accent);
+    color: var(--auth-accent) !important;
+}
+
+.auth-theme button[type="submit"],
+.auth-theme .auth-primary-action {
+    background-color: var(--auth-accent) !important;
+    border-radius: var(--auth-button-radius) !important;
+}
+
+.auth-theme button[type="submit"]:hover,
+.auth-theme .auth-primary-action:hover {
+    filter: brightness(0.92);
 }

@@ -11,6 +11,12 @@
     $titleFormat = ($settings['default_meta_title_format'] ?? null) ?: '{title} · {site_name}';
     $documentTitle = str_replace(['{title}', '{site_name}'], [$page->seo['title'] ?? $page->title, $siteName], $titleFormat);
     $canonicalUrl = $page->canonical_url ?: (($settings['canonical_base_url'] ?? null) ? rtrim($settings['canonical_base_url'], '/').($page->slug === 'home' ? '/' : '/'.$page->slug) : ($page->slug === 'home' ? url('/') : url('/'.$page->slug)));
+    $configuredLightLogo = $settings['logo_url'] ?? null;
+    $configuredDarkLogo = $settings['logo_dark_url'] ?? null;
+    $defaultLightLogo = file_exists(public_path('branding/light_logo.png')) ? asset('branding/light_logo.png') : (file_exists(public_path('branding/logo/light_logo.png')) ? asset('branding/logo/light_logo.png') : null);
+    $defaultDarkLogo = file_exists(public_path('branding/dark_logo.png')) ? asset('branding/dark_logo.png') : (file_exists(public_path('branding/logo/dark_logo.png')) ? asset('branding/logo/dark_logo.png') : null);
+    $lightLogo = $configuredLightLogo ?: $defaultLightLogo;
+    $darkLogo = $configuredDarkLogo ?: $configuredLightLogo ?: $defaultDarkLogo ?: $lightLogo;
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -54,24 +60,40 @@
             :root { --cms-primary: {{ $settings['primary_color'] ?? '#0f172a' }}; --cms-secondary: {{ $settings['secondary_color'] ?? '#475569' }}; --cms-accent: {{ $settings['accent_color'] ?? '#4f46e5' }}; --cms-button-radius: {{ $settings['button_radius'] ?? '8px' }}; --cms-card-radius: {{ $settings['card_radius'] ?? '12px' }}; --cms-container: {{ $settings['container_width'] ?? '1152px' }}; }
             body { font-family: '{{ $bodyFont }}', ui-sans-serif, system-ui, sans-serif; }
             h1, h2, h3, h4, h5, h6 { font-family: '{{ $headingFont }}', ui-sans-serif, system-ui, sans-serif; }
+            html { scroll-behavior: smooth; }
             .cms-container { max-width: var(--cms-container); }
-            .cms-button { border-radius: var(--cms-button-radius); background: var(--cms-primary); color: white; }
+            .cms-button { border-radius: var(--cms-button-radius); background: var(--cms-accent); color: white; transition: transform .2s ease, filter .2s ease; }
+            .cms-button:hover { filter: brightness(.92); transform: translateY(-1px); }
+            .cms-heading { color:#020617; font-size:clamp(1.75rem,3.25vw,2.75rem); line-height:1.1; letter-spacing:-.03em; font-weight:750; }
+            .cms-copy { max-width:42rem; color:#475569; font-size:1rem; line-height:1.7; }
+            .cms-eyebrow { color:var(--cms-accent); font-size:.6875rem; line-height:1rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+            .cms-text-link { color:#047857; font-size:.875rem; font-weight:750; }
+            main > section:not(.cms-page-hero) { padding-top:clamp(2.5rem,5vw,4rem)!important; padding-bottom:clamp(2.5rem,5vw,4rem)!important; }
+            .cms-product-window { overflow:hidden; border:1px solid rgba(148,163,184,.35); border-radius:1.25rem; background:white; box-shadow:0 35px 80px -28px rgba(15,23,42,.45); transform:perspective(1200px) rotateY(-2deg) rotateX(1deg); }
+            .cms-product-window i { display:block; width:.5rem; height:.5rem; border-radius:9999px; background:#cbd5e1; }
+            .cms-reveal { opacity:0; transform:translateY(18px); animation:cms-reveal .65s cubic-bezier(.2,.75,.25,1) forwards; }
+            .cms-float { animation:cms-float 5s ease-in-out infinite; }
+            .cms-orb { animation:cms-orb 8s ease-in-out infinite alternate; }
+            @keyframes cms-reveal { to { opacity:1; transform:translateY(0); } }
+            @keyframes cms-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+            @keyframes cms-orb { from { transform:translate3d(0,0,0) scale(1); } to { transform:translate3d(-36px,26px,0) scale(1.15); } }
+            @media (prefers-reduced-motion: reduce) { .cms-reveal,.cms-float,.cms-orb { animation:none; opacity:1; transform:none; } }
         </style>
     </head>
-    <body class="min-h-screen bg-white text-slate-700 antialiased">
+    <body class="min-h-screen overflow-x-hidden bg-white text-slate-700 antialiased selection:bg-emerald-100 selection:text-emerald-950">
         @if($settings['google_tag_manager_id'] ?? null)<noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ $settings['google_tag_manager_id'] }}" height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe></noscript>@endif
         @if($settings['meta_pixel_id'] ?? null)<noscript><img height="1" width="1" style="display:none" alt="" src="https://www.facebook.com/tr?id={{ $settings['meta_pixel_id'] }}&ev=PageView&noscript=1"></noscript>@endif
-        <header class="border-b border-slate-200">
-            <div class="cms-container mx-auto flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+        @foreach($page->sections->where('type', 'announcement') as $section)
+            @include('website.sections.announcement', ['content' => array_replace(config('cms.blocks.announcement.defaults', []), $section->content ?? [])])
+        @endforeach
+        <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[.02] backdrop-blur-xl">
+            <div class="cms-container mx-auto flex min-h-[72px] items-center justify-between gap-4 px-6 py-3">
                 <a href="{{ url('/') }}" class="flex items-center gap-2 text-lg font-bold text-navy-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 rounded">
-                    @if($settings['logo_url'] ?? null)
-                        <img src="{{ $settings['logo_url'] }}" alt="{{ $settings['site_name'] ?? '' }}" class="h-8 w-auto">
-                    @endif
-                    {{ $settings['site_name'] ?? config('app.name') }}
+                    @if($lightLogo)<img src="{{ $lightLogo }}" alt="{{ $siteName }}" class="h-8 w-auto max-w-[170px] object-contain">@else<span>{{ $siteName }}</span>@endif
                 </a>
 
                 @if($headerNavigation->count())
-                    <nav class="hidden flex-wrap items-center gap-6 text-sm font-semibold text-slate-600 md:flex" aria-label="Primary">
+                    <nav class="hidden flex-wrap items-center gap-7 text-sm font-semibold text-slate-600 lg:flex" aria-label="Primary">
                         @foreach($headerNavigation as $item)
                             @php
                                 $children = $navigation->where('parent_id', $item->id);
@@ -92,25 +114,25 @@
                     </nav>
                 @endif
 
-                <div class="hidden items-center gap-2 md:flex">
-                    <a href="{{ route('portal.login') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Customer login</a>
-                    <a href="{{ route('portal.register') }}" class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Start free trial</a>
+                <div class="hidden items-center gap-3 lg:flex">
+                    <a href="{{ route('portal.login') }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Sign in</a>
+                    <a href="{{ route('portal.register') }}" class="cms-button px-4 py-2.5 text-sm font-bold">Start free</a>
                 </div>
 
                 @if($mobileNavigation->count())
-                    <details class="relative md:hidden">
+                    <details class="relative lg:hidden">
                         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-slate-300 text-slate-600 [&::-webkit-details-marker]:hidden" aria-label="Open menu">
                             <span aria-hidden="true">&#9776;</span>
                         </summary>
-                        <nav class="absolute right-0 z-20 mt-2 w-56 rounded-md border border-slate-200 bg-white p-2 shadow-soft-lg" aria-label="Mobile">
+                        <nav class="absolute right-0 z-20 mt-3 w-[min(19rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl" aria-label="Mobile">
                             @foreach($mobileNavigation as $item)
                                 <a href="{{ $item->url }}" @if($item->open_new_tab) target="_blank" rel="noopener noreferrer" @endif class="block rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ $item->label }}</a>
                                 @foreach($navigation->where('parent_id', $item->id) as $child)
                                     <a href="{{ $child->url }}" @if($child->open_new_tab) target="_blank" rel="noopener noreferrer" @endif class="block rounded py-2 pl-6 pr-3 text-sm text-slate-600 hover:bg-slate-50">{{ $child->label }}</a>
                                 @endforeach
                             @endforeach
-                            <a href="{{ route('portal.login') }}" class="mt-1 block rounded border-t border-slate-100 px-3 py-2 pt-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Customer login</a>
-                            <a href="{{ route('portal.register') }}" class="block rounded px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50">Start free trial</a>
+                            <a href="{{ route('portal.login') }}" class="mt-2 block rounded border-t border-slate-100 px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Sign in</a>
+                            <a href="{{ route('portal.register') }}" class="block rounded-lg bg-emerald-600 px-3 py-3 text-center text-sm font-semibold text-white">Start free</a>
                         </nav>
                     </details>
                 @endif
@@ -120,6 +142,7 @@
         <main>
             @if($preview)<div class="bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900">Draft preview · this page is not publicly published</div>@endif
             @foreach($page->sections as $section)
+                @continue($section->type === 'announcement')
                 @php
                     $blockDefaults = config("cms.blocks.{$section->type}.defaults", []);
                     $blockContent = array_replace($blockDefaults, is_array($section->content) ? $section->content : []);
@@ -128,37 +151,6 @@
             @endforeach
         </main>
 
-        <footer class="border-t border-slate-200 bg-slate-50">
-            <div class="cms-container mx-auto px-6 py-10">
-                @if($settings['footer_description'] ?? null)<p class="mb-8 max-w-xl text-sm leading-6 text-slate-600">{{ $settings['footer_description'] }}</p>@endif
-                @if($footerLinks->count())
-                    <div class="grid gap-8 sm:grid-cols-3">
-                        @foreach($footerLinks as $group => $links)
-                            <div>
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $group }}</div>
-                                <ul class="mt-3 space-y-2 text-sm">
-                                    @foreach($links as $link)
-                                        <li><a href="{{ $link->url }}" class="rounded text-slate-600 hover:text-navy-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">{{ $link->label }}</a></li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-                @if($footerNavigation->count())
-                    <nav class="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="Footer">
-                        @foreach($footerNavigation as $item)<a href="{{ $item->url }}" @if($item->open_new_tab) target="_blank" rel="noopener noreferrer" @endif class="text-slate-600 hover:text-navy-900">{{ $item->label }}</a>@endforeach
-                    </nav>
-                @endif
-                <div class="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-6 text-xs text-slate-500">
-                    <span>&copy; {{ date('Y') }} {{ $settings['copyright_text'] ?? (($settings['site_name'] ?? config('app.name')).'. All rights reserved.') }}</span>
-                    <div class="flex gap-4">
-                        @if($settings['contact_email'] ?? null)<a href="mailto:{{ $settings['contact_email'] }}" class="hover:text-navy-900">{{ $settings['contact_email'] }}</a>@endif
-                        @if($settings['social_twitter'] ?? null)<a href="{{ $settings['social_twitter'] }}" class="hover:text-navy-900">Twitter/X</a>@endif
-                        @if($settings['social_linkedin'] ?? null)<a href="{{ $settings['social_linkedin'] }}" class="hover:text-navy-900">LinkedIn</a>@endif
-                    </div>
-                </div>
-            </div>
-        </footer>
+        @include('website.partials.footer')
     </body>
 </html>

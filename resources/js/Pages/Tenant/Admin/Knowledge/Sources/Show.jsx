@@ -2,8 +2,10 @@ import KnowledgeStatusBadge from '@/Components/Knowledge/KnowledgeStatusBadge';
 import KnowledgeShell from '@/Components/Knowledge/KnowledgeShell';
 import SourceTypeBadge from '@/Components/Knowledge/SourceTypeBadge';
 import { SectionCard } from '@/Components/UI/Card';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
 import { Link, router } from '@inertiajs/react';
 import { AlertTriangle, Ban, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 const FRESHNESS_COPY = {
     current: { label: 'Current', className: 'text-emerald-700' },
@@ -19,6 +21,7 @@ const FRESHNESS_COPY = {
  */
 export default function SourceShow({ source, freshness, documents, pages, syncRuns, failures, credential, can }) {
     const fresh = FRESHNESS_COPY[freshness] || FRESHNESS_COPY.current;
+    const [deleteOpen, setDeleteOpen] = useState(false);
 
     return (
         <KnowledgeShell
@@ -54,11 +57,7 @@ export default function SourceShow({ source, freshness, documents, pages, syncRu
                     {can?.delete && (
                         <button
                             type="button"
-                            onClick={() => {
-                                if (window.confirm(`Delete "${source.name}"? Its ${source.chunk_count} chunk(s) stop being used for answers immediately.`)) {
-                                    router.delete(route('tenant.admin.knowledge.sources.destroy', source.uuid));
-                                }
-                            }}
+                            onClick={() => setDeleteOpen(true)}
                             className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                         >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -68,6 +67,9 @@ export default function SourceShow({ source, freshness, documents, pages, syncRu
                 </>
             )}
         >
+            <ConfirmDialog open={deleteOpen} title={`Delete ${source.name}?`} confirmLabel="Delete source" variant="danger" onCancel={() => setDeleteOpen(false)} onConfirm={() => router.delete(route('tenant.admin.knowledge.sources.destroy', source.uuid), { onFinish: () => setDeleteOpen(false) })}>
+                Its {source.chunk_count} knowledge chunk(s) will stop being used for AI answers immediately. This action cannot be undone.
+            </ConfirmDialog>
             {source.last_error && (
                 <div className="mb-5 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4" role="alert">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />

@@ -26,6 +26,7 @@ class TenantStoreRequest extends FormRequest
             'owner_password' => ['required', 'string', 'min:10'],
             'plan_id' => ['nullable', 'exists:plans,id'],
             'provisioning_mode' => ['nullable', 'in:manual,cpanel,mysql'],
+            'execution_mode' => ['nullable', 'in:immediate,queue'],
             'database_host' => ['nullable', 'required_if:provisioning_mode,manual', 'string', 'max:255'],
             'database_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'database_name' => ['nullable', 'required_if:provisioning_mode,manual', 'string', 'max:64', 'regex:/^[A-Za-z0-9_]+$/'],

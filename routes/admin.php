@@ -57,6 +57,7 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         Route::post('accounts/{account}/limits', [CustomerAccountController::class, 'storeLimit'])->name('accounts.limits.store')->middleware('permission:customers.manage');
         Route::delete('accounts/{account}/limits/{limit}', [CustomerAccountController::class, 'destroyLimit'])->name('accounts.limits.destroy')->middleware('permission:customers.manage');
         Route::get('users', [PortalUserController::class, 'index'])->name('users.index')->middleware('permission:customers.view');
+        Route::post('users', [PortalUserController::class, 'store'])->name('users.store')->middleware('permission:customers.manage');
     });
 
     Route::get('revenue', RevenueController::class)->name('revenue.index')->middleware('permission:revenue.view');
@@ -72,6 +73,8 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         ->name('communications.email-templates.update')->middleware('permission:communications.manage');
     Route::post('communications/email-templates/{template}/test', [EmailTemplateController::class, 'test'])
         ->name('communications.email-templates.test')->middleware('permission:communications.manage');
+    Route::post('communications/bulk-email', [EmailTemplateController::class, 'bulk'])
+        ->name('communications.bulk-email.store')->middleware('permission:communications.manage');
 
     Route::prefix('security')->name('security.')->group(function (): void {
         Route::get('admins', [SecurityController::class, 'admins'])->name('admins.index')->middleware('permission:administrators.view');

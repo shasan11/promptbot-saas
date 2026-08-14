@@ -13,8 +13,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,6 +28,7 @@ class RegisteredUserController extends Controller
         return Inertia::render('Portal/Auth/Register', [
             'selectedPlan' => $plans->query()->where('slug', $request->query('plan'))->first(),
             'interval' => in_array($request->query('interval'), ['monthly', 'yearly'], true) ? $request->query('interval') : 'monthly',
+            'googleAuth' => $this->googleAuth($settings, $request),
         ]);
     }
 
@@ -43,7 +45,7 @@ class RegisteredUserController extends Controller
             'interval' => ['nullable', 'in:monthly,yearly'],
         ]);
         if (filled($data['plan'] ?? null) && ! $plans->query()->where('slug', $data['plan'])->exists()) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['plan' => 'The selected plan is not available for registration.']);
+            throw ValidationException::withMessages(['plan' => 'The selected plan is not available for registration.']);
         }
 
         $verificationRequired = filter_var($settings->get('registration', 'email_verification_required', true), FILTER_VALIDATE_BOOL);
@@ -54,6 +56,7 @@ class RegisteredUserController extends Controller
                 'email_verified_at' => $verificationRequired ? null : now(),
             ]);
             $account = $accounts->createWithOwner($user, ['name' => $data['account_name'], 'timezone' => $data['timezone'] ?? 'UTC']);
+
             return [$user, $account];
         });
 
@@ -77,5 +80,13 @@ class RegisteredUserController extends Controller
         $value = $settings->get('registration', 'enabled', $legacyMode === null || $legacyMode === 'enabled');
 
         return filter_var($value, FILTER_VALIDATE_BOOL);
+    }
+
+    private function googleAuth(PlatformSettingsService $settings, Request $request): array
+    {
+        $enabled = filter_var($settings->get('customer_portal', 'google_login_enabled', false), FILTER_VALIDATE_BOOL);
+        $configured = filled(config('services.google.client_id')) && filled(config('services.google.client_secret')) && filled(config('services.google.redirect'));
+
+        return ['enabled' => $enabled && $configured, 'configured' => $configured, 'url' => route('portal.oauth.google.redirect', ['intent' => 'register', 'plan' => $request->query('plan'), 'interval' => $request->query('interval')])];
     }
 }

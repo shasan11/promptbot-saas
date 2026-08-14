@@ -403,6 +403,10 @@ class SettingsController extends Controller
                 'description' => 'Control customer-facing account, service, billing, member, and support capabilities.',
                 'fields' => [
                     'enabled' => ['label' => 'Customer portal', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
+                    'google_login_enabled' => ['label' => 'Google customer login', 'type' => 'checkbox', 'help' => 'Shows Google sign-in after the credentials below are configured.', 'rules' => ['sometimes', 'boolean']],
+                    'google_client_id' => ['label' => 'Google OAuth client ID', 'help' => 'Create a Web application credential in Google Cloud Console.', 'rules' => ['sometimes', 'nullable', 'string', 'max:1000']],
+                    'google_client_secret' => ['label' => 'Google OAuth client secret', 'type' => 'password', 'sensitive' => true, 'help' => 'Stored encrypted. Leave blank to keep the configured secret.', 'rules' => ['sometimes', 'nullable', 'string', 'max:1000']],
+                    'google_redirect_uri' => ['label' => 'Google OAuth redirect URL', 'type' => 'url', 'placeholder' => rtrim(config('app.url'), '/').'/account/oauth/google/callback', 'help' => 'Add this exact URL to the authorized redirect URIs in Google Cloud.', 'rules' => ['sometimes', 'nullable', 'url:http,https', 'max:2048']],
                     'allow_workspace_creation' => ['label' => 'Allow workspace creation', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
                     'allow_plan_changes' => ['label' => 'Allow plan changes', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],
                     'allow_cancellations' => ['label' => 'Allow cancellations', 'type' => 'checkbox', 'rules' => ['sometimes', 'boolean']],

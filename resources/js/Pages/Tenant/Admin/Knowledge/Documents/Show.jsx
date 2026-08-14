@@ -2,6 +2,7 @@ import KnowledgeShell from '@/Components/Knowledge/KnowledgeShell';
 import KnowledgeStatusBadge from '@/Components/Knowledge/KnowledgeStatusBadge';
 import ProcessingProgress from '@/Components/Knowledge/ProcessingProgress';
 import { SectionCard } from '@/Components/UI/Card';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
 import Tabs from '@/Components/UI/Tabs';
 import { Link, router } from '@inertiajs/react';
 import { AlertTriangle, Download, RefreshCw, Trash2 } from 'lucide-react';
@@ -17,6 +18,7 @@ function formatBytes(bytes) {
 
 export default function DocumentShow({ document, extractedText, chunks, versions, logs, failures, can }) {
     const [tab, setTab] = useState('preview');
+    const [deleteOpen, setDeleteOpen] = useState(false);
 
     const tabs = [
         { value: 'preview', label: 'Extracted text' },
@@ -54,11 +56,7 @@ export default function DocumentShow({ document, extractedText, chunks, versions
                     {can?.delete && (
                         <button
                             type="button"
-                            onClick={() => {
-                                if (window.confirm(`Delete "${document.title}"? It will stop being used for answers immediately.`)) {
-                                    router.delete(route('tenant.admin.knowledge.documents.destroy', document.uuid));
-                                }
-                            }}
+                            onClick={() => setDeleteOpen(true)}
                             className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                         >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -68,6 +66,9 @@ export default function DocumentShow({ document, extractedText, chunks, versions
                 </>
             )}
         >
+            <ConfirmDialog open={deleteOpen} title={`Delete ${document.title}?`} confirmLabel="Delete document" variant="danger" onCancel={() => setDeleteOpen(false)} onConfirm={() => router.delete(route('tenant.admin.knowledge.documents.destroy', document.uuid), { onFinish: () => setDeleteOpen(false) })}>
+                This document will stop being used for AI answers immediately. This action cannot be undone.
+            </ConfirmDialog>
             {document.last_error && (
                 <div className="mb-5 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4" role="alert">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\LegacyPathRedirectController;
 use App\Http\Controllers\Tenant\Admin\Administration\BusinessHourController;
 use App\Http\Controllers\Tenant\Admin\Administration\DepartmentController;
 use App\Http\Controllers\Tenant\Admin\Administration\HolidayController;
@@ -11,6 +12,8 @@ use App\Http\Controllers\Tenant\Admin\Administration\RoleController;
 use App\Http\Controllers\Tenant\Admin\Administration\TeamController;
 use App\Http\Controllers\Tenant\Admin\Administration\UserController as AdministrationUserController;
 use App\Http\Controllers\Tenant\Admin\Administration\WorkspaceSettingsController;
+use App\Http\Controllers\Tenant\Admin\Automation\AutomationController;
+use App\Http\Controllers\Tenant\Admin\Channel\ChannelController;
 use App\Http\Controllers\Tenant\Admin\Connections\ApiOperationController;
 use App\Http\Controllers\Tenant\Admin\Connections\ConnectionController;
 use App\Http\Controllers\Tenant\Admin\Connections\CredentialController;
@@ -24,31 +27,18 @@ use App\Http\Controllers\Tenant\Admin\Connections\OverviewController as Connecti
 use App\Http\Controllers\Tenant\Admin\Connections\PermissionController;
 use App\Http\Controllers\Tenant\Admin\Connections\SyncRunController;
 use App\Http\Controllers\Tenant\Admin\Connections\WebhookEventController;
-use App\Http\Controllers\Tenant\Admin\DashboardController as TenantAdminDashboardController;
-use App\Http\Controllers\LegacyPathRedirectController;
 use App\Http\Controllers\Tenant\Admin\Customer\CompanyController;
 use App\Http\Controllers\Tenant\Admin\Customer\ContactController;
+use App\Http\Controllers\Tenant\Admin\Customer\CustomerOverviewController;
 use App\Http\Controllers\Tenant\Admin\Customer\CustomerImportController;
 use App\Http\Controllers\Tenant\Admin\Customer\CustomFieldController;
 use App\Http\Controllers\Tenant\Admin\Customer\TagController;
-use App\Http\Controllers\Tenant\Admin\Channel\ChannelController;
+use App\Http\Controllers\Tenant\Admin\DashboardController as TenantAdminDashboardController;
+use App\Http\Controllers\Tenant\Admin\WorkspaceEntryController;
+use App\Http\Controllers\Tenant\Admin\Experience\ExperienceController;
+use App\Http\Controllers\Tenant\Admin\Governance\GovernanceController;
 use App\Http\Controllers\Tenant\Admin\Inbox\AttachmentController;
 use App\Http\Controllers\Tenant\Admin\Inbox\ConversationController;
-use App\Http\Controllers\Tenant\Channel\InboundEmailController;
-use App\Http\Controllers\Tenant\Widget\WebChatController;
-use App\Http\Controllers\Tenant\Widget\WidgetCorsController;
-use App\Http\Controllers\Tenant\Admin\Ticket\TicketController;
-use App\Http\Controllers\Tenant\Admin\Ticket\TicketSettingsController;
-use App\Http\Controllers\Tenant\Admin\Task\TaskController;
-use App\Http\Controllers\Tenant\Admin\Operations\OperationsController as SupportOperationsController;
-use App\Http\Controllers\Tenant\Admin\Automation\AutomationController;
-use App\Http\Controllers\Tenant\Admin\Experience\ExperienceController;
-use App\Http\Controllers\Tenant\PublicSupportController;
-use App\Http\Controllers\Tenant\Admin\Reporting\ReportingController;
-use App\Http\Controllers\Tenant\Admin\Governance\GovernanceController;
-use App\Http\Controllers\Tenant\Admin\Quality\QualityWorkforceController;
-use App\Http\Controllers\Tenant\Admin\SearchController;
-use App\Http\Controllers\Tenant\Admin\NotificationController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\CollectionController as KnowledgeCollectionController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\DocumentController as KnowledgeDocumentController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\FaqController as KnowledgeFaqController;
@@ -60,9 +50,22 @@ use App\Http\Controllers\Tenant\Admin\Knowledge\OverviewController as KnowledgeO
 use App\Http\Controllers\Tenant\Admin\Knowledge\PlaygroundController as KnowledgePlaygroundController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\SourceController as KnowledgeSourceController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\WebsiteController as KnowledgeWebsiteController;
+use App\Http\Controllers\Tenant\Admin\NotificationController;
+use App\Http\Controllers\Tenant\Admin\Operations\OperationsController as SupportOperationsController;
+use App\Http\Controllers\Tenant\Admin\ProfileController;
+use App\Http\Controllers\Tenant\Admin\Quality\QualityWorkforceController;
+use App\Http\Controllers\Tenant\Admin\Reporting\ReportingController;
+use App\Http\Controllers\Tenant\Admin\SearchController;
+use App\Http\Controllers\Tenant\Admin\Task\TaskController;
+use App\Http\Controllers\Tenant\Admin\Ticket\TicketController;
+use App\Http\Controllers\Tenant\Admin\Ticket\TicketSettingsController;
 use App\Http\Controllers\Tenant\Auth\TenantAuthenticatedSessionController;
+use App\Http\Controllers\Tenant\Channel\InboundEmailController;
 use App\Http\Controllers\Tenant\Connections\InboundWebhookController;
 use App\Http\Controllers\Tenant\InvitationAcceptController;
+use App\Http\Controllers\Tenant\PublicSupportController;
+use App\Http\Controllers\Tenant\Widget\WebChatController;
+use App\Http\Controllers\Tenant\Widget\WidgetCorsController;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -112,18 +115,26 @@ Route::middleware([
     Route::get('/help', [PublicSupportController::class, 'help'])->middleware('throttle:120,1')->name('tenant.help');
     Route::get('/forms/{slug}', [PublicSupportController::class, 'form'])->middleware('throttle:120,1')->name('tenant.forms.show');
     Route::post('/forms/{slug}', [PublicSupportController::class, 'submit'])->middleware('throttle:10,1')->name('tenant.forms.submit');
-    Route::post('/csat/{survey}/{resourceType}/{resourceId}', [PublicSupportController::class, 'csat'])->middleware(['signed','throttle:10,1'])->name('tenant.csat.submit');
+    Route::post('/csat/{survey}/{resourceType}/{resourceId}', [PublicSupportController::class, 'csat'])->middleware(['signed', 'throttle:10,1'])->name('tenant.csat.submit');
     Route::get('/portal/{token}', [PublicSupportController::class, 'portal'])->middleware('throttle:30,1')->name('tenant.portal');
 
     Route::middleware('auth:tenant')->name('tenant.admin.')->group(function (): void {
         Route::get('/dashboard', TenantAdminDashboardController::class)->name('dashboard');
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
         Route::get('/search', SearchController::class)->name('search');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::put('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
         Route::put('/notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
         Route::put('/notification-preferences', [NotificationController::class, 'preference'])->name('notifications.preferences');
 
+        Route::get('/engagement', [WorkspaceEntryController::class, 'engagement'])->name('engagement.entry');
+        Route::get('/operations-workspace', [WorkspaceEntryController::class, 'operations'])->name('operations.entry');
+        Route::get('/platform', [WorkspaceEntryController::class, 'platform'])->name('platform.entry');
+
         Route::prefix('customers')->name('customers.')->group(function (): void {
+            Route::get('/', CustomerOverviewController::class)->name('index');
             Route::post('contacts/bulk', [ContactController::class, 'bulk'])->name('contacts.bulk');
             Route::post('contacts/{contact}/restore', [ContactController::class, 'restore'])->name('contacts.restore');
             Route::resource('contacts', ContactController::class);

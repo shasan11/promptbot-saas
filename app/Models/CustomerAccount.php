@@ -17,6 +17,17 @@ class CustomerAccount extends Model
 {
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
+    public const DEFAULT_ACCOUNT_NUMBER = 'ACC-DEFAULT';
+
+    protected static function booted(): void
+    {
+        static::deleting(function (CustomerAccount $account): void {
+            if ($account->isSystemDefault()) {
+                throw new \DomainException('The system Default Account cannot be deleted.');
+            }
+        });
+    }
+
     protected $fillable = [
         'public_uuid', 'name', 'legal_name', 'account_number', 'status', 'type',
         'primary_owner_user_id', 'billing_email', 'billing_phone', 'country', 'state',
@@ -33,6 +44,12 @@ class CustomerAccount extends Model
             'suspended_at' => 'datetime',
             'closed_at' => 'datetime',
         ];
+    }
+
+    public function isSystemDefault(): bool
+    {
+        return $this->account_number === self::DEFAULT_ACCOUNT_NUMBER
+            || (bool) data_get($this->metadata, 'system_default', false);
     }
 
     public function owner(): BelongsTo

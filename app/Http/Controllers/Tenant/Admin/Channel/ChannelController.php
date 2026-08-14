@@ -51,7 +51,7 @@ class ChannelController extends Controller
     public function show(Channel $channel): Response
     {
         Gate::authorize('view', $channel); $channel->load(['team:id,name', 'defaultAssignee:id,name', 'businessHours:id,name', 'emailSettings', 'webChatWidget', 'credential:id,channel_id,provider,status,last_rotated_at']);
-        return Inertia::render('Tenant/Admin/Channels/Show', ['channel' => $channel, 'adapter' => ['available' => $this->manager->adapter($channel->type)->available(), 'capabilities' => $this->manager->adapter($channel->type)->capabilities(), 'configurationErrors' => $this->manager->adapter($channel->type)->validateConfiguration($channel)], 'embedUrl' => $channel->type === 'web_chat' ? url('/widget/promptbot.js').'?key='.$channel->webChatWidget?->public_key : null, 'inboundWebhookUrl' => $channel->type === 'email' ? route('tenant.channels.email.inbound', $channel) : null]);
+        return Inertia::render('Tenant/Admin/Channels/Show', ['channel' => $channel, 'adapter' => ['available' => $this->manager->adapter($channel->type)->available(), 'capabilities' => $this->manager->adapter($channel->type)->capabilities(), 'configurationErrors' => $this->manager->adapter($channel->type)->validateConfiguration($channel)], 'embedUrl' => $channel->type === 'web_chat' && $channel->status === 'active' && $channel->webChatWidget?->active ? url('/widget/promptbot.js').'?key='.$channel->webChatWidget->public_key : null, 'inboundWebhookUrl' => $channel->type === 'email' ? route('tenant.channels.email.inbound', $channel) : null]);
     }
 
     public function edit(Channel $channel): Response

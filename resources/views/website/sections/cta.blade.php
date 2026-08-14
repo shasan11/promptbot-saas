@@ -1,12 +1,1 @@
-<section class="border-t border-slate-200 bg-navy-900">
-    <div class="mx-auto max-w-4xl px-6 py-16 text-center sm:py-20">
-        @if(!empty($content['heading']))
-            <h2 class="text-3xl font-bold text-white">{{ $content['heading'] }}</h2>
-        @endif
-        @if(!empty($content['description']))<p class="mx-auto mt-3 max-w-2xl text-slate-300">{{ $content['description'] }}</p>@endif
-        <div class="mt-8 flex flex-wrap justify-center gap-3">
-            @if(!empty($content['primary_label']) && !empty($content['primary_url']))<a href="{{ $content['primary_url'] }}" class="rounded-md bg-brand-500 px-6 py-3 text-sm font-bold text-white">{{ $content['primary_label'] }}</a>@endif
-            @if(!empty($content['secondary_label']) && !empty($content['secondary_url']))<a href="{{ $content['secondary_url'] }}" class="rounded-md border border-slate-600 px-6 py-3 text-sm font-bold text-white">{{ $content['secondary_label'] }}</a>@endif
-        </div>
-    </div>
-</section>
+<section class="bg-white px-6 py-12 sm:py-16"><div class="cms-reveal cms-container relative mx-auto overflow-hidden rounded-3xl bg-slate-950 px-6 py-10 text-center text-white shadow-2xl sm:px-12 sm:py-14"><div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-500/30 blur-3xl"></div><div class="relative">@if(!empty($content['heading']))<h2 class="mx-auto max-w-3xl text-3xl font-bold tracking-tight sm:text-5xl">{{ $content['heading'] }}</h2>@endif @if(!empty($content['description']))<p class="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-300">{{ $content['description'] }}</p>@endif<div class="mt-8 flex flex-wrap justify-center gap-3">@if(!empty($content['primary_label']) && !empty($content['primary_url']))<a href="{{ $content['primary_url'] }}" class="rounded-xl bg-emerald-500 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-400">{{ $content['primary_label'] }}</a>@endif @if(!empty($content['secondary_label']) && !empty($content['secondary_url']))<a href="{{ $content['secondary_url'] }}" class="rounded-xl border border-white/20 px-6 py-3.5 text-sm font-bold text-white hover:bg-white/10">{{ $content['secondary_label'] }}</a>@endif</div></div></div></section>

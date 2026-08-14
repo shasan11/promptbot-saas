@@ -5,11 +5,13 @@ namespace App\Services\Tenancy;
 use App\Enums\Tenant\UserStatus;
 use App\Enums\TenantStatus;
 use App\Exceptions\TenancyProvisioningException;
+use App\Jobs\Tenancy\ProvisionTenantJob;
 use App\Models\Plan;
 use App\Models\ProvisioningLog;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Platform\DefaultCustomerAccountService;
 use App\Services\Platform\SubscriptionService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -28,6 +30,7 @@ class TenantProvisioningService
     public function provision(array $data): Tenant
     {
         $data = $this->validateProvisioningData($data);
+        $data['customer_account_id'] ??= app(DefaultCustomerAccountService::class)->get()->getKey();
         $slug = Str::slug($data['slug'] ?? $data['company_name']);
         $lock = Cache::lock('tenant-provision:'.$slug, (int) config('saas.locks.provisioning_ttl', 600));
 
@@ -56,6 +59,34 @@ class TenantProvisioningService
         } finally {
             optional($lock)->release();
         }
+    }
+
+    public function queueProvisioning(array $data): Tenant
+    {
+        $data = $this->validateProvisioningData($data);
+        $data['customer_account_id'] ??= app(DefaultCustomerAccountService::class)->get()->getKey();
+        $slug = Str::slug($data['slug'] ?? $data['company_name']);
+
+        $tenant = Tenant::firstOrCreate(
+            ['slug' => $slug],
+            [
+                'id' => $slug,
+                'customer_account_id' => $data['customer_account_id'],
+                'company_name' => $data['company_name'],
+                'region' => $data['region'] ?? null,
+                'plan_id' => $data['plan_id'] ?? Plan::query()->where('is_active', true)->orderBy('sort_order')->value('id'),
+                'status' => TenantStatus::Pending,
+                'provisioning_step' => 'queued',
+            ]
+        );
+
+        if ((int) $tenant->customer_account_id !== (int) $data['customer_account_id']) {
+            throw new TenancyProvisioningException('This workspace slug is already owned by another customer account.', 'validation');
+        }
+
+        ProvisionTenantJob::dispatch($data);
+
+        return $tenant->refresh();
     }
 
     public function retry(Tenant $tenant, array $data = []): Tenant

@@ -11,12 +11,17 @@ export default function Edit({ group, groups, title, description, fields, canUpd
         ...imageFields.map((f) => [f.key, null]),
         ...imageFields.map((f) => [`remove_${f.key}`, false]),
     ]);
-    const { data, setData, put, processing, errors, recentlySuccessful, isDirty } = useForm(initial);
+    const { data, setData, post, transform, processing, errors, recentlySuccessful, isDirty } = useForm(initial);
 
     const submit = (event) => {
         event.preventDefault();
         if (!canUpdate) return;
-        put(route('tenant.admin.administration.workspace.update', group), { preserveScroll: true });
+        transform((formData) => ({ ...formData, _method: 'put' }));
+        post(route('tenant.admin.administration.workspace.update', group), {
+            forceFormData: true,
+            preserveScroll: true,
+            preserveState: false,
+        });
     };
 
     return (

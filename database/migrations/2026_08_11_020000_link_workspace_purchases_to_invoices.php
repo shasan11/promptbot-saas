@@ -8,17 +8,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('workspace_purchase_requests', function (Blueprint $table): void {
-            $table->uuid('invoice_id')->nullable()->after('tenant_id')->index();
-            $table->foreign('invoice_id')->references('id')->on('invoices')->nullOnDelete();
-        });
+        if (Schema::hasTable('workspace_purchase_requests')
+            && ! Schema::hasColumn('workspace_purchase_requests', 'invoice_id')) {
+            Schema::table('workspace_purchase_requests', function (Blueprint $table): void {
+                $table->uuid('invoice_id')->nullable()->after('tenant_id')->index();
+                $table->foreign('invoice_id')->references('id')->on('invoices')->nullOnDelete();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('workspace_purchase_requests', function (Blueprint $table): void {
-            $table->dropForeign(['invoice_id']);
-            $table->dropColumn('invoice_id');
-        });
+        if (Schema::hasTable('workspace_purchase_requests')
+            && Schema::hasColumn('workspace_purchase_requests', 'invoice_id')) {
+            Schema::table('workspace_purchase_requests', function (Blueprint $table): void {
+                $table->dropForeign(['invoice_id']);
+                $table->dropColumn('invoice_id');
+            });
+        }
     }
 };

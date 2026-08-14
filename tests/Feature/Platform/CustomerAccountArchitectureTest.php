@@ -42,6 +42,28 @@ class CustomerAccountArchitectureTest extends TestCase
         $this->assertCount(3, $account->users);
     }
 
+    public function test_tenants_without_an_account_share_the_protected_default_account(): void
+    {
+        $first = Tenant::create(['id' => 'unassigned-one', 'company_name' => 'Unassigned One', 'slug' => 'unassigned-one', 'status' => 'active']);
+        $second = Tenant::create(['id' => 'unassigned-two', 'company_name' => 'Unassigned Two', 'slug' => 'unassigned-two', 'status' => 'active']);
+
+        $defaultAccount = CustomerAccount::where('account_number', CustomerAccount::DEFAULT_ACCOUNT_NUMBER)->firstOrFail();
+
+        $this->assertTrue($defaultAccount->isSystemDefault());
+        $this->assertSame($defaultAccount->id, $first->customer_account_id);
+        $this->assertSame($defaultAccount->id, $second->customer_account_id);
+        $this->assertSame(1, CustomerAccount::where('account_number', CustomerAccount::DEFAULT_ACCOUNT_NUMBER)->count());
+    }
+
+    public function test_default_account_cannot_be_deleted(): void
+    {
+        Tenant::create(['id' => 'protected-default', 'company_name' => 'Protected Default', 'slug' => 'protected-default', 'status' => 'active']);
+        $defaultAccount = CustomerAccount::where('account_number', CustomerAccount::DEFAULT_ACCOUNT_NUMBER)->firstOrFail();
+
+        $this->expectException(\DomainException::class);
+        $defaultAccount->delete();
+    }
+
     private function membership(string $role): array
     {
         $user = PortalUser::factory()->create();

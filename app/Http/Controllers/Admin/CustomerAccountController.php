@@ -114,6 +114,9 @@ class CustomerAccountController extends Controller
     public function status(Request $request, CustomerAccount $account, AuditLogService $audit): RedirectResponse
     {
         $data = $request->validate(['status' => ['required', 'in:active,trial,past_due,suspended,closed'], 'reason' => ['required', 'string', 'max:1000']]);
+        if ($account->isSystemDefault() && $data['status'] !== 'active') {
+            return back()->with('error', 'The system Default Account must remain active and cannot be closed or suspended.');
+        }
         $old = $account->status->value;
         $account->update([
             'status' => $data['status'],

@@ -40,6 +40,9 @@ return [
     'cache' => [
         'expiration_time' => DateInterval::createFromDateString('24 hours'),
         'key' => 'spatie.permission.cache',
-        'store' => 'default',
+        // The database cache repository is resolved before tenancy switches
+        // connections. A process-local store prevents central permissions
+        // from being returned during tenant authorization.
+        'store' => 'array',
     ],
 ];

@@ -17,6 +17,11 @@ class PortalUserPolicy
         return $user->can('customers.view');
     }
 
+    public function create(CentralUser $user): bool
+    {
+        return $user->can('customers.manage');
+    }
+
     public function update(CentralUser $user, PortalUser $portalUser): bool
     {
         return $user->can('customers.manage');

@@ -4,6 +4,7 @@ import ProcessingProgress from '@/Components/Knowledge/ProcessingProgress';
 import UploadZone from '@/Components/Knowledge/UploadZone';
 import Pagination from '@/Components/Superadmin/Pagination';
 import { SectionCard } from '@/Components/UI/Card';
+import Button from '@/Components/UI/Button';
 import EmptyState from '@/Components/UI/EmptyState';
 import { FilterBar } from '@/Components/UI/FilterBar';
 import FormField from '@/Components/UI/FormField';
@@ -54,14 +55,9 @@ export default function DocumentsIndex({ documents, filters, bases, statuses, la
             title="Documents"
             description="Every file and article your AI agents can draw on, with its processing state."
             actions={can?.upload && bases.length > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setUploadOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800"
-                >
-                    <Upload className="h-4 w-4" aria-hidden="true" />
+                <Button type="button" variant="brand" size="md" icon={Upload} onClick={() => setUploadOpen(true)}>
                     Upload documents
-                </button>
+                </Button>
             )}
         >
             <FilterBar className="mb-4">

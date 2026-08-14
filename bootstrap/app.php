@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureInstallerIsOpen;
 use App\Http\Middleware\EnsureTenancyIsInitialized;
 use App\Http\Middleware\EnsureTenantIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\HandleWebChatCors;
 use App\Http\Middleware\RequireTenantFeature;
 use App\Http\Middleware\ResolveActiveCustomerAccount;
 use App\Http\Middleware\TrackPortalSession;
@@ -41,6 +42,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Widget CORS is tenant-configurable and must run before Laravel's
+        // application-wide CORS allowlist handles cross-origin preflights.
+        $middleware->prepend(HandleWebChatCors::class);
+
         $middleware->validateCsrfTokens(except: [
             'widget/api/*',
             'channels/email/*/inbound',

@@ -6,13 +6,6 @@ import {
     Globe, HelpCircle, LayoutGrid, Library, ListChecks, PenLine, Settings,
 } from 'lucide-react';
 
-/**
- * Navigation shell for the Knowledge Base module.
- *
- * Items are filtered by the viewer's permissions rather than rendered disabled:
- * a link to a page that will 403 is worse than no link, and the sidebar doubles
- * as a map of what this user can actually do.
- */
 const SECTIONS = [
     {
         label: 'Knowledge',
@@ -58,7 +51,6 @@ export default function KnowledgeShell({ title, description, actions, children }
     return (
         <AuthenticatedLayout title="Knowledge base">
             <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-                {/* Narrow screens get a select rather than a squeezed sidebar. */}
                 <div className="lg:hidden">
                     <label htmlFor="knowledge-nav" className="sr-only">Knowledge navigation</label>
                     <Select

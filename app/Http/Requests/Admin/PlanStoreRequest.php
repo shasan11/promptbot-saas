@@ -6,6 +6,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class PlanStoreRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('is_public')) {
+            $this->merge(['is_public' => true]);
+        }
+    }
+
     public function authorize(): bool
     {
         return (bool) $this->user('central')?->can('plans.create');

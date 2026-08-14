@@ -16,11 +16,9 @@ const itemSchemas = {
     stats: ['value', 'label'],
     testimonials: ['quote', 'name', 'role', 'company', 'avatar_url', 'logo_url'],
     integrations: ['name', 'description', 'image_url', 'url'],
-    how_it_works: ['title', 'description'],
     faq: ['question', 'answer'],
     gallery: ['image_url', 'alt_text'],
     how_it_works: ['title', 'description'],
-    comparison_table: ['feature', 'starter', 'growth', 'scale'],
     pricing: ['name', 'description', 'monthly_price', 'annual_price', 'currency', 'url'],
 };
 const itemCollectionKeys = { how_it_works: 'steps', comparison_table: 'rows' };
@@ -64,7 +62,10 @@ function PageDetails({ page }) {
 }
 
 function ItemsField({ block, setContent }) {
-    const schema = itemSchemas[block.type];
+    const comparisonKeys = block.type === 'comparison_table'
+        ? ['feature', ...(block.content.columns || []).map(column => column.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''))]
+        : null;
+    const schema = comparisonKeys || itemSchemas[block.type];
     const collectionKey = itemCollectionKeys[block.type] || 'items';
     if (!schema || !Array.isArray(block.content[collectionKey])) return null;
     const items = block.content[collectionKey];

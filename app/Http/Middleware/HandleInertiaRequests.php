@@ -2,10 +2,12 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Setting;
-use App\Services\Platform\PlatformSettingsService;
 use App\Models\PortalNotification;
+use App\Models\WebsiteSetting;
+use App\Services\Platform\PlatformSettingsService;
+use App\Services\Tenant\TenantSettingsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -34,6 +36,9 @@ class HandleInertiaRequests extends Middleware
                 'guard' => $guard,
                 'user' => $user,
                 'permissions' => $permissions,
+                'avatarUrl' => $guard === 'tenant' && $user?->avatar_path
+                    ? '/storage/'.ltrim($user->avatar_path, '/')
+                    : null,
             ],
             'portal' => fn () => $guard === 'portal' ? [
                 'activeAccount' => $activeAccount,
@@ -51,17 +56,75 @@ class HandleInertiaRequests extends Middleware
             ] : null,
             'platform' => function (): array {
                 $settings = app(PlatformSettingsService::class);
+
                 return [
                     ...$settings->publicBranding(),
                     'maintenanceBanner' => filter_var($settings->get('maintenance', 'banner_enabled', false), FILTER_VALIDATE_BOOL)
                         ? (string) $settings->get('maintenance', 'banner_message', '') : null,
                 ];
             },
-            'tenant' => fn () => tenancy()->initialized ? [
+            'websiteTheme' => function (): array {
+                $defaults = [
+                    'primaryColor' => '#064E3B',
+                    'secondaryColor' => '#475569',
+                    'accentColor' => '#059669',
+                    'headingFont' => 'Manrope',
+                    'bodyFont' => 'Inter',
+                    'buttonRadius' => '12px',
+                    'cardRadius' => '16px',
+                ];
+                $keys = [
+                    'primary_color' => 'primaryColor',
+                    'secondary_color' => 'secondaryColor',
+                    'accent_color' => 'accentColor',
+                    'heading_font' => 'headingFont',
+                    'body_font' => 'bodyFont',
+                    'button_radius' => 'buttonRadius',
+                    'card_radius' => 'cardRadius',
+                ];
+                $stored = WebsiteSetting::on(config('tenancy.database.central_connection'))
+                    ->where('group', 'theme')
+                    ->whereIn('key', array_keys($keys))
+                    ->get();
+
+                foreach ($stored as $setting) {
+                    $value = data_get($setting->value, 'value');
+                    if ($value !== null && $value !== '') {
+                        $defaults[$keys[$setting->key]] = $value;
+                    }
+                }
+
+                return $defaults;
+            },
+            'tenant' => function () use ($user) {
+                if (! tenancy()->initialized) {
+                    return null;
+                }
+
+                $settings = app(TenantSettingsService::class);
+
+                return [
                 'id' => tenant('id'),
-                'companyName' => Setting::query()->where('key', 'general.workspace_name')->value('value')['value'] ?? tenant('company_name'),
-                'logoUrl' => Setting::query()->where('key', 'branding.logo')->value('value')['value'] ?? null,
-            ] : null,
+                'companyName' => $settings->get('general.workspace_name', tenant('company_name')),
+                'logoUrl' => $settings->get('branding.logo'),
+                'faviconUrl' => $settings->get('branding.favicon'),
+                'primaryColor' => $settings->get('branding.primary_color', '#059669'),
+                'secondaryColor' => $settings->get('branding.secondary_color', '#0F172A'),
+                'notifications' => $user ? [
+                    'unreadCount' => DB::table('notifications')
+                        ->where('notifiable_type', $user::class)
+                        ->where('notifiable_id', $user->id)
+                        ->whereNull('read_at')
+                        ->count(),
+                    'recent' => DB::table('notifications')
+                        ->where('notifiable_type', $user::class)
+                        ->where('notifiable_id', $user->id)
+                        ->latest()
+                        ->limit(6)
+                        ->get(['id', 'type', 'data', 'read_at', 'created_at']),
+                ] : ['unreadCount' => 0, 'recent' => []],
+                ];
+            },
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
                 'error' => fn () => $request->session()->get('error'),

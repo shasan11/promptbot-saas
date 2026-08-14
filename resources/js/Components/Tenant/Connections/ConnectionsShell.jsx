@@ -1,6 +1,6 @@
 import Select from '@/Components/UI/Select';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity, AlertTriangle, AppWindow, Braces, Cable, ClipboardList, Database,
     Globe2, KeyRound, PlugZap, RotateCcw, Settings, ServerCog, ShieldCheck,
@@ -41,15 +41,24 @@ const SECTIONS = [
 export default function ConnectionsShell({ title, description, actions, children }) {
     const { auth } = usePage().props;
     const can = (permission) => !permission || auth?.permissions?.includes(permission);
-    const sections = SECTIONS.map((section) => ({ ...section, items: section.items.filter((item) => can(item.permission)) })).filter((section) => section.items.length);
+    const sections = SECTIONS
+        .map((section) => ({ ...section, items: section.items.filter((item) => can(item.permission)) }))
+        .filter((section) => section.items.length);
     const flatItems = sections.flatMap((section) => section.items);
     const itemHref = (item) => (item ? route(item.route) : '');
+    const activeItem = flatItems.find((item) => route().current(item.pattern)) || flatItems[0];
 
     return (
         <AuthenticatedLayout title="Connections">
             <div className="grid gap-6 xl:grid-cols-[236px_1fr]">
                 <div className="xl:hidden">
-                    <Select value={itemHref(flatItems.find((item) => route().current(item.pattern)) || flatItems[0])} onChange={(event) => event.target.value && window.location.assign(event.target.value)} disabled={!flatItems.length}>
+                    <label htmlFor="connections-nav" className="sr-only">Connections navigation</label>
+                    <Select
+                        id="connections-nav"
+                        value={itemHref(activeItem)}
+                        onChange={(event) => event.target.value && router.visit(event.target.value)}
+                        disabled={!flatItems.length}
+                    >
                         {sections.map((section) => (
                             <optgroup key={section.label} label={section.label}>
                                 {section.items.map((item) => <option key={item.route} value={itemHref(item)}>{item.label}</option>)}
@@ -66,6 +75,7 @@ export default function ConnectionsShell({ title, description, actions, children
                                 {section.items.map((item) => {
                                     const Icon = item.icon;
                                     const isActive = route().current(item.pattern);
+
                                     return (
                                         <Link
                                             key={item.route}

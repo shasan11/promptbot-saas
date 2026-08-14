@@ -1,6 +1,7 @@
 <?php
 
 $definitions = [
+    'announcement' => ['label' => 'Announcement Bar', 'category' => 'Marketing', 'defaults' => ['message' => '', 'link_label' => '', 'link_url' => '', 'variant' => 'brand']],
     'hero' => ['label' => 'Hero', 'category' => 'Marketing', 'defaults' => ['eyebrow' => '', 'heading' => '', 'highlighted_text' => '', 'description' => '', 'primary_label' => '', 'primary_url' => '', 'secondary_label' => '', 'secondary_url' => '', 'image_url' => '', 'video_url' => '', 'alignment' => 'center', 'background' => 'light']],
     'logo_cloud' => ['label' => 'Logo Cloud', 'category' => 'Social proof', 'defaults' => ['heading' => '', 'items' => []]],
     'feature_grid' => ['label' => 'Feature Grid', 'category' => 'Features', 'defaults' => ['heading' => '', 'description' => '', 'items' => []]],
@@ -16,6 +17,7 @@ $definitions = [
     'faq' => ['label' => 'FAQ', 'category' => 'Content', 'defaults' => ['heading' => 'Frequently asked questions', 'description' => '', 'items' => []]],
     'cta' => ['label' => 'CTA', 'category' => 'Conversion', 'defaults' => ['heading' => '', 'description' => '', 'primary_label' => '', 'primary_url' => '', 'secondary_label' => '', 'secondary_url' => '', 'background' => 'brand']],
     'newsletter' => ['label' => 'Newsletter', 'category' => 'Conversion', 'defaults' => ['heading' => '', 'description' => '', 'button_label' => 'Subscribe', 'form_slug' => 'newsletter']],
+    'resources' => ['label' => 'Resources / Blog', 'category' => 'Content', 'defaults' => ['eyebrow' => 'Resources', 'heading' => '', 'description' => '', 'limit' => 3, 'button_label' => 'View all resources', 'button_url' => '/blog']],
     'contact_form' => ['label' => 'Contact Form', 'category' => 'Conversion', 'defaults' => ['heading' => '', 'description' => '', 'form_slug' => 'general-contact']],
     'video' => ['label' => 'Video', 'category' => 'Media', 'defaults' => ['heading' => '', 'url' => '', 'poster_url' => '']],
     'gallery' => ['label' => 'Gallery', 'category' => 'Media', 'defaults' => ['heading' => '', 'items' => []]],

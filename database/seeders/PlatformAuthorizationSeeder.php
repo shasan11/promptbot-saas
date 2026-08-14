@@ -3,10 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\CentralUser;
+use App\Models\NotificationTemplate;
 use App\Models\PlatformPermission;
 use App\Models\PlatformRole;
 use App\Models\PlatformSetting;
-use App\Models\NotificationTemplate;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
@@ -207,6 +207,7 @@ class PlatformAuthorizationSeeder extends Seeder
             ],
             'customer_portal' => [
                 'enabled' => true,
+                'google_login_enabled' => false,
                 'allow_workspace_creation' => true,
                 'allow_plan_changes' => true,
                 'allow_cancellations' => true,
@@ -265,6 +266,10 @@ class PlatformAuthorizationSeeder extends Seeder
             'subscription_renewal' => ['Subscription renewal for {{workspace_name}}', '<h1>Subscription renewal</h1><p>The subscription for {{workspace_name}} is approaching its renewal date.</p><p><a href="{{action_url}}">Review subscription</a></p>', ['workspace_name', 'action_url']],
             'workspace_suspended' => ['Action required for {{workspace_name}}', '<h1>Workspace suspended</h1><p>{{workspace_name}} has been suspended. Open the customer portal for details and support.</p><p><a href="{{action_url}}">View workspace</a></p>', ['workspace_name', 'action_url']],
             'support_update' => ['Update on ticket {{ticket_number}}', '<h1>Support ticket updated</h1><p>Hello {{customer_name}}, there is a new update on {{ticket_number}}.</p><p><a href="{{action_url}}">View ticket</a></p>', ['customer_name', 'ticket_number', 'action_url']],
+            'plan_changed' => ['Your plan for {{workspace_name}} changed', '<h1>Plan updated</h1><p>The subscription plan for {{workspace_name}} has been updated.</p><p><a href="{{action_url}}">Review subscription</a></p>', ['workspace_name', 'action_url']],
+            'invoice_overdue' => ['Invoice {{invoice_number}} is overdue', '<h1>Invoice overdue</h1><p>Invoice {{invoice_number}} for {{account_name}} requires attention.</p><p><a href="{{action_url}}">Review invoice</a></p>', ['invoice_number', 'account_name', 'action_url']],
+            'workspace_provisioning_failed' => ['We need your attention for {{workspace_name}}', '<h1>Workspace setup needs attention</h1><p>We could not complete setup for {{workspace_name}}. Review the service or contact support.</p><p><a href="{{action_url}}">Review workspace</a></p>', ['workspace_name', 'action_url']],
+            'member_removed' => ['Access changed for {{account_name}}', '<h1>Account access changed</h1><p>Your membership in {{account_name}} has been removed.</p>', ['account_name']],
         ];
 
         foreach ($templates as $key => [$subject, $body, $variables]) {

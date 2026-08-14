@@ -1,15 +1,10 @@
-<!doctype html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Blog · {{ $settings['site_name'] ?? config('app.name') }}</title>
+@extends('website.blog.layout')
+@section('title', 'Resources')
+@section('meta')
     @if($settings['default_description'] ?? null)<meta name="description" content="{{ $settings['default_description'] }}">@endif
-    <link rel="canonical" href="{{ rtrim($settings['canonical_base_url'] ?? url('/'), '/').'/blog' }}">
-    <meta name="robots" content="index,follow">
-    @if($settings['favicon_url'] ?? null)<link rel="icon" href="{{ $settings['favicon_url'] }}">@endif
-    @vite('resources/css/app.css')
-</head>
-<body class="bg-slate-50 text-slate-800">
-<header class="border-b bg-white"><div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4"><a href="/" class="font-bold text-slate-950">{{ $settings['site_name'] ?? config('app.name') }}</a><div class="flex gap-3 text-sm font-semibold"><a href="{{ route('portal.login') }}">Customer login</a><a href="{{ route('portal.register') }}" class="rounded-lg bg-slate-950 px-3 py-2 text-white">Start free trial</a></div></div></header>
-<main class="mx-auto max-w-5xl px-6 py-16"><h1 class="text-4xl font-bold">Latest articles</h1><div class="mt-10 grid gap-6 md:grid-cols-2">@forelse($posts as $post)<article class="rounded-2xl border bg-white p-6">@if($post->featured_image)<img src="{{ $post->featured_image }}" alt="" class="mb-5 aspect-video w-full rounded-xl object-cover">@endif<p class="text-xs text-slate-500">{{ $post->published_at?->format('M j, Y') }}</p><h2 class="mt-2 text-xl font-bold"><a href="{{ route('website.blog.show', $post->slug) }}">{{ $post->title }}</a></h2><p class="mt-3 text-sm text-slate-600">{{ $post->excerpt }}</p></article>@empty<p>No articles have been published yet.</p>@endforelse</div><div class="mt-8">{{ $posts->links() }}</div></main>
-</body></html>
+    <link rel="canonical" href="{{ rtrim($settings['canonical_base_url'] ?? url('/'), '/').'/blog' }}"><meta name="robots" content="index,follow">
+@endsection
+@section('content')
+<section class="relative overflow-hidden bg-slate-950 px-6 py-8 text-center text-white sm:py-10"><div class="pointer-events-none absolute inset-0 opacity-70" style="background-image:linear-gradient(to right,rgba(16,185,129,.10) 1px,transparent 1px),linear-gradient(to bottom,rgba(16,185,129,.10) 1px,transparent 1px),linear-gradient(to right,rgba(16,185,129,.05) 1px,transparent 1px),linear-gradient(to bottom,rgba(16,185,129,.05) 1px,transparent 1px);background-size:44px 44px,44px 44px,176px 176px,176px 176px"></div><div class="pointer-events-none absolute -right-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-emerald-300/20 blur-3xl"></div><div class="pointer-events-none absolute -left-32 bottom-0 h-80 w-80 rounded-full bg-cyan-200/20 blur-3xl"></div><div class="cms-container relative mx-auto"><div class="mx-auto max-w-4xl"><p class="text-[11px] font-extrabold uppercase tracking-[.15em] text-emerald-300">Blog</p><h1 class="mt-2 text-2xl font-bold leading-[1.08] tracking-[-.035em] sm:text-3xl lg:text-4xl">Practical ideas for clearer support operations.</h1><p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Product guidance, operational patterns, and updates from the PromptBot team.</p></div></div></section>
+<section class="bg-slate-50 py-16 sm:py-24"><div class="cms-container mx-auto px-6"><div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">@forelse($posts as $post)<article class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">@if($post->featured_image)<img src="{{ $post->featured_image }}" alt="" class="aspect-video w-full object-cover">@else<div class="flex aspect-video items-center justify-center bg-gradient-to-br from-slate-950 to-emerald-800 text-xs font-bold uppercase tracking-[.2em] text-emerald-200">PromptBot resources</div>@endif<div class="p-6"><p class="text-xs font-semibold uppercase tracking-wider text-emerald-600">{{ $post->published_at?->format('M j, Y') }}</p><h2 class="mt-3 text-xl font-bold leading-7 text-slate-950"><a href="{{ route('website.blog.show', $post->slug) }}">{{ $post->title }}</a></h2><p class="mt-3 text-sm leading-6 text-slate-600">{{ $post->excerpt }}</p><a href="{{ route('website.blog.show', $post->slug) }}" class="mt-5 inline-block text-sm font-bold text-emerald-700">Read article →</a></div></article>@empty<div class="col-span-full rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><h2 class="text-xl font-bold text-slate-950">Resources are on the way</h2><p class="mt-2 text-slate-500">Published articles will appear here.</p></div>@endforelse</div><div class="mt-10">{{ $posts->links() }}</div></div></section>
+@endsection

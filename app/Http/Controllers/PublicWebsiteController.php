@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\WebsiteFooterLink;
-use App\Models\WebsiteNavigationItem;
-use App\Models\WebsitePage;
-use App\Models\WebsiteSetting;
-use App\Models\WebsiteRedirect;
 use App\Models\BlogPost;
+use App\Models\Domain;
+use App\Models\WebsiteFooterLink;
 use App\Models\WebsiteForm;
 use App\Models\WebsiteFormSubmission;
-use App\Models\Domain;
+use App\Models\WebsiteNavigationItem;
+use App\Models\WebsitePage;
+use App\Models\WebsiteRedirect;
+use App\Models\WebsiteSetting;
 use App\Services\Platform\PublicPlanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +25,9 @@ class PublicWebsiteController extends Controller
     public function home(Request $request)
     {
         $host = strtolower($request->getHost());
-        if (in_array($host, config('tenancy.central_domains', []), true)) return $this->show($request);
+        if (in_array($host, config('tenancy.central_domains', []), true)) {
+            return $this->show($request);
+        }
         abort_unless(Domain::where('domain', $host)->exists(), 404);
 
         return redirect('/dashboard');
@@ -44,6 +46,7 @@ class PublicWebsiteController extends Controller
         $redirect = WebsiteRedirect::where('from_path', $path)->where('is_active', true)->first();
         if ($redirect && $redirect->to_url !== $path) {
             $redirect->increment('hit_count');
+
             return redirect()->to($redirect->to_url, $redirect->status_code);
         }
 
@@ -69,6 +72,7 @@ class PublicWebsiteController extends Controller
     public function preview(WebsitePage $page)
     {
         $page->load(['sections' => fn ($query) => $query->where('is_hidden', false)]);
+
         return $this->render($page, true);
     }
 
@@ -76,6 +80,7 @@ class PublicWebsiteController extends Controller
     {
         $pages = WebsitePage::where('status', 'published')->where('robots_index', true)->orderBy('slug')->get(['slug', 'updated_at']);
         $posts = BlogPost::where('status', 'published')->where('published_at', '<=', now())->where('robots_index', true)->get(['slug', 'updated_at']);
+
         return response(view('website.sitemap', ['pages' => $pages, 'posts' => $posts])->render(), 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
     }
 
@@ -83,14 +88,15 @@ class PublicWebsiteController extends Controller
     {
         return view('website.blog.index', [
             'posts' => BlogPost::where('status', 'published')->where('published_at', '<=', now())->latest('published_at')->paginate(12),
-            'settings' => $this->websiteSettings(),
+            ...$this->websiteChrome(),
         ]);
     }
 
     public function post(string $slug)
     {
         $post = BlogPost::with(['author', 'categories', 'tags'])->where('slug', $slug)->where('status', 'published')->where('published_at', '<=', now())->firstOrFail();
-        return view('website.blog.show', ['post' => $post, 'settings' => $this->websiteSettings()]);
+
+        return view('website.blog.show', ['post' => $post, ...$this->websiteChrome()]);
     }
 
     public function submitForm(Request $request, WebsiteForm $form): RedirectResponse
@@ -98,7 +104,10 @@ class PublicWebsiteController extends Controller
         abort_unless($form->is_active, 404);
         $allowed = collect($form->fields)->pluck('name')->filter()->all();
         $rules = collect($form->fields)->mapWithKeys(function (array $field): array {
-            $type = match ($field['type'] ?? 'text') { 'email' => 'email', 'tel' => 'string', 'textarea' => 'string', default => 'string' };
+            $type = match ($field['type'] ?? 'text') {
+                'email' => 'email', 'tel' => 'string', 'textarea' => 'string', default => 'string'
+            };
+
             return [($field['name'] ?? '_invalid') => [($field['required'] ?? false) ? 'required' : 'nullable', $type, 'max:5000']];
         })->all();
         $rules['_website'] = ['nullable', 'string', 'max:0'];
@@ -112,6 +121,7 @@ class PublicWebsiteController extends Controller
             'referrer' => str($request->headers->get('referer'))->limit(2048),
             'ip_hash' => hash_hmac('sha256', (string) $request->ip(), config('app.key')),
         ]);
+
         return back()->with('status', 'Thanks — your message has been received.');
     }
 
@@ -119,6 +129,7 @@ class PublicWebsiteController extends Controller
     {
         $rules = WebsiteSetting::where('group', 'seo')->where('key', 'robots_content')->value('value');
         $content = data_get($rules, 'value', "User-agent: *\nAllow: /\nDisallow: /account/\nDisallow: /superadmin/\nSitemap: ".url('/sitemap.xml'));
+
         return response($content."\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
@@ -132,6 +143,7 @@ class PublicWebsiteController extends Controller
             'footerLinks' => WebsiteFooterLink::query()->orderBy('sort_order')->get()->groupBy(fn (WebsiteFooterLink $link) => $link->group ?: 'General'),
             'settings' => $settings,
             'publicPlans' => $this->publicPlans->query()->orderBy('sort_order')->get(),
+            'publishedPosts' => BlogPost::query()->where('status', 'published')->where('published_at', '<=', now())->latest('published_at')->limit(6)->get(),
             'preview' => $preview,
         ]);
     }
@@ -156,5 +168,14 @@ class PublicWebsiteController extends Controller
             ->all();
 
         return [...$defaults, ...array_filter($stored, fn ($value) => $value !== null && $value !== '')];
+    }
+
+    private function websiteChrome(): array
+    {
+        return [
+            'settings' => $this->websiteSettings(),
+            'navigation' => WebsiteNavigationItem::query()->where('is_active', true)->orderBy('sort_order')->get(),
+            'footerLinks' => WebsiteFooterLink::query()->orderBy('sort_order')->get()->groupBy(fn (WebsiteFooterLink $link) => $link->group ?: 'General'),
+        ];
     }
 }

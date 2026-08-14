@@ -4,7 +4,7 @@ The public website is database-driven and editable from Superadmin → Website &
 
 ## Editing workflow
 
-The block registry in `config/cms.php` is the source of truth for the editor and renderer. It includes hero, logo cloud, feature variants, image/text, stats, testimonials, live or manual pricing, comparison tables, integrations, how-it-works, FAQ, CTA, newsletter, contact forms, video, gallery, rich text, spacers, and restricted custom HTML. Editors can add, drag, move, duplicate, hide, and remove blocks without editing raw section JSON.
+The block registry in `config/cms.php` is the source of truth for the editor and renderer. It includes announcement bars, hero, logo cloud, feature variants, image/text, stats, testimonials, live or manual pricing, comparison tables, integrations, how-it-works, FAQ, CTA, newsletter, published blog resources, contact forms, video, gallery, rich text, spacers, and restricted custom HTML. Editors can add, drag, move, duplicate, hide, and remove blocks without editing raw section JSON. The resources block reads existing published `BlogPost` records and hides itself when no published posts exist.
 
 Pages support draft, published, and scheduled states. Saving captures a revision. A revision can be restored, which also captures the pre-restore state. Preview URLs are signed, expire, and can render drafts; an obvious preview banner prevents confusion with production.
 
@@ -12,7 +12,9 @@ Blog articles support draft/published/scheduled workflow, sanitized HTML, author
 
 The form builder creates a validated field schema using text, email, phone, and textarea controls with required flags. Forms can be activated or disabled. Public submissions accept only declared fields and store attribution, a keyed IP hash, lifecycle status, and private operator notes. Leads move through New, Contacted, Qualified, Won, Lost, or Spam and export to formula-injection-safe CSV. Seed data includes General Contact, Contact Sales, Request Demo, and Newsletter forms.
 
-The starter seeder creates a polished, fully editable home page with hero, feature, image/text, how-it-works, pricing, testimonial, FAQ, CTA, and contact blocks. Pricing defaults to active public plans, supports an annual/monthly toggle, and carries plan and interval into customer registration; editors can deliberately choose manual cards instead.
+The starter seeder creates a polished, fully editable home page covering the support problem, verified product capabilities, unified inbox, accountable work, deterministic automation, multi-workspace accounts, customer portal, deployment control, security, use cases, live pricing, FAQ, resources, and conversion CTAs. It also creates starter Features, Pricing, About, Contact, Security, Privacy, and Terms pages plus managed navigation/footer records. Legal pages are administrative starters and must be reviewed for the deployment. The seeder creates sections only when a page has none, so reruns do not duplicate content and never replace an edited homepage. Pricing defaults to active public plans, supports an annual/monthly toggle, and carries plan and interval into customer registration; editors can deliberately choose manual cards instead.
+
+Brand logos resolve in this order: Website & CMS logo settings, bundled `/branding/dark_logo.png` or `/branding/white_logo.png` appropriate to the background, then a textual site-name fallback. Uploaded administrator branding is never overwritten by the seeder.
 
 Navigation supports separate Header, Mobile, and Footer groups, internal pages, safe external links, dropdown parents, buttons, new-tab behavior, active state, and drag ordering. Footer links are grouped and draggable. Theme settings cover logos, favicon, palette, heading/body fonts, button/card radii, container width, footer copy, social links, and copyright.
 

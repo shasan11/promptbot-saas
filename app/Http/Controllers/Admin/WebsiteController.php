@@ -81,7 +81,17 @@ class WebsiteController extends Controller
             'robots_content' => ['nullable', 'string', 'max:5000'], 'google_verification' => ['nullable', 'string', 'max:255'],
             'bing_verification' => ['nullable', 'string', 'max:255'], 'google_analytics_id' => ['nullable', 'regex:/^G-[A-Z0-9]+$/'],
             'google_tag_manager_id' => ['nullable', 'regex:/^GTM-[A-Z0-9]+$/'], 'meta_pixel_id' => ['nullable', 'digits_between:5,30'],
+            'logo_file' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'logo_dark_file' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'favicon_file' => ['nullable', 'file', 'mimes:png,ico,webp', 'max:512'],
         ]);
+
+        $uploads = collect([
+            'logo_file' => ['setting' => 'logo_url', 'group' => 'general'],
+            'logo_dark_file' => ['setting' => 'logo_dark_url', 'group' => 'theme'],
+            'favicon_file' => ['setting' => 'favicon_url', 'group' => 'theme'],
+        ])->filter(fn (array $definition, string $key) => $request->hasFile($key));
+        $validated = collect($validated)->except(['logo_file', 'logo_dark_file', 'favicon_file'])->all();
 
         foreach ($validated as $key => $value) {
             $group = in_array($key, ['primary_color', 'secondary_color', 'accent_color', 'logo_dark_url', 'favicon_url', 'heading_font', 'body_font', 'button_radius', 'card_radius', 'container_width'], true) ? 'theme'
@@ -90,6 +100,16 @@ class WebsiteController extends Controller
                 ['group' => $group, 'key' => $key],
                 ['value' => ['value' => $value]]
             );
+        }
+
+        foreach ($uploads as $fileKey => $definition) {
+            $path = $request->file($fileKey)->store('website/branding', 'public');
+            $url = Storage::disk('public')->url($path);
+            WebsiteSetting::updateOrCreate(
+                ['group' => $definition['group'], 'key' => $definition['setting']],
+                ['value' => ['value' => $url]],
+            );
+            $validated[$definition['setting']] = $url;
         }
 
         $auditLog->record('website_settings.updated', null, ['entity_type' => 'WebsiteSetting', 'new_values' => $validated]);
@@ -411,6 +431,14 @@ class WebsiteController extends Controller
 
     private function validateNavigation(Request $request, ?WebsiteNavigationItem $item = null): array
     {
+        $request->merge([
+            'type' => $request->input('type', $item?->type ?? 'external'),
+            'menu_group' => $request->input('menu_group', $item?->menu_group ?? 'header'),
+            'open_new_tab' => $request->boolean('open_new_tab', $item?->open_new_tab ?? false),
+            'is_active' => $request->boolean('is_active', $item?->is_active ?? true),
+            'style' => $request->input('style', $item?->style ?? 'link'),
+        ]);
+
         $data = $request->validate([
             'label' => ['required', 'string', 'max:100'],
             'type' => ['required', Rule::in(['internal', 'external', 'dropdown', 'button'])],

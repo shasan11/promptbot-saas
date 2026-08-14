@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\PortalLoginActivity;
 use App\Models\PortalUser;
+use App\Services\Platform\PortalAuthenticationService;
 use App\Services\Platform\TotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,11 +18,14 @@ class TwoFactorChallengeController extends Controller
 {
     public function create(Request $request): Response|RedirectResponse
     {
-        if (! $request->session()->has('portal.two_factor_user_id')) return redirect()->route('portal.login');
+        if (! $request->session()->has('portal.two_factor_user_id')) {
+            return redirect()->route('portal.login');
+        }
+
         return Inertia::render('Portal/Auth/TwoFactorChallenge');
     }
 
-    public function store(Request $request, TotpService $totp): RedirectResponse
+    public function store(Request $request, TotpService $totp, PortalAuthenticationService $authentication): RedirectResponse
     {
         $data = $request->validate(['code' => ['required', 'string', 'max:20']]);
         $user = PortalUser::findOrFail($request->session()->get('portal.two_factor_user_id'));
@@ -31,7 +35,8 @@ class TwoFactorChallengeController extends Controller
         $recoveryIndex = array_search($recoveryHash, $recovery, true);
 
         if (! $validTotp && $recoveryIndex === false) {
-            PortalLoginActivity::create(['portal_user_id' => $user->id, 'email' => $user->email, 'event' => 'login.two_factor_failed', 'successful' => false, 'ip_address' => $request->ip(), 'user_agent' => str($request->userAgent())->limit(1000), 'created_at' => now()]);
+            $provider = data_get($request->session()->get('portal.two_factor_metadata', []), 'provider', 'password');
+            PortalLoginActivity::create(['portal_user_id' => $user->id, 'email' => $user->email, 'event' => 'login.two_factor_failed', 'successful' => false, 'ip_address' => $request->ip(), 'user_agent' => str($request->userAgent())->limit(1000), 'metadata' => ['provider' => $provider], 'created_at' => now()]);
             throw ValidationException::withMessages(['code' => 'The authentication code is invalid.']);
         }
         if ($recoveryIndex !== false) {
@@ -43,9 +48,12 @@ class TwoFactorChallengeController extends Controller
         $request->session()->forget('portal.two_factor_user_id');
         Auth::guard('portal')->login($user, $remember);
         $request->session()->regenerate();
-        $user->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();
-        PortalLoginActivity::create(['portal_user_id' => $user->id, 'email' => $user->email, 'event' => 'login.succeeded', 'successful' => true, 'ip_address' => $request->ip(), 'user_agent' => str($request->userAgent())->limit(1000), 'metadata' => ['two_factor' => true, 'recovery_code' => $recoveryIndex !== false], 'created_at' => now()]);
+        $oauthMetadata = $request->session()->pull('portal.two_factor_metadata', []);
+        $provider = $oauthMetadata['provider'] ?? 'password';
+        $authentication->recordSuccess($request, $user, $provider, ['two_factor' => true, 'recovery_code' => $recoveryIndex !== false]);
 
-        return redirect()->intended(route('portal.dashboard', absolute: false));
+        $destination = $request->session()->pull('portal.post_auth_redirect');
+
+        return $destination ? redirect()->to($destination) : redirect()->intended(route('portal.dashboard', absolute: false));
     }
 }

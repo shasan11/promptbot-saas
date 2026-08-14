@@ -134,4 +134,21 @@ class SettingsControllerTest extends TestCase
         ));
         Storage::disk('public')->assertMissing($path);
     }
+
+    public function test_admin_can_configure_google_customer_login_credentials(): void
+    {
+        $this->actingAs($this->centralAdminWithPermissions(['settings.update']), 'central')
+            ->put(route('superadmin.system.settings.update', 'customer_portal'), [
+                'google_login_enabled' => true,
+                'google_client_id' => 'google-client-id.apps.exampleusercontent.com',
+                'google_client_secret' => 'encrypted-google-secret',
+                'google_redirect_uri' => 'https://app.example.test/account/oauth/google/callback',
+            ])->assertRedirect();
+
+        $secret = PlatformSetting::where('group', 'customer_portal')->where('key', 'google_client_secret')->firstOrFail();
+        $this->assertTrue($secret->is_sensitive);
+        $this->assertSame('encrypted-google-secret', data_get($secret->value, 'value'));
+        $this->assertSame('google-client-id.apps.exampleusercontent.com', config('services.google.client_id'));
+        $this->assertSame('https://app.example.test/account/oauth/google/callback', config('services.google.redirect'));
+    }
 }

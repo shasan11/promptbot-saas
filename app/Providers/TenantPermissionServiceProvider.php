@@ -60,14 +60,10 @@ class TenantPermissionServiceProvider extends ServiceProvider
         $registrar->setRoleClass(TenantRole::class);
         $registrar->setPermissionClass(TenantPermission::class);
 
-        // In-memory only — forgetCachedPermissions() would hit the configured
-        // cache store's backing table, which doesn't exist yet on a tenant
-        // database that's mid-migration (e.g. during initial provisioning).
-        // Each tenant has its own physically isolated cache table, so simply
-        // not touching the persisted cache here is safe: it either doesn't
-        // exist yet (fresh tenant) or already holds this same tenant's own
-        // valid data (existing tenant), never another tenant's.
-        $registrar->clearPermissionsCollection();
+        // Permission caching uses the array store. Flush both the registrar
+        // collection and its process-local cache so central permissions can
+        // never survive into a tenant authorization check.
+        $registrar->forgetCachedPermissions();
     }
 
     private function useCentralModels(): void
@@ -78,10 +74,8 @@ class TenantPermissionServiceProvider extends ServiceProvider
         $registrar->setRoleClass(PlatformRole::class);
         $registrar->setPermissionClass(PlatformPermission::class);
 
-        // The cache store may be database-backed and the tenant connection is
-        // already being torn down by the time TenancyEnded fires, so clearing
-        // the in-memory cache is enough here — the next central request will
-        // rebuild the Spatie cache against the central connection naturally.
-        $registrar->clearPermissionsCollection();
+        // Remove the tenant catalog before the next central request rebuilds
+        // permissions using the central models and tables above.
+        $registrar->forgetCachedPermissions();
     }
 }

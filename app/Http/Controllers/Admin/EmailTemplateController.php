@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\NotificationTemplate;
+use App\Models\PortalUser;
+use App\Mail\BulkPlatformMail;
 use App\Services\Platform\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +68,45 @@ class EmailTemplateController extends Controller
 
             return back()->with('error', 'Test delivery failed. Check the mail configuration and application logs.');
         }
+    }
+
+    public function bulk(Request $request, AuditLogService $audit): RedirectResponse
+    {
+        $validated = $request->validate([
+            'audience' => ['required', 'in:active,all,custom'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:100000'],
+            'recipients' => ['nullable', 'required_if:audience,custom', 'string', 'max:100000'],
+        ]);
+
+        if ($validated['audience'] === 'custom') {
+            $emails = collect(preg_split('/[\s,;]+/', $validated['recipients'] ?? '', -1, PREG_SPLIT_NO_EMPTY))
+                ->map(fn (string $email) => strtolower(trim($email)))
+                ->unique()
+                ->values();
+            abort_if($emails->count() > 5000, 422, 'A bulk send is limited to 5,000 recipients at a time.');
+            $invalid = $emails->first(fn (string $email) => ! filter_var($email, FILTER_VALIDATE_EMAIL));
+            if ($invalid) {
+                return back()->withErrors(['recipients' => "{$invalid} is not a valid email address."]);
+            }
+        } else {
+            $query = PortalUser::query()->select('email')->whereNotNull('email');
+            if ($validated['audience'] === 'active') {
+                $query->where('status', 'active');
+            }
+            $emails = $query->distinct()->pluck('email')->map(fn (string $email) => strtolower($email));
+        }
+
+        foreach ($emails as $email) {
+            Mail::to($email)->queue(new BulkPlatformMail($validated['subject'], $validated['body']));
+        }
+
+        $audit->record('bulk_email.queued', null, [
+            'entity_type' => 'PortalUser',
+            'new_values' => ['audience' => $validated['audience'], 'recipient_count' => $emails->count(), 'subject' => $validated['subject']],
+        ]);
+
+        return back()->with('status', number_format($emails->count()).' email'.($emails->count() === 1 ? '' : 's').' queued for delivery.');
     }
 
     private function render(string $content, array $values): string

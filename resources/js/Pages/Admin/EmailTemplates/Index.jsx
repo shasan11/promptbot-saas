@@ -2,6 +2,7 @@ import PageHeader from '@/Components/Superadmin/PageHeader';
 import { SectionCard } from '@/Components/UI/Card';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
+import { MailPlus, Send } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 const replaceVariables = (value, samples) => Object.entries(samples).reduce(
@@ -51,5 +52,19 @@ function TemplateEditor({ template, samples }) {
 }
 
 export default function Index({ templates, sampleValues }) {
-    return <AuthenticatedLayout header={<PageHeader title="Email templates" subtitle="Edit, preview, activate, and test customer lifecycle email content." />}><Head title="Email templates" /><div className="space-y-5">{templates.map(template => <TemplateEditor key={template.id} template={template} samples={sampleValues} />)}</div></AuthenticatedLayout>;
+    const bulk = useForm({ audience: 'active', subject: '', body: '<h1>Hello from {{platform_name}}</h1><p>Write your announcement here.</p>', recipients: '' });
+    const [showBulk, setShowBulk] = useState(false);
+    return <AuthenticatedLayout header={<PageHeader title="Email templates" subtitle="Manage lifecycle messages, previews, tests, and queued customer announcements." actions={<button onClick={() => setShowBulk(value => !value)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"><MailPlus className="h-4 w-4" />{showBulk ? 'Close composer' : 'Compose bulk email'}</button>} />}><Head title="Email templates" /><div className="space-y-5">
+        {showBulk && <SectionCard title="Bulk email composer" description="Messages are queued individually so normal mail delivery and retry handling still apply.">
+            <form onSubmit={event => { event.preventDefault(); bulk.post(route('superadmin.communications.bulk-email.store'), { preserveScroll: true, onSuccess: () => bulk.reset() }); }} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-[220px_1fr]"><label className="text-sm font-medium text-slate-700">Audience<select value={bulk.data.audience} onChange={event => bulk.setData('audience',event.target.value)} className="mt-1.5 w-full rounded-lg border-slate-300"><option value="active">All active portal users</option><option value="all">All portal users</option><option value="custom">Custom email list</option></select></label><label className="text-sm font-medium text-slate-700">Subject<input value={bulk.data.subject} onChange={event => bulk.setData('subject',event.target.value)} required className="mt-1.5 w-full rounded-lg border-slate-300" /></label></div>
+                {bulk.data.audience === 'custom' && <label className="block text-sm font-medium text-slate-700">Recipients<textarea value={bulk.data.recipients} onChange={event => bulk.setData('recipients',event.target.value)} rows="3" placeholder="one@example.com, two@example.com" className="mt-1.5 w-full rounded-lg border-slate-300 text-sm" />{bulk.errors.recipients && <span className="mt-1 block text-xs text-rose-600">{bulk.errors.recipients}</span>}</label>}
+                <label className="block text-sm font-medium text-slate-700">HTML message<textarea value={bulk.data.body} onChange={event => bulk.setData('body',event.target.value)} required rows="10" className="mt-1.5 w-full rounded-lg border-slate-300 font-mono text-sm" /></label>
+                {Object.entries(bulk.errors).filter(([key]) => key !== 'recipients').map(([key,error]) => <p key={key} className="text-sm text-rose-600">{error}</p>)}
+                <div className="flex justify-end"><button disabled={bulk.processing} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" />{bulk.processing ? 'Queuing…' : 'Queue bulk email'}</button></div>
+            </form>
+        </SectionCard>}
+        <div className="rounded-xl border border-slate-200 bg-white px-5 py-4"><p className="text-sm font-semibold text-slate-900">{templates.length} lifecycle templates</p><p className="mt-1 text-xs text-slate-500">Each template supports variables, a safe preview, activation status, and test delivery.</p></div>
+        {templates.map(template => <TemplateEditor key={template.id} template={template} samples={sampleValues} />)}
+    </div></AuthenticatedLayout>;
 }

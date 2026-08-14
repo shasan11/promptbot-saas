@@ -3,7 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\CentralUser;
+use App\Models\WebsiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\InteractsWithPlatformPermissions;
 use Tests\TestCase;
 
@@ -16,6 +18,19 @@ class AuthenticationTest extends TestCase
         $response = $this->get('/superadmin/login');
 
         $response->assertStatus(200);
+    }
+
+    public function test_login_screen_receives_the_saved_website_theme(): void
+    {
+        WebsiteSetting::create(['group' => 'theme', 'key' => 'primary_color', 'value' => ['value' => '#123456']]);
+        WebsiteSetting::create(['group' => 'theme', 'key' => 'accent_color', 'value' => ['value' => '#ABCDEF']]);
+        WebsiteSetting::create(['group' => 'theme', 'key' => 'button_radius', 'value' => ['value' => '9999px']]);
+
+        $this->get('/superadmin/login')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('websiteTheme.primaryColor', '#123456')
+            ->where('websiteTheme.accentColor', '#ABCDEF')
+            ->where('websiteTheme.buttonRadius', '9999px')
+        );
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void

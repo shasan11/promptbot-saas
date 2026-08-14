@@ -42,9 +42,9 @@ export default function Overview({ metrics, healthSummary, recentActivity, issue
                 <Metric label="Last successful sync" value={metrics.lastSuccessfulSync ? new Date(metrics.lastSuccessfulSync).toLocaleString() : 'None'} />
             </div>
 
-            <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.2fr]">
+            <div className="mt-6 space-y-6">
                 <SectionCard title="Connection health">
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         {healthSummary.map((item) => (
                             <Link key={item.status} href={route('tenant.admin.connections.index', { health_status: item.status })} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
                                 <HealthBadge value={item.status} />

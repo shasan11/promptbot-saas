@@ -3,6 +3,7 @@
 namespace Tests\Feature\Http\Controllers\Admin;
 
 use App\Models\NotificationTemplate;
+use App\Mail\BulkPlatformMail;
 use App\Models\PortalUser;
 use App\Notifications\Portal\VerifyEmailNotification;
 use Database\Seeders\PlatformAuthorizationSeeder;
@@ -66,5 +67,22 @@ class EmailTemplateControllerTest extends TestCase
 
         $this->assertSame('Verify for Alex &amp; Co', $message->subject);
         $this->assertSame('mail.platform-template', $message->view);
+    }
+
+    public function test_admin_can_queue_a_bulk_email_to_active_portal_users(): void
+    {
+        Mail::fake();
+        PortalUser::factory()->count(2)->create(['status' => 'active']);
+        PortalUser::factory()->create(['status' => 'suspended']);
+
+        $this->actingAs($this->centralAdminWithPermissions(['communications.manage']), 'central')
+            ->post(route('superadmin.communications.bulk-email.store'), [
+                'audience' => 'active',
+                'subject' => 'Platform update',
+                'body' => '<p>A useful customer update.</p>',
+            ])->assertRedirect();
+
+        Mail::assertQueued(BulkPlatformMail::class, 2);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'bulk_email.queued']);
     }
 }
