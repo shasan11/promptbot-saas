@@ -229,8 +229,8 @@ Route::middleware(['central.domain', 'auth:central', 'central.active', 'central.
         Route::get('/', AIOverviewController::class)->name('overview')->middleware('permission:ai.view');
 
         Route::resource('providers', AIProviderController::class)
-            ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
-            ->middlewareFor(['index', 'create', 'edit'], 'permission:ai.providers.view')
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->middlewareFor(['index'], 'permission:ai.providers.view')
             ->middlewareFor(['store', 'update', 'destroy'], 'permission:ai.providers.manage');
         Route::post('providers/{provider}/test', [AIProviderController::class, 'test'])->name('providers.test')->middleware('permission:ai.providers.manage');
         Route::post('providers/{provider}/toggle', [AIProviderController::class, 'toggle'])->name('providers.toggle')->middleware('permission:ai.providers.manage');

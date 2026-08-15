@@ -153,6 +153,15 @@ return [
                 'dimensions' => null,
                 'cost_per_million_tokens' => null,
             ],
+            // Delegates to a provider the tenant configured themselves in
+            // their own AI workspace (Neuron-backed), independent of whether
+            // the platform owner has allowed tenant AI on the central module.
+            'tenant_ai' => [
+                'driver' => 'tenant_ai',
+                'model' => 'tenant-provider-default',
+                'dimensions' => (int) env('KNOWLEDGE_AI_EMBEDDING_DIMENSIONS', 1024),
+                'cost_per_million_tokens' => null,
+            ],
         ],
     ],
 

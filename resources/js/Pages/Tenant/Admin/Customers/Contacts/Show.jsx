@@ -5,7 +5,7 @@ import Button from '@/Components/UI/Button';
 import { Card, SectionCard } from '@/Components/UI/Card';
 import ConfirmDialog from '@/Components/UI/ConfirmDialog';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Archive, Building2, CalendarDays, Clock3, Globe2, Languages, Mail, MapPin, Pencil, Phone, Tag, UserRound } from 'lucide-react';
+import { Archive, Building2, CalendarDays, Clock3, Globe2, Languages, Mail, MapPin, Pencil, Phone, Sparkles, Tag, UserRound } from 'lucide-react';
 import { useState } from 'react';
 
 const tones = { active: 'brand', vip: 'warning', blocked: 'danger', inactive: 'neutral' };
@@ -19,10 +19,11 @@ function DetailRow({ icon: Icon, label, children }) {
     return <div className="flex gap-3 py-3 first:pt-0 last:pb-0"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0"><dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-0.5 break-words text-sm font-medium text-slate-700">{children}</dd></div></div>;
 }
 
-export default function Show({ contact }) {
+export default function Show({ contact, ai }) {
     const permissions = usePage().props.auth?.permissions || [];
     const [archiveOpen, setArchiveOpen] = useState(false);
     const archive = () => router.delete(route('tenant.admin.customers.contacts.destroy', contact.public_uuid), { onFinish: () => setArchiveOpen(false) });
+    const generateBrief = () => router.post(route('tenant.admin.customers.contacts.ai-brief', contact.public_uuid), {}, { preserveScroll: true });
 
     return (
         <CustomersShell
@@ -63,6 +64,13 @@ export default function Show({ contact }) {
                             <DetailRow icon={Languages} label="Language">{contact.preferred_language || 'Not provided'}</DetailRow>
                         </dl>
                     </SectionCard>
+
+                    {ai && (
+                        <SectionCard title="AI brief" description="Summarized from verified workspace facts only.">
+                            <Button size="sm" variant="secondary" icon={Sparkles} onClick={generateBrief}>Generate AI brief</Button>
+                            {ai.brief && <p className="mt-3 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700">{ai.brief.text}</p>}
+                        </SectionCard>
+                    )}
                 </aside>
 
                 <main className="min-w-0 space-y-5">

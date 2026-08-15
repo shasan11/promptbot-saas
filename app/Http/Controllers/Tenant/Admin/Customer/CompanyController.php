@@ -7,9 +7,11 @@ use App\Http\Requests\Tenant\Customer\CompanyRequest;
 use App\Models\Customer\Company;
 use App\Models\Customer\CustomField;
 use App\Models\Customer\Tag;
+use App\Models\AI\Suggestion;
 use App\Models\User;
 use App\Services\Customer\CustomerTimelineService;
 use App\Services\Customer\CustomFieldValueService;
+use App\Services\SaaS\TenantFeatureService;
 use App\Services\Tenant\TenantAuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,12 +53,17 @@ class CompanyController extends Controller
         return redirect()->route('tenant.admin.customers.companies.show', $company)->with('status', 'Company created.');
     }
 
-    public function show(Company $company): Response
+    public function show(Company $company, TenantFeatureService $features): Response
     {
         Gate::authorize('view', $company);
         $company->load(['accountOwner:id,name,email', 'tags:id,public_uuid,name,color', 'customFieldValues.field', 'activities.actor:id,name']);
         $contacts = $company->contacts()->with('owner:id,name')->orderBy('display_name')->paginate(15);
-        return Inertia::render('Tenant/Admin/Customers/Companies/Show', ['company' => $company, 'contacts' => $contacts]);
+        $aiEnabled = request()->user('tenant')->can('ai.copilot.use') && $features->enabled('ai_platform');
+        $brief = $aiEnabled ? Suggestion::query()->where('resource_type', Company::class)->where('resource_id', $company->id)->latest()->first() : null;
+        return Inertia::render('Tenant/Admin/Customers/Companies/Show', [
+            'company' => $company, 'contacts' => $contacts,
+            'ai' => $aiEnabled ? ['brief' => $brief ? ['text' => $brief->text, 'created_at' => $brief->created_at] : null] : null,
+        ]);
     }
 
     public function edit(Company $company): Response

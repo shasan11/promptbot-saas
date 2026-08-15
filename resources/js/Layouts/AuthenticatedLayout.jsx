@@ -21,6 +21,7 @@ import {
     Menu,
     Search,
     ShieldCheck,
+    Sparkles,
     Star,
     TicketCheck,
     UsersRound,
@@ -114,6 +115,13 @@ const primaryNavigation = [
         permission: 'knowledge.view',
     },
     {
+        label: 'AI',
+        routeName: 'tenant.admin.ai.index',
+        active: 'tenant.admin.ai.*',
+        icon: Sparkles,
+        permission: 'ai.view',
+    },
+    {
         label: 'Operations',
         destinations: [
             { permission: 'operations.view', routeName: 'tenant.admin.operations.index' },
@@ -169,7 +177,7 @@ function Brand({ tenant }) {
             className="flex min-w-0 items-center gap-2"
         >
             <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md text-white"
+                className="flex h-7 w-full shrink-0 items-center justify-center overflow-hidden rounded-md text-white"
                 style={{ backgroundColor: 'var(--tenant-secondary)' }}
             >
                 <img
@@ -179,15 +187,7 @@ function Brand({ tenant }) {
                 />
             </span>
 
-            <span className="min-w-0 leading-tight">
-                <span className="block truncate text-sm font-semibold text-navy-900">
-                    {tenant?.companyName || 'Your workspace'}
-                </span>
-
-                <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-                    PromptBot workspace
-                </span>
-            </span>
+             
         </Link>
     );
 }

@@ -37,6 +37,10 @@ class FeatureSeeder extends Seeder
             ['name' => 'Custom branding', 'code' => 'custom_branding', 'type' => 'boolean', 'description' => 'Workspace logo, color, and identity controls'],
             ['name' => 'Audit retention', 'code' => 'audit_retention_days', 'type' => 'limited', 'description' => 'Days of audit and activity history retained'],
             ['name' => 'Priority support', 'code' => 'priority_support', 'type' => 'boolean', 'description' => 'Priority platform support handling'],
+            ['name' => 'AI Platform', 'code' => 'ai_platform', 'type' => 'boolean', 'description' => 'Tenant AI agents and copilot'],
+            ['name' => 'AI Monthly Tokens', 'code' => 'ai_monthly_tokens', 'type' => 'limited', 'description' => 'Monthly AI token allowance'],
+            ['name' => 'AI Agents', 'code' => 'ai_agents', 'type' => 'limited', 'description' => 'Deployed AI agents'],
+            ['name' => 'AI Autonomous Replies', 'code' => 'ai_autonomous_replies', 'type' => 'boolean', 'description' => 'Safety-gated autonomous customer replies'],
         ])->each(fn (array $feature) => Feature::updateOrCreate(['code' => $feature['code']], $feature));
     }
 }

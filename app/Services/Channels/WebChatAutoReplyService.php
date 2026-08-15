@@ -2,7 +2,10 @@
 
 namespace App\Services\Channels;
 
+use App\Enums\AI\AgentStatus;
+use App\Enums\AI\DeploymentMode;
 use App\Enums\Knowledge\RetrievalMode;
+use App\Models\AI\Agent;
 use App\Models\Channel\WebChatWidget;
 use App\Models\Inbox\Conversation;
 use App\Models\Knowledge\KnowledgeRetrievalLog;
@@ -22,6 +25,14 @@ use Throwable;
  * is already stored by the time this runs, so any error (AI not configured,
  * provider down, no knowledge base assigned) is swallowed and reported —
  * the visitor simply waits for a human agent, exactly as they would today.
+ *
+ * This is a simpler, widget-only auto-reply path, independent of the
+ * Agent-based autonomous reply system (AutonomousReplyService), which is
+ * queued asynchronously for every channel via AnalyzeConversationJob →
+ * AutoReplyConversationJob. If a tenant has ALSO deployed an autonomous
+ * Agent on this same channel, that system already owns replying here —
+ * running both would risk sending the visitor two answers to one message,
+ * so this simpler path defers to it.
  */
 class WebChatAutoReplyService
 {
@@ -43,11 +54,28 @@ class WebChatAutoReplyService
             return;
         }
 
+        if ($this->hasAutonomousAgent($conversation)) {
+            return;
+        }
+
         try {
             $this->reply($widget, $conversation, $question);
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    private function hasAutonomousAgent(Conversation $conversation): bool
+    {
+        return Agent::query()
+            ->where('status', AgentStatus::Active)
+            ->where('deployment_mode', DeploymentMode::Autonomous)
+            ->where('auto_reply_enabled', true)
+            ->whereHas('channels', fn ($query) => $query
+                ->where('channels.id', $conversation->channel_id)
+                ->where('ai_agent_channels.enabled', true)
+                ->where('ai_agent_channels.deployment_mode', DeploymentMode::Autonomous->value))
+            ->exists();
     }
 
     private function reply(WebChatWidget $widget, Conversation $conversation, string $question): void

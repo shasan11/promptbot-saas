@@ -6,11 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Inbox\Conversation;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\AI\Exceptions\AIException;
 use App\Services\Inbox\ConversationService;
-use App\Services\Inbox\InboxAIService;
+use App\Services\SaaS\TenantFeatureService;
 use App\Services\Sla\SlaService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -20,11 +18,7 @@ use Inertia\Response;
 
 class ConversationController extends Controller
 {
-    public function __construct(
-        private readonly ConversationService $service,
-        private readonly SlaService $sla,
-        private readonly InboxAIService $ai,
-    ) {}
+    public function __construct(private readonly ConversationService $service, private readonly SlaService $sla) {}
 
     public function index(Request $request): Response
     {
@@ -50,7 +44,20 @@ class ConversationController extends Controller
             $message->attachments->each(fn ($attachment) => $attachment->setAttribute('download_url', URL::temporarySignedRoute('tenant.admin.inbox.attachments.download', now()->addMinutes(10), $attachment)));
             return $message;
         });
-        return Inertia::render('Tenant/Admin/Inbox/Show', ['conversation' => $conversation, 'messages' => $messages, 'users' => User::query()->where('status','active')->orderBy('name')->get(['id','name']), 'teams' => Team::query()->where('status','active')->orderBy('name')->get(['id','name'])]);
+        $aiEnabled = request()->user('tenant')->can('ai.copilot.use') && app(TenantFeatureService::class)->enabled('ai_platform');
+        return Inertia::render('Tenant/Admin/Inbox/Show', [
+            'conversation' => $conversation, 'messages' => $messages,
+            'users' => User::query()->where('status','active')->orderBy('name')->get(['id','name']),
+            'teams' => Team::query()->where('status','active')->orderBy('name')->get(['id','name']),
+            'ai' => $aiEnabled ? [
+                'insight' => $conversation->aiInsight()->first(),
+                'suggestions' => $conversation->aiSuggestions()->latest()->limit(10)->get()->map(fn ($suggestion) => [
+                    'public_uuid' => $suggestion->public_uuid, 'type' => $suggestion->type, 'text' => $suggestion->text,
+                    'citations' => $suggestion->citations ?? [], 'status' => $suggestion->status->value,
+                    'created_at' => $suggestion->created_at,
+                ]),
+            ] : null,
+        ]);
     }
 
     public function reply(Request $request, Conversation $conversation): RedirectResponse
@@ -78,27 +85,5 @@ class ConversationController extends Controller
     public function follow(Request $request, Conversation $conversation): RedirectResponse
     {
         Gate::authorize('view', $conversation); $conversation->followers()->toggle($request->user('tenant')->id); return back()->with('status','Follower preference updated.');
-    }
-
-    public function draftReply(Conversation $conversation): JsonResponse
-    {
-        Gate::authorize('reply', $conversation);
-
-        try {
-            return response()->json($this->ai->draftReply($conversation->load('contact')));
-        } catch (AIException $exception) {
-            return response()->json(['message' => $exception->operatorMessage()], 422);
-        }
-    }
-
-    public function summarize(Conversation $conversation): JsonResponse
-    {
-        Gate::authorize('view', $conversation);
-
-        try {
-            return response()->json($this->ai->summarize($conversation));
-        } catch (AIException $exception) {
-            return response()->json(['message' => $exception->operatorMessage()], 422);
-        }
     }
 }

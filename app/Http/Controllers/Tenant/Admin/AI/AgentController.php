@@ -22,7 +22,7 @@ class AgentController extends Controller
     {
         abort_unless($request->user('tenant')->can('ai.agents.view'), 403);
         return Inertia::render('Tenant/Admin/AI/Agents/Index', [
-            'agents' => Agent::query()->with(['providerConfig:id,public_uuid,name,status', 'deployedVersion:id,public_uuid,version', 'versions.creator:id,name', 'connectionActions:id,public_uuid,connection_id,key,name,risk_level', 'channels:id,public_uuid,name,type'])->latest()->get()->map(fn (Agent $agent) => $this->payload($agent)),
+            'agents' => Agent::query()->with(['providerConfig:id,public_uuid,name,status', 'deployedVersion:id,public_uuid,version', 'versions.creator:id,name', 'connectionActions:id,uuid,connection_id,key,name,risk_level', 'channels:id,public_uuid,name,type'])->latest()->get()->map(fn (Agent $agent) => $this->payload($agent)),
             'providers' => ProviderConfig::query()->where('enabled', true)->get()->map(fn (ProviderConfig $provider) => ['id' => $provider->id, 'public_uuid' => $provider->public_uuid, 'name' => $provider->name, 'status' => $provider->status->value, 'default_chat_model' => $provider->default_chat_model, 'capabilities' => $provider->capabilities ?? []]),
             'canManage' => $request->user('tenant')->can('ai.agents.manage'),
             'canDeploy' => $request->user('tenant')->can('ai.agents.deploy'),

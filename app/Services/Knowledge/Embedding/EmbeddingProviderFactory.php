@@ -3,6 +3,8 @@
 namespace App\Services\Knowledge\Embedding;
 
 use App\Contracts\Knowledge\EmbeddingProviderInterface;
+use App\Enums\AI\ProviderStatus;
+use App\Models\AI\ProviderConfig;
 use App\Models\Knowledge\KnowledgeBase;
 use App\Services\AI\AIFeatureManager;
 use App\Services\AI\AIManager;
@@ -51,6 +53,11 @@ class EmbeddingProviderFactory
         return $this->resolved[$cacheKey] ??= match ($config['driver']) {
             'local' => new LocalHashEmbeddingProvider((int) $config['dimensions'], (string) $config['model']),
             'ai_manager' => new AiManagerEmbeddingProvider(app(AIManager::class), app(AIFeatureManager::class), app(AIModelResolver::class)),
+            'tenant_ai' => new NeuronEmbeddingProviderAdapter(
+                ProviderConfig::query()->where('enabled', true)->where('status', ProviderStatus::Healthy)->whereNotNull('default_embedding_model')->orderBy('id')->first()
+                    ?? throw new InvalidArgumentException('No healthy tenant AI provider with an embedding model is configured.'),
+                (string) $config['model'], (int) $config['dimensions'], app(\App\Services\Knowledge\Crawler\UrlSafetyGuard::class),
+            ),
             default => throw new InvalidArgumentException("Unsupported embedding driver [{$config['driver']}]."),
         };
     }
@@ -74,16 +81,19 @@ class EmbeddingProviderFactory
                 'configured' => match ($config['driver']) {
                     'local' => true,
                     'ai_manager' => $this->features->isEnabled('knowledge_embeddings'),
+                    'tenant_ai' => ProviderConfig::query()->where('enabled', true)->whereNotNull('default_embedding_model')->exists(),
                     default => false,
                 },
                 'label' => match ($key) {
                     'local' => 'Built-in (offline)',
                     'ai_manager' => 'AI Provider (Superadmin-configured)',
+                    'tenant_ai' => 'Tenant AI provider (semantic)',
                     default => ucfirst((string) $key),
                 },
                 'description' => match ($key) {
                     'local' => 'Deterministic offline token matching. Requires no API key, external service, or usage billing.',
                     'ai_manager' => 'Uses the LLM provider configured by your platform in Superadmin → AI & LLM. Requires the platform owner to enable AI and the Knowledge Embeddings feature toggle.',
+                    'tenant_ai' => 'Real semantic embeddings through the first healthy AI provider you configure in this workspace\'s AI settings.',
                     default => '',
                 },
             ];

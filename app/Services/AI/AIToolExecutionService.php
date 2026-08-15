@@ -89,6 +89,10 @@ class AIToolExecutionService
     {
         if ($agent->human_approval_mode === 'always') return true;
         if ($action->requires_approval || in_array($risk, [ActionRiskLevel::High, ActionRiskLevel::Critical], true)) return true;
+        // A connectionless action (schema permits connection_id to be null)
+        // has no connection-scoped grant to consult — fail safe by requiring
+        // approval rather than crashing or silently allowing it through.
+        if (! $action->connection) return true;
         return $this->policy->approvalRequired($action->connection, $action, $agent->agent_key, null);
     }
 }

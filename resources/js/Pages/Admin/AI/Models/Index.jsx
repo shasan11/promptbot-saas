@@ -23,16 +23,18 @@ function AddModelModal({ open, onClose, providers }) {
         output_cost_per_million_tokens: '',
     });
 
+    const close = () => { reset(); onClose(); };
+
     const submit = (event) => {
         event.preventDefault();
         post(route('superadmin.ai.models.store'), {
             preserveScroll: true,
-            onSuccess: () => { reset(); onClose(); },
+            onSuccess: close,
         });
     };
 
     return (
-        <Modal open={open} onClose={onClose} title="Add model" size="lg">
+        <Modal open={open} onClose={close} title="Add model" size="lg">
             <form onSubmit={submit} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                     <FormField label="Provider" required error={errors.ai_provider_id}>
@@ -53,7 +55,7 @@ function AddModelModal({ open, onClose, providers }) {
                         <Input value={data.display_name} onChange={(e) => setData('display_name', e.target.value)} />
                     </FormField>
                     {data.capability === 'embedding' && (
-                        <FormField label="Embedding dimensions" error={errors.embedding_dimensions}>
+                        <FormField label="Embedding dimensions" required error={errors.embedding_dimensions}>
                             <Input type="number" value={data.embedding_dimensions} onChange={(e) => setData('embedding_dimensions', e.target.value)} />
                         </FormField>
                     )}
@@ -65,7 +67,7 @@ function AddModelModal({ open, onClose, providers }) {
                     </FormField>
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="button" variant="secondary" onClick={close}>Cancel</Button>
                     <Button type="submit" variant="brand" loading={processing}>Add model</Button>
                 </div>
             </form>
@@ -73,8 +75,82 @@ function AddModelModal({ open, onClose, providers }) {
     );
 }
 
+function EditModelModal({ open, onClose, model }) {
+    const isEmbedding = model?.capability === 'embedding';
+
+    const { data, setData, put, processing, errors, reset } = useForm({
+        display_name: model?.display_name || '',
+        context_window: model?.context_window ?? '',
+        max_output_tokens: model?.max_output_tokens ?? '',
+        embedding_dimensions: model?.embedding_dimensions ?? '',
+        input_cost_per_million_tokens: model?.input_cost_per_million_tokens ?? '',
+        output_cost_per_million_tokens: model?.output_cost_per_million_tokens ?? '',
+        supports_streaming: model?.supports_streaming ?? false,
+        supports_json_mode: model?.supports_json_mode ?? false,
+    });
+
+    const close = () => { reset(); onClose(); };
+
+    const submit = (event) => {
+        event.preventDefault();
+        put(route('superadmin.ai.models.update', model.id), {
+            preserveScroll: true,
+            onSuccess: close,
+        });
+    };
+
+    if (!model) return null;
+
+    return (
+        <Modal open={open} onClose={close} title={`Edit ${model.display_name}`} description={`${model.model_key} · ${isEmbedding ? 'Embedding' : 'Chat'} model`} size="lg">
+            <form onSubmit={submit} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField label="Display name" required error={errors.display_name}>
+                        <Input value={data.display_name} onChange={(e) => setData('display_name', e.target.value)} />
+                    </FormField>
+                    {isEmbedding ? (
+                        <FormField label="Embedding dimensions" required error={errors.embedding_dimensions}>
+                            <Input type="number" value={data.embedding_dimensions} onChange={(e) => setData('embedding_dimensions', e.target.value)} />
+                        </FormField>
+                    ) : (
+                        <>
+                            <FormField label="Context window (tokens)" optional error={errors.context_window}>
+                                <Input type="number" value={data.context_window} onChange={(e) => setData('context_window', e.target.value)} />
+                            </FormField>
+                            <FormField label="Max output tokens" optional error={errors.max_output_tokens}>
+                                <Input type="number" value={data.max_output_tokens} onChange={(e) => setData('max_output_tokens', e.target.value)} />
+                            </FormField>
+                        </>
+                    )}
+                    <FormField label="Input cost / 1M tokens (USD)" optional error={errors.input_cost_per_million_tokens}>
+                        <Input type="number" step="0.01" value={data.input_cost_per_million_tokens} onChange={(e) => setData('input_cost_per_million_tokens', e.target.value)} />
+                    </FormField>
+                    <FormField label="Output cost / 1M tokens (USD)" optional error={errors.output_cost_per_million_tokens}>
+                        <Input type="number" step="0.01" value={data.output_cost_per_million_tokens} onChange={(e) => setData('output_cost_per_million_tokens', e.target.value)} />
+                    </FormField>
+                    {!isEmbedding && (
+                        <>
+                            <FormField label="Supports streaming">
+                                <div className="mt-2"><Switch checked={data.supports_streaming} onChange={(value) => setData('supports_streaming', value)} /></div>
+                            </FormField>
+                            <FormField label="Supports JSON mode">
+                                <div className="mt-2"><Switch checked={data.supports_json_mode} onChange={(value) => setData('supports_json_mode', value)} /></div>
+                            </FormField>
+                        </>
+                    )}
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                    <Button type="button" variant="secondary" onClick={close}>Cancel</Button>
+                    <Button type="submit" variant="brand" loading={processing}>Save changes</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
 export default function Index({ providers }) {
-    const [modalOpen, setModalOpen] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
+    const [editModel, setEditModel] = useState(null);
 
     const toggle = (model) => router.post(route('superadmin.ai.models.toggle', model.id), {}, { preserveScroll: true });
     const remove = (model) => {
@@ -92,7 +168,7 @@ export default function Index({ providers }) {
                     actions={(
                         <>
                             <Link href={route('superadmin.ai.assignments.index')} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Model assignments</Link>
-                            <Button icon={Plus} onClick={() => setModalOpen(true)} disabled={providers.length === 0}>Add model</Button>
+                            <Button icon={Plus} onClick={() => setAddOpen(true)} disabled={providers.length === 0}>Add model</Button>
                         </>
                     )}
                 />
@@ -132,7 +208,7 @@ export default function Index({ providers }) {
                                     {provider.models.map((model) => (
                                         <tr key={model.id}>
                                             <td className="px-4 py-3">
-                                                <div className="font-semibold text-slate-900">{model.display_name}</div>
+                                                <button type="button" onClick={() => setEditModel(model)} className="font-semibold text-slate-900 hover:text-blue-700">{model.display_name}</button>
                                                 <div className="font-mono text-xs text-slate-500">{model.model_key}</div>
                                             </td>
                                             <td className="px-4 py-3"><StatusBadge status={model.capability} /></td>
@@ -143,7 +219,10 @@ export default function Index({ providers }) {
                                             </td>
                                             <td className="px-4 py-3"><Switch checked={model.is_enabled} onChange={() => toggle(model)} /></td>
                                             <td className="px-4 py-3 text-right">
-                                                <button type="button" onClick={() => remove(model)} className="text-xs font-semibold text-rose-600 hover:underline">Remove</button>
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <button type="button" onClick={() => setEditModel(model)} className="text-xs font-semibold text-blue-700 hover:underline">Edit</button>
+                                                    <button type="button" onClick={() => remove(model)} className="text-xs font-semibold text-rose-600 hover:underline">Remove</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -154,7 +233,8 @@ export default function Index({ providers }) {
                 ))}
             </div>
 
-            <AddModelModal open={modalOpen} onClose={() => setModalOpen(false)} providers={providers} />
+            <AddModelModal open={addOpen} onClose={() => setAddOpen(false)} providers={providers} />
+            {editModel && <EditModelModal open={!!editModel} onClose={() => setEditModel(null)} model={editModel} />}
         </AuthenticatedLayout>
     );
 }

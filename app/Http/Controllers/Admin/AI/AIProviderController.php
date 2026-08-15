@@ -31,13 +31,6 @@ class AIProviderController extends Controller
         ]);
     }
 
-    public function create(): Response
-    {
-        return Inertia::render('Admin/AI/Providers/Form', [
-            'driverOptions' => $this->driverOptions(),
-        ]);
-    }
-
     public function store(AiProviderStoreRequest $request, AuditLogService $auditLog): RedirectResponse
     {
         $validated = $request->validated();
@@ -51,14 +44,6 @@ class AIProviderController extends Controller
         ]);
 
         return redirect()->route('superadmin.ai.providers.index')->with('status', 'Provider created.');
-    }
-
-    public function edit(AiProvider $provider): Response
-    {
-        return Inertia::render('Admin/AI/Providers/Form', [
-            'provider' => $this->present($provider),
-            'driverOptions' => $this->driverOptions(),
-        ]);
     }
 
     public function update(AiProviderUpdateRequest $request, AiProvider $provider, AuditLogService $auditLog): RedirectResponse
