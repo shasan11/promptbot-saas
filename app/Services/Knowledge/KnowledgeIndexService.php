@@ -2,7 +2,9 @@
 
 namespace App\Services\Knowledge;
 
+use App\Enums\Knowledge\FailureCategory;
 use App\Enums\Knowledge\SourceType;
+use App\Exceptions\Knowledge\KnowledgeException;
 use App\Models\Knowledge\KnowledgeChunk;
 use App\Models\Knowledge\KnowledgeDocument;
 use App\Models\Knowledge\KnowledgeFaq;
@@ -38,6 +40,18 @@ class KnowledgeIndexService
     {
         $source = $document->source;
         $base = $document->knowledgeBase;
+
+        // The source relation is null once its row is soft-deleted. A
+        // document can still be mid-retry when that happens (its own queue
+        // job was already in flight when the source was removed), and must
+        // fail cleanly here rather than crash on a null property access.
+        if (! $source) {
+            throw new KnowledgeException(
+                "Chunking failed for document #{$document->id}: its source (#{$document->knowledge_source_id}) no longer exists.",
+                FailureCategory::InvalidFile,
+                'The source this document belonged to was deleted. Remove this document — it can no longer be processed.',
+            );
+        }
 
         $metadata = [
             'document_name' => $document->title,
@@ -192,13 +206,21 @@ class KnowledgeIndexService
                 KnowledgeChunk::query()->upsert(
                     $batch,
                     ['owner_key', 'chunk_index'],
-                    // uuid and embedding columns are intentionally absent: an
-                    // upsert must not mint a new uuid for an existing chunk
-                    // (breaking citation links) nor clear a reusable vector.
+                    // uuid and the raw embedding binary are intentionally
+                    // absent: an upsert must not mint a new uuid for an
+                    // existing chunk (breaking citation links), and the vector
+                    // for content that is unchanged must survive untouched.
+                    // embedding_status/is_retrievable MUST be written, though:
+                    // each row above already computed the correct pending/
+                    // not-retrievable pair for changed content, and omitting
+                    // them here left a changed chunk's stale `ready`/true
+                    // values in place, silently serving an outdated vector
+                    // for content that no longer matches it.
                     [
                         'knowledge_collection_id', 'content', 'content_hash', 'token_count',
                         'character_count', 'metadata', 'language', 'priority', 'source_type',
-                        'effective_from', 'effective_until', 'updated_at',
+                        'effective_from', 'effective_until', 'embedding_status', 'is_retrievable',
+                        'updated_at',
                     ]
                 );
             }

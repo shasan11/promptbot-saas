@@ -18,10 +18,11 @@ class TenantAuthenticatedSessionController extends Controller
     {
         abort_unless(tenancy()->initialized, 404);
 
-        return Inertia::render('Auth/Login', [
-            'canResetPassword' => false,
-            'loginRoute' => 'tenant.login',
-            'panelName' => 'Tenant Admin',
+        // Dedicated page rather than the shared Auth/Login used by super
+        // admin/customer portal: it reads its logo, colors, and title from
+        // the tenant's own `tenant` prop (shared by HandleInertiaRequests on
+        // every tenant-domain request) instead of the platform's branding.
+        return Inertia::render('Tenant/Auth/Login', [
             'status' => session('status'),
         ]);
     }

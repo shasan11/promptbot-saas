@@ -106,7 +106,14 @@ class WorkspaceSettingsController extends Controller
 
         if ($request->hasFile($fieldKey)) {
             $path = $request->file($fieldKey)->store('workspace-branding', 'public');
-            $url = Storage::disk('public')->url($path);
+            // Not Storage::disk('public')->url(): FilesystemTenancyBootstrapper
+            // suffixes the "public" disk's root per tenant (storage/tenant<id>/
+            // app/public/...) but never touches its `url` config, so that helper
+            // returns the same central, non-tenant URL for every tenant and the
+            // file 404s. tenant_asset() instead resolves through the
+            // stancl.tenancy.asset route, which re-resolves storage_path() per
+            // request and so serves the right tenant's file.
+            $url = tenant_asset($path);
 
             $this->settings->set($settingKey, $url, $actor, $this->auditLog);
 
@@ -126,7 +133,11 @@ class WorkspaceSettingsController extends Controller
     private function forgetStoredFile(string $url): void
     {
         $path = ltrim(parse_url($url, PHP_URL_PATH) ?? '', '/');
-        $relative = preg_replace('#^storage/#', '', $path);
+        // Strip whichever prefix produced this URL: the current tenant_asset()
+        // route, or the legacy Storage::disk('public')->url() shape from
+        // before that fix, so files uploaded before the fix can still be
+        // cleaned up when replaced.
+        $relative = preg_replace('#^(tenancy/assets|storage)/#', '', $path);
 
         if ($relative && str_starts_with($relative, 'workspace-branding/')) {
             Storage::disk('public')->delete($relative);

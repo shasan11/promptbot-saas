@@ -26,7 +26,6 @@ function formatBytes(bytes) {
 export default function DocumentsIndex({ documents, filters, bases, statuses, languages, can }) {
     const [search, setSearch] = useState(filters.search || '');
     const [uploadOpen, setUploadOpen] = useState(false);
-    const [files, setFiles] = useState([]);
 
     const { data, setData, post, processing, progress, errors, reset } = useForm({
         knowledge_base: bases[0]?.uuid || '',
@@ -45,8 +44,7 @@ export default function DocumentsIndex({ documents, filters, bases, statuses, la
 
         post(route('tenant.admin.knowledge.documents.store'), {
             forceFormData: true,
-            data: { ...data, files },
-            onSuccess: () => { setUploadOpen(false); setFiles([]); reset('files'); },
+            onSuccess: () => { setUploadOpen(false); reset(); },
         });
     };
 
@@ -179,7 +177,17 @@ export default function DocumentsIndex({ documents, filters, bases, statuses, la
                             </Select>
                         </FormField>
 
-                        <UploadZone files={files} onChange={setFiles} uploading={processing} progress={progress?.percentage || 0} />
+                        <UploadZone files={data.files} onChange={(files) => setData('files', files)} uploading={processing} progress={progress?.percentage || 0} />
+
+                        {Object.entries(errors).some(([key]) => key === 'files' || key.startsWith('files.')) && (
+                            <ul className="space-y-1 rounded-md border border-rose-200 bg-rose-50 p-3" role="alert">
+                                {Object.entries(errors)
+                                    .filter(([key]) => key === 'files' || key.startsWith('files.'))
+                                    .map(([key, message]) => (
+                                        <li key={key} className="text-xs text-rose-600">{message}</li>
+                                    ))}
+                            </ul>
+                        )}
 
                         <FormField label="If a file is already in this knowledge base" id="upload-duplicate">
                             <Select id="upload-duplicate" value={data.on_duplicate} onChange={(event) => setData('on_duplicate', event.target.value)}>
@@ -196,10 +204,10 @@ export default function DocumentsIndex({ documents, filters, bases, statuses, la
                         </button>
                         <button
                             type="submit"
-                            disabled={processing || files.length === 0}
+                            disabled={processing || data.files.length === 0}
                             className="rounded-md bg-navy-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {processing ? 'Uploading…' : `Upload ${files.length || ''} file${files.length === 1 ? '' : 's'}`}
+                            {processing ? 'Uploading…' : `Upload ${data.files.length || ''} file${data.files.length === 1 ? '' : 's'}`}
                         </button>
                     </div>
                 </form>

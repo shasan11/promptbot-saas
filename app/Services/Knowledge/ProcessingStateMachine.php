@@ -40,7 +40,12 @@ class ProcessingStateMachine
             return true;
         }
 
-        if (! $from->canTransitionTo($to)) {
+        // A same-status call is never an illegal "transition" — it is a stage
+        // or attribute refresh within the resting status the document already
+        // holds (e.g. Processing -> Processing to advance from "normalizing"
+        // to "detecting_language"). Only a genuine status change is checked
+        // against the allowed-transition table.
+        if ($from !== $to && ! $from->canTransitionTo($to)) {
             throw new LogicException(
                 "Illegal knowledge document transition {$from->value} -> {$to->value} (document #{$document->id})."
             );
@@ -84,18 +89,38 @@ class ProcessingStateMachine
 
     public function queue(KnowledgeDocument $document): bool
     {
+        // Same-status call: transition() now treats this as a refresh rather
+        // than an illegal self-transition, so re-queuing a document that is
+        // already queued (e.g. a duplicate upload while a worker has not yet
+        // picked it up) is a harmless no-op instead of a crash.
         return $this->transition($document, DocumentStatus::Queued, ProcessingStage::Uploaded);
     }
 
     /**
-     * Completes processing. `$chunksEmbedded < $chunksTotal` lands the document
-     * in `partially_ready`: some content is searchable, so it should serve
-     * retrieval, but the failure must stay visible rather than being rounded up
-     * to success.
+     * Completes processing. Requires that every chunk has already been
+     * resolved (embedded or permanently failed) — callers must not call this
+     * while chunks are still pending, or a genuinely unfinished document will
+     * be reported as done.
+     *
+     *   chunksEmbedded == chunksTotal (> 0)  -> ready
+     *   0 < chunksEmbedded < chunksTotal     -> partially_ready
+     *   chunksEmbedded == 0                  -> failed (nothing survived embedding)
+     *   chunksTotal == 0                     -> failed (nothing to search)
      */
     public function complete(KnowledgeDocument $document, int $chunksTotal, int $chunksEmbedded): bool
     {
-        $status = ($chunksEmbedded > 0 && $chunksEmbedded < $chunksTotal)
+        if ($chunksTotal === 0 || $chunksEmbedded === 0) {
+            return $this->fail(
+                $document,
+                ProcessingStage::Embedding,
+                FailureCategory::EmbeddingProviderError,
+                $chunksTotal === 0
+                    ? 'No chunks were produced from this document, so there is nothing to search.'
+                    : 'All chunks failed to generate embeddings.',
+            );
+        }
+
+        $status = $chunksEmbedded < $chunksTotal
             ? DocumentStatus::PartiallyReady
             : DocumentStatus::Ready;
 
@@ -155,5 +180,32 @@ class ProcessingStateMachine
         }
 
         return $moved;
+    }
+
+    /**
+     * Ends in-flight work as cancelled rather than failed.
+     *
+     * A document that never had working content lands in `cancelled` — there
+     * is nothing to fall back to. A document that already had ready chunks
+     * and was mid-reindex lands in `outdated` instead: its existing chunks are
+     * never touched by cancellation (only an explicit withdraw call clears
+     * `is_retrievable`), so they keep answering queries until a future
+     * successful reindex replaces them.
+     */
+    public function cancel(KnowledgeDocument $document): bool
+    {
+        $hadWorkingContent = $document->indexed_at !== null || $document->chunk_count > 0;
+        $target = $hadWorkingContent ? DocumentStatus::Outdated : DocumentStatus::Cancelled;
+
+        if ($document->status !== $target && ! $document->status->canTransitionTo($target)) {
+            return false;
+        }
+
+        return $this->transition($document, $target, $document->current_stage, [
+            'last_error' => $hadWorkingContent
+                ? 'Reindex cancelled by operator; previous content remains available.'
+                : 'Cancelled by operator before processing completed.',
+            'processing_completed_at' => now(),
+        ]);
     }
 }

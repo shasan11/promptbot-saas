@@ -172,22 +172,12 @@ function Brand({ tenant }) {
     }
 
     return (
-        <Link
-            href={route('tenant.admin.dashboard')}
-            className="flex min-w-0 items-center gap-2"
-        >
-            <span
-                className="flex h-7 w-full shrink-0 items-center justify-center overflow-hidden rounded-md text-white"
-                style={{ backgroundColor: 'var(--tenant-secondary)' }}
-            >
-                <img
-                    src={tenant.logoUrl}
-                    alt=""
-                    className="h-full w-full object-contain p-1"
-                />
-            </span>
-
-             
+        <Link href={route('tenant.admin.dashboard')} className="flex min-w-0 items-center">
+            <img
+                src={tenant.logoUrl}
+                alt={tenant.companyName || 'Workspace logo'}
+                className="h-8 w-auto max-w-[10.5rem] object-contain"
+            />
         </Link>
     );
 }

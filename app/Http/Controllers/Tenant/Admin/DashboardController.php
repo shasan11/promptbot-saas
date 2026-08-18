@@ -32,10 +32,12 @@ class DashboardController extends Controller
             ->pluck('aggregate', 'activity_date');
 
         return Inertia::render('Tenant/Admin/Dashboard', [
-            'tenant' => [
-                'id' => tenant('id'),
-                'company_name' => tenant('company_name'),
-            ],
+            // Deliberately not passing 'tenant' here: HandleInertiaRequests
+            // already shares a richer 'tenant' prop (id, companyName, logoUrl,
+            // faviconUrl, colors) on every request. A page-local prop with the
+            // same key would shadow it for this page only, which previously
+            // broke the header logo/branding specifically on the dashboard —
+            // the first page a user lands on after login.
             'stats' => [
                 'users' => User::query()->count(),
                 'roles' => TenantRole::query()->count(),

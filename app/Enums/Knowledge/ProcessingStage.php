@@ -52,4 +52,27 @@ enum ProcessingStage: string
     {
         return (int) array_search($this, self::pipeline(), true);
     }
+
+    /**
+     * Single source of truth for "how far along is this stage", in percent.
+     * Both the operator-visible KnowledgeProcessingJob row and the frontend
+     * progress bar read this value — nobody else should hardcode a percentage
+     * for a stage.
+     */
+    public function progress(): int
+    {
+        return match ($this) {
+            self::Uploaded => 5,
+            self::Validating => 15,
+            self::Scanning => 20,
+            self::Extracting => 30,
+            self::Normalizing => 40,
+            self::DetectingLanguage => 48,
+            self::Deduplicating => 55,
+            self::Chunking => 65,
+            self::Embedding => 85,
+            self::Indexing => 95,
+            self::Ready => 100,
+        };
+    }
 }

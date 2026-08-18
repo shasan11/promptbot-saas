@@ -19,7 +19,7 @@ export default function Login({ status, canResetPassword, loginRoute = 'login', 
 
     return (
         <GuestLayout>
-            <Head title={`${panelName} login`} />
+            <Head title={`Login - ${panelName}`} />
             <form onSubmit={submit}>
                 <div className="text-center">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">{panelName}</p>

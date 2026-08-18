@@ -21,6 +21,7 @@ enum DocumentStatus: string
     case Ready = 'ready';
     case PartiallyReady = 'partially_ready';
     case Failed = 'failed';
+    case Cancelled = 'cancelled';
     case Outdated = 'outdated';
     case Archived = 'archived';
 
@@ -38,6 +39,7 @@ enum DocumentStatus: string
             self::Ready => 'Ready',
             self::PartiallyReady => 'Partially ready',
             self::Failed => 'Failed',
+            self::Cancelled => 'Cancelled',
             self::Outdated => 'Outdated',
             self::Archived => 'Archived',
         };
@@ -45,7 +47,7 @@ enum DocumentStatus: string
 
     public function isTerminal(): bool
     {
-        return in_array($this, [self::Ready, self::PartiallyReady, self::Failed, self::Outdated, self::Archived], true);
+        return in_array($this, [self::Ready, self::PartiallyReady, self::Failed, self::Cancelled, self::Outdated, self::Archived], true);
     }
 
     public function isInFlight(): bool
@@ -78,7 +80,7 @@ enum DocumentStatus: string
             self::Embedding => 80,
             self::Indexing => 92,
             self::Ready, self::PartiallyReady, self::Outdated, self::Archived => 100,
-            self::Failed => 0,
+            self::Failed, self::Cancelled => 0,
         };
     }
 
@@ -86,18 +88,19 @@ enum DocumentStatus: string
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::Uploaded => [self::Queued, self::Validating, self::Failed, self::Archived],
-            self::Queued => [self::Validating, self::Failed, self::Archived],
-            self::Validating => [self::Extracting, self::Failed],
-            self::Extracting => [self::Processing, self::Chunking, self::Failed],
-            self::Processing => [self::Chunking, self::Failed],
-            self::Chunking => [self::Embedding, self::Failed],
-            self::Embedding => [self::Indexing, self::PartiallyReady, self::Failed],
-            self::Indexing => [self::Ready, self::PartiallyReady, self::Failed],
+            self::Uploaded => [self::Queued, self::Validating, self::Failed, self::Cancelled, self::Archived],
+            self::Queued => [self::Validating, self::Failed, self::Cancelled, self::Outdated, self::Archived],
+            self::Validating => [self::Extracting, self::Failed, self::Cancelled, self::Outdated],
+            self::Extracting => [self::Processing, self::Chunking, self::Failed, self::Cancelled, self::Outdated],
+            self::Processing => [self::Chunking, self::Failed, self::Cancelled, self::Outdated],
+            self::Chunking => [self::Embedding, self::Failed, self::Cancelled, self::Outdated],
+            self::Embedding => [self::Indexing, self::PartiallyReady, self::Failed, self::Cancelled, self::Outdated],
+            self::Indexing => [self::Ready, self::PartiallyReady, self::Failed, self::Cancelled, self::Outdated],
             self::Ready => [self::Outdated, self::Archived, self::Queued],
             self::PartiallyReady => [self::Ready, self::Outdated, self::Archived, self::Queued],
-            // A failed item can only re-enter the pipeline from the top.
+            // A failed or cancelled item can only re-enter the pipeline from the top.
             self::Failed => [self::Queued, self::Archived],
+            self::Cancelled => [self::Queued, self::Archived],
             self::Outdated => [self::Queued, self::Archived, self::Ready],
             self::Archived => [self::Queued],
         };

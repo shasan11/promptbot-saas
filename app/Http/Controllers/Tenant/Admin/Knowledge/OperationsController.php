@@ -11,10 +11,13 @@ use App\Jobs\Knowledge\ProcessKnowledgeDocumentJob;
 use App\Jobs\Knowledge\SyncKnowledgeSourceJob;
 use App\Models\Knowledge\KnowledgeBase;
 use App\Models\Knowledge\KnowledgeFailure;
+use App\Models\Knowledge\KnowledgeGap;
 use App\Models\Knowledge\KnowledgeProcessingJob;
 use App\Models\Knowledge\KnowledgeSource;
+use App\Models\Knowledge\KnowledgeSyncRun;
 use App\Services\Knowledge\KnowledgeAnalyticsService;
 use App\Services\Knowledge\ProcessingStateMachine;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -53,7 +56,7 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function cancelJob(string $job): RedirectResponse
+    public function cancelJob(string $job, ProcessingStateMachine $states): RedirectResponse
     {
         $record = $this->resolveJob($job);
         abort_unless($this->actor()->can('knowledge.reindex'), 403);
@@ -62,19 +65,31 @@ class OperationsController extends Controller
             return back()->with('error', 'That job has already finished.');
         }
 
-        // Cooperative: long-running workers check this flag between units of
-        // work, so a crawl stops at the next page rather than being killed
-        // mid-write.
-        $record->forceFill([
-            'cancel_requested' => true,
-            'status' => $record->status === ProcessingJobStatus::Queued
-                ? ProcessingJobStatus::Cancelled->value
-                : $record->status->value,
-        ])->save();
+        // A job still sitting in `queued` has not been picked up by a worker
+        // yet — cancel it immediately, and move its document out of `queued`
+        // now, or it would sit there forever with no worker left to advance
+        // or fail it.
+        if ($record->status === ProcessingJobStatus::Queued) {
+            $record->forceFill([
+                'cancel_requested' => true,
+                'status' => ProcessingJobStatus::Cancelled->value,
+                'finished_at' => now(),
+                'last_error' => 'Cancelled by operator before it started.',
+            ])->save();
 
-        return back()->with('status', $record->status === ProcessingJobStatus::Cancelled
-            ? 'Job cancelled.'
-            : 'Cancellation requested — the job stops after its current step.');
+            if ($record->document) {
+                $states->cancel($record->document);
+            }
+
+            return back()->with('status', 'Job cancelled.');
+        }
+
+        // Cooperative: long-running workers check this flag between units of
+        // work, so a crawl stops at the next safe checkpoint rather than
+        // being killed mid-write.
+        $record->forceFill(['cancel_requested' => true])->save();
+
+        return back()->with('status', 'Cancellation requested — the job stops after its current step.');
     }
 
     public function failures(Request $request): Response
@@ -108,7 +123,7 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function failureDetails(string $failure): \Illuminate\Http\JsonResponse
+    public function failureDetails(string $failure): JsonResponse
     {
         $record = $this->resolveFailure($failure);
         abort_unless($this->actor()->can('knowledge.manage'), 403);
@@ -149,7 +164,7 @@ class OperationsController extends Controller
 
             ProcessKnowledgeDocumentJob::dispatch($document->id, $job->id, true);
         } elseif ($source = $record->source) {
-            SyncKnowledgeSourceJob::dispatch($source->id, \App\Models\Knowledge\KnowledgeSyncRun::TRIGGER_MANUAL, $this->actor()->id);
+            SyncKnowledgeSourceJob::dispatch($source->id, KnowledgeSyncRun::TRIGGER_MANUAL, $this->actor()->id);
         } else {
             return back()->with('error', 'There is nothing left to retry — the item this failure refers to was deleted.');
         }
@@ -188,7 +203,7 @@ class OperationsController extends Controller
     {
         abort_unless($this->actor()->can('knowledge.analytics.view'), 403);
 
-        $record = \App\Models\Knowledge\KnowledgeGap::query()->where('uuid', $gap)->firstOrFail();
+        $record = KnowledgeGap::query()->where('uuid', $gap)->firstOrFail();
 
         if ($record->knowledge_base_id && ! in_array($record->knowledge_base_id, $this->allowedBaseIds(), true)) {
             throw new NotFoundHttpException;
@@ -197,7 +212,7 @@ class OperationsController extends Controller
         $action = $request->string('action')->toString();
 
         if ($action === 'ignore') {
-            $record->forceFill(['status' => \App\Models\Knowledge\KnowledgeGap::STATUS_IGNORED])->save();
+            $record->forceFill(['status' => KnowledgeGap::STATUS_IGNORED])->save();
 
             return back()->with('status', 'Gap dismissed.');
         }
@@ -206,7 +221,7 @@ class OperationsController extends Controller
             $request->validate(['assigned_to' => ['required', 'integer', 'exists:users,id']]);
 
             $record->forceFill([
-                'status' => \App\Models\Knowledge\KnowledgeGap::STATUS_ASSIGNED,
+                'status' => KnowledgeGap::STATUS_ASSIGNED,
                 'assigned_to' => $request->integer('assigned_to'),
             ])->save();
 

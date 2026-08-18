@@ -67,6 +67,10 @@ class DocumentProcessingService
             return ['status' => 'skipped_not_owned', 'chunks' => 0, 'reused' => 0];
         }
 
+        if ($this->cancelled($document, $job)) {
+            return ['status' => 'cancelled', 'chunks' => 0, 'reused' => 0];
+        }
+
         $temporaryPath = null;
 
         try {
@@ -89,6 +93,10 @@ class DocumentProcessingService
                 'ocr' => $content->ocrApplied,
             ], (int) ((hrtime(true) - $extractedAt) / 1_000_000));
 
+            if ($this->cancelled($document, $job)) {
+                return ['status' => 'cancelled', 'chunks' => 0, 'reused' => 0];
+            }
+
             // --- NORMALIZING --------------------------------------------------
             $this->states->transition($document, DocumentStatus::Processing, ProcessingStage::Normalizing);
             $text = ContentNormaliser::normalise($content->text);
@@ -97,11 +105,24 @@ class DocumentProcessingService
                 throw ExtractionException::empty($document->original_filename ?? $document->title);
             }
 
+            $logger->stage($document, ProcessingStage::Normalizing, 'Normalised document text', [
+                'characters' => mb_strlen($text),
+            ]);
+
             // --- DETECTING LANGUAGE -------------------------------------------
-            $document->current_stage = ProcessingStage::DetectingLanguage;
+            $this->states->transition($document, DocumentStatus::Processing, ProcessingStage::DetectingLanguage);
             $language = $document->language ?: LanguageDetector::detect($text, $base->default_language);
+            $logger->stage($document, ProcessingStage::DetectingLanguage, 'Detected document language', [
+                'language' => $language,
+            ]);
 
             // --- DEDUPLICATING ------------------------------------------------
+            $this->states->transition($document, DocumentStatus::Processing, ProcessingStage::Deduplicating);
+
+            if ($this->cancelled($document, $job)) {
+                return ['status' => 'cancelled', 'chunks' => 0, 'reused' => 0];
+            }
+
             $contentHash = ContentNormaliser::hash($text);
             $unchanged = $document->content_hash === $contentHash;
 
@@ -140,6 +161,10 @@ class DocumentProcessingService
                 'title' => $document->title ?: ($content->detectedTitle ?? 'Untitled document'),
             ])->save();
 
+            if ($this->cancelled($document, $job)) {
+                return ['status' => 'cancelled', 'chunks' => 0, 'reused' => 0];
+            }
+
             // --- CHUNKING -------------------------------------------------------
             $this->states->transition($document, DocumentStatus::Chunking, ProcessingStage::Chunking);
             $chunkedAt = hrtime(true);
@@ -172,6 +197,7 @@ class DocumentProcessingService
 
             if ($pending === 0) {
                 $this->states->transition($document, DocumentStatus::Indexing, ProcessingStage::Indexing);
+                $logger->stage($document, ProcessingStage::Indexing, 'Indexing chunks', ['chunks' => $result['written']]);
                 $this->states->complete($document, $result['written'], $result['written']);
 
                 $this->afterProcessing($document);
@@ -179,6 +205,11 @@ class DocumentProcessingService
 
                 return ['status' => 'ready', 'chunks' => $result['written'], 'reused' => $result['reused']];
             }
+
+            $logger->stage($document, ProcessingStage::Embedding, 'Queued for embedding', [
+                'pending' => $pending,
+                'reused' => $result['reused'],
+            ]);
 
             $this->afterProcessing($document);
 
@@ -203,6 +234,23 @@ class DocumentProcessingService
                 @unlink($temporaryPath);
             }
         }
+    }
+
+    /**
+     * Cooperative cancellation checkpoint. Checked between expensive stages
+     * (never mid-write) so an operator's cancel request is honoured promptly
+     * without tearing a transaction in half.
+     */
+    private function cancelled(KnowledgeDocument $document, ?KnowledgeProcessingJob $job): bool
+    {
+        if (! $job?->isCancelled()) {
+            return false;
+        }
+
+        $this->states->cancel($document);
+        $this->afterProcessing($document);
+
+        return true;
     }
 
     private function extractStoredFile(KnowledgeDocument $document, ?string &$temporaryPath): ExtractedContent

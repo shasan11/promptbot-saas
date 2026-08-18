@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TenantStoreRequest;
 use App\Http\Requests\Admin\TenantUpdateRequest;
@@ -42,6 +43,7 @@ class TenantController extends Controller
     public function index(Request $request): Response
     {
         $tenants = Tenant::query()
+            ->where('status', '!=', TenantStatus::Deleted->value)
             ->with(['plan', 'domains', 'customerAccount.owner', 'subscriptions' => fn ($query) => $query->with('plan')->latest()])
             ->withCount(['subscriptions', 'invoices', 'payments', 'supportTickets'])
             ->when($request->string('status')->isNotEmpty(), function ($query) use ($request): void {

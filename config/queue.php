@@ -40,10 +40,13 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            // Tenant provisioning can legitimately spend several minutes on a
-            // first migration. Keep retry_after above its 1800-second timeout
-            // so another worker cannot reserve the same job concurrently.
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 1900),
+            // Must stay above the longest job timeout on this connection, with
+            // a safety margin — otherwise the database queue driver considers
+            // a job "available again" and hands it to a second worker while the
+            // first is still legitimately processing it. The longest job today
+            // is SyncKnowledgeSourceJob at 3600s (a large site crawl); this
+            // must be re-checked whenever a job's own $timeout grows.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 3900),
             'after_commit' => false,
         ],
 

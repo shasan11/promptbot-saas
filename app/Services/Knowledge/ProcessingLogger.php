@@ -3,6 +3,7 @@
 namespace App\Services\Knowledge;
 
 use App\Enums\Knowledge\FailureCategory;
+use App\Enums\Knowledge\ProcessingJobStatus;
 use App\Enums\Knowledge\ProcessingStage;
 use App\Exceptions\Knowledge\KnowledgeException;
 use App\Models\Knowledge\KnowledgeDocument;
@@ -50,13 +51,20 @@ class ProcessingLogger
         return $clone;
     }
 
-    /** @param  array<string, mixed>  $context */
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  int|null  $knowledgeBaseId  Fallback attribution when no single
+     *                                     document owns this log line — e.g. an
+     *                                     embedding batch spanning several
+     *                                     documents. Ignored when $document is set.
+     */
     public function stage(
         ?KnowledgeDocument $document,
         ProcessingStage $stage,
         string $message,
         array $context = [],
         ?int $durationMs = null,
+        ?int $knowledgeBaseId = null,
     ): void {
         KnowledgeProcessingLog::create([
             'knowledge_processing_job_id' => $this->job?->id,
@@ -73,9 +81,33 @@ class ProcessingLogger
             'stage' => $stage->value,
             'document_id' => $document?->id,
             'source_id' => $document?->knowledge_source_id,
-            'knowledge_base_id' => $document?->knowledge_base_id,
+            'knowledge_base_id' => $document?->knowledge_base_id ?? $knowledgeBaseId,
             'duration_ms' => $durationMs,
         ] + $this->sanitise($context)));
+
+        $this->advanceJobStage($stage);
+    }
+
+    /**
+     * Mirrors a pipeline stage onto the operator-visible KnowledgeProcessingJob
+     * row, so the Processing screen shows live progress instead of a row that
+     * only changes at the very end. Guarded to `running` jobs so a race with
+     * completion/failure/cancellation never resurrects a finished row.
+     */
+    private function advanceJobStage(ProcessingStage $stage): void
+    {
+        if (! $this->job) {
+            return;
+        }
+
+        KnowledgeProcessingJob::query()
+            ->whereKey($this->job->id)
+            ->where('status', ProcessingJobStatus::Running->value)
+            ->update([
+                'current_stage' => $stage->value,
+                'progress' => $stage->progress(),
+                'updated_at' => now(),
+            ]);
     }
 
     /** @param  array<string, mixed>  $context */
@@ -101,6 +133,15 @@ class ProcessingLogger
     /**
      * Records a failure and returns the row, so callers can attach its uuid to
      * whatever they surface to the user.
+     *
+     * @param  int|null  $knowledgeBaseId  Fallback attribution used only when
+     *                                     neither $document nor $source is
+     *                                     available — e.g. an embedding batch
+     *                                     failure that could not be traced back
+     *                                     to a single document. Without this,
+     *                                     the failure row's knowledge_base_id
+     *                                     is left null and disappears from that
+     *                                     base's Failed Sources page.
      */
     public function failure(
         ProcessingStage $stage,
@@ -108,6 +149,7 @@ class ProcessingLogger
         ?KnowledgeDocument $document = null,
         ?KnowledgeSource $source = null,
         int $attempt = 1,
+        ?int $knowledgeBaseId = null,
     ): KnowledgeFailure {
         $category = $exception instanceof KnowledgeException
             ? $exception->category()
@@ -120,7 +162,7 @@ class ProcessingLogger
         $source ??= $document?->source;
 
         $failure = KnowledgeFailure::create([
-            'knowledge_base_id' => $document?->knowledge_base_id ?? $source?->knowledge_base_id,
+            'knowledge_base_id' => $document?->knowledge_base_id ?? $source?->knowledge_base_id ?? $knowledgeBaseId,
             'knowledge_source_id' => $source?->id,
             'knowledge_document_id' => $document?->id,
             'knowledge_processing_job_id' => $this->job?->id,

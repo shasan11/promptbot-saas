@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands\Knowledge;
 
-use App\Enums\Knowledge\ProcessingJobStatus;
 use App\Enums\TenantStatus;
-use App\Models\Knowledge\KnowledgeProcessingJob;
 use App\Models\Tenant;
+use App\Services\Knowledge\StaleProcessingRecoveryService;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -36,11 +35,7 @@ class ReleaseStaleKnowledgeJobsCommand extends Command
             try {
                 tenancy()->initialize($tenant);
 
-                $released += KnowledgeProcessingJob::query()->stale()->update([
-                    'status' => ProcessingJobStatus::Failed->value,
-                    'finished_at' => now(),
-                    'last_error' => 'The worker processing this job stopped responding. Retry the source.',
-                ]);
+                $released += app(StaleProcessingRecoveryService::class)->releaseStaleJobs();
             } catch (Throwable $e) {
                 $this->error("  {$tenant->id}: {$e->getMessage()}");
             } finally {
