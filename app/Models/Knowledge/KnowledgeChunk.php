@@ -35,6 +35,7 @@ class KnowledgeChunk extends Model
     protected $fillable = [
         'knowledge_base_id', 'knowledge_source_id', 'knowledge_collection_id',
         'knowledge_document_id', 'knowledge_website_page_id', 'knowledge_faq_id',
+        'knowledge_article_id',
         'owner_key', 'chunk_index', 'content', 'content_hash', 'token_count',
         'character_count', 'language', 'metadata', 'source_type', 'priority',
         'is_retrievable', 'effective_from', 'effective_until',
@@ -81,6 +82,11 @@ class KnowledgeChunk extends Model
     public function faq(): BelongsTo
     {
         return $this->belongsTo(KnowledgeFaq::class, 'knowledge_faq_id');
+    }
+
+    public function article(): BelongsTo
+    {
+        return $this->belongsTo(KnowledgeArticle::class, 'knowledge_article_id');
     }
 
     public function collection(): BelongsTo
@@ -175,6 +181,7 @@ class KnowledgeChunk extends Model
             'section' => $metadata['heading'] ?? $metadata['section'] ?? null,
             'url' => $metadata['url'] ?? null,
             'faq_question' => $metadata['faq_question'] ?? null,
+            'article_title' => $metadata['article_title'] ?? null,
             'collection' => $metadata['collection'] ?? null,
             'last_updated' => $metadata['last_updated'] ?? null,
         ], fn ($value) => $value !== null && $value !== '');

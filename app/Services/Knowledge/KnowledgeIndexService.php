@@ -5,11 +5,13 @@ namespace App\Services\Knowledge;
 use App\Enums\Knowledge\FailureCategory;
 use App\Enums\Knowledge\SourceType;
 use App\Exceptions\Knowledge\KnowledgeException;
+use App\Models\Knowledge\KnowledgeArticle;
 use App\Models\Knowledge\KnowledgeChunk;
 use App\Models\Knowledge\KnowledgeDocument;
 use App\Models\Knowledge\KnowledgeFaq;
 use App\Models\Knowledge\KnowledgeSource;
 use App\Services\Knowledge\Data\ChunkCandidate;
+use App\Services\Knowledge\Data\ExtractedContent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -28,7 +30,10 @@ use Illuminate\Support\Str;
  */
 class KnowledgeIndexService
 {
-    public function __construct(private readonly KnowledgeStatisticsService $statistics) {}
+    public function __construct(
+        private readonly KnowledgeStatisticsService $statistics,
+        private readonly ChunkingService $chunker,
+    ) {}
 
     /**
      * Replaces a document's chunks with `$candidates`.
@@ -134,6 +139,66 @@ class KnowledgeIndexService
                 'faq_question' => $faq->question,
                 'section' => $faq->category,
                 'collection' => $faq->collection?->name,
+            ], fn ($v) => $v !== null && $v !== ''),
+            embeddingSignature: $base->embeddingSignature(),
+        );
+    }
+
+    /**
+     * An article is long-form content, so unlike an FAQ it goes through the
+     * same chunker documents use rather than becoming a single chunk.
+     *
+     * @return array{written: int, reused: int, removed: int}
+     */
+    public function syncArticleChunks(KnowledgeArticle $article): array
+    {
+        $source = $article->source;
+        $base = $article->knowledgeBase;
+
+        // A draft, in-review or archived article must leave the index
+        // immediately — this is the guarantee that unapproved content never
+        // keeps answering after it stops being publishable.
+        if (! $article->isRetrievable()) {
+            $removed = KnowledgeChunk::query()->where('owner_key', $article->chunkOwnerKey())->delete();
+            $this->statistics->refreshForBase($base);
+
+            return ['written' => 0, 'reused' => 0, 'removed' => $removed];
+        }
+
+        $baseMetadata = [
+            'article_title' => $article->title,
+            'section' => $article->summary,
+            'collection' => $article->collection?->name,
+        ];
+
+        $candidates = $this->chunker->chunk(
+            new ExtractedContent($article->retrievableText()),
+            $base->chunking_strategy,
+            $base->chunk_size,
+            $base->chunk_overlap,
+            array_filter($baseMetadata, fn ($v) => $v !== null && $v !== ''),
+        );
+
+        return $this->sync(
+            ownerKey: $article->chunkOwnerKey(),
+            candidates: $candidates,
+            columns: [
+                'knowledge_base_id' => $article->knowledge_base_id,
+                'knowledge_source_id' => $article->knowledge_source_id,
+                'knowledge_collection_id' => $article->knowledge_collection_id,
+                'knowledge_document_id' => null,
+                'knowledge_website_page_id' => null,
+                'knowledge_faq_id' => null,
+                'knowledge_article_id' => $article->id,
+                'source_type' => SourceType::Article->value,
+                'priority' => $source->priority->value,
+                'language' => $article->language,
+                'effective_from' => null,
+                'effective_until' => null,
+            ],
+            baseMetadata: array_filter([
+                'article_title' => $article->title,
+                'collection' => $article->collection?->name,
             ], fn ($v) => $v !== null && $v !== ''),
             embeddingSignature: $base->embeddingSignature(),
         );

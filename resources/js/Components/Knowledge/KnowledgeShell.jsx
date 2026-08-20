@@ -2,7 +2,7 @@ import Select from '@/Components/UI/Select';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle, BarChart3, Database, FileText, FlaskConical, Folder,
+    AlertTriangle, BarChart3, ClipboardCheck, Database, FileEdit, FileText, FlaskConical, Folder,
     Globe, HelpCircle, LayoutGrid, Library, ListChecks, PenLine, Settings,
 } from 'lucide-react';
 
@@ -21,6 +21,7 @@ const SECTIONS = [
             { label: 'Documents', route: 'tenant.admin.knowledge.documents.index', pattern: 'tenant.admin.knowledge.documents.*', icon: FileText, permission: 'knowledge.sources.view' },
             { label: 'Websites', route: 'tenant.admin.knowledge.websites.index', pattern: 'tenant.admin.knowledge.websites.*', icon: Globe, permission: 'knowledge.sources.view' },
             { label: 'FAQs', route: 'tenant.admin.knowledge.faqs.index', pattern: 'tenant.admin.knowledge.faqs.*', icon: HelpCircle, permission: 'knowledge.sources.view' },
+            { label: 'Articles', route: 'tenant.admin.knowledge.articles.index', pattern: 'tenant.admin.knowledge.articles.index', icon: FileEdit, permission: 'knowledge.sources.view' },
             { label: 'Text sources', route: 'tenant.admin.knowledge.text-sources.index', pattern: 'tenant.admin.knowledge.text-sources.*', icon: PenLine, permission: 'knowledge.sources.view' },
             { label: 'All sources', route: 'tenant.admin.knowledge.sources.index', pattern: 'tenant.admin.knowledge.sources.*', icon: Database, permission: 'knowledge.sources.view' },
         ],
@@ -28,6 +29,7 @@ const SECTIONS = [
     {
         label: 'Operations',
         items: [
+            { label: 'Review queue', route: 'tenant.admin.knowledge.articles.review-queue', pattern: 'tenant.admin.knowledge.articles.review-queue', icon: ClipboardCheck, permission: 'knowledge.update' },
             { label: 'Processing', route: 'tenant.admin.knowledge.processing.index', pattern: 'tenant.admin.knowledge.processing.*', icon: ListChecks, permission: 'knowledge.sources.view' },
             { label: 'Failed sources', route: 'tenant.admin.knowledge.failed.index', pattern: 'tenant.admin.knowledge.failed.*', icon: AlertTriangle, permission: 'knowledge.sources.view' },
             { label: 'Retrieval playground', route: 'tenant.admin.knowledge.playground.index', pattern: 'tenant.admin.knowledge.playground.*', icon: FlaskConical, permission: 'knowledge.retrieval.test' },

@@ -78,6 +78,11 @@ class KnowledgeSource extends Model
         return $this->hasMany(KnowledgeFaq::class);
     }
 
+    public function articles(): HasMany
+    {
+        return $this->hasMany(KnowledgeArticle::class);
+    }
+
     public function chunks(): HasMany
     {
         return $this->hasMany(KnowledgeChunk::class);

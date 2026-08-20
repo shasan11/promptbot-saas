@@ -10,15 +10,25 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function EditKnowledgeBase({
-    base, languages, visibilities, chunkingStrategies, retrievalModes, embeddingProviders, staleVectorCount,
+    base, languages, visibilities, statuses, chunkingStrategies, retrievalModes, embeddingProviders, staleVectorCount,
 }) {
     const [confirmText, setConfirmText] = useState('');
+
+    // Processing/Warning are computed automatically and Archived has its own
+    // Archive/Restore action, so this dropdown only ever offers the manually
+    // settable states — a base sitting in one of the other states shows its
+    // current status read-only instead of a dropdown that can't represent it.
+    const statusIsManuallySettable = statuses.some((s) => s.value === base.status);
 
     const { data, setData, put, processing, errors } = useForm({
         name: base.name,
         description: base.description || '',
         default_language: base.default_language,
         visibility: base.visibility,
+        // Only sent when it is a value the request actually accepts — a base
+        // currently Processing/Warning/Archived must not have that value
+        // bounced back to it as a validation error on an unrelated save.
+        ...(statusIsManuallySettable ? { status: base.status } : {}),
         embedding_provider: base.embedding_provider,
         chunking_strategy: base.chunking_strategy,
         chunk_size: base.chunk_size,
@@ -60,6 +70,30 @@ export default function EditKnowledgeBase({
                                 </Select>
                             </FormField>
                         </div>
+
+                        {statusIsManuallySettable ? (
+                            <FormField
+                                label="Status"
+                                id="e-status"
+                                error={errors.status}
+                                hint={data.status === 'draft'
+                                    ? 'Draft knowledge bases activate automatically once a source finishes processing — set this to Active only if you want agents to use it before that.'
+                                    : data.status === 'disabled'
+                                        ? 'Disabled removes every chunk in this base from retrieval immediately, without deleting anything.'
+                                        : 'Agents can use this knowledge base.'}
+                            >
+                                <Select id="e-status" value={data.status} onChange={(e) => setData('status', e.target.value)}>
+                                    {statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </Select>
+                            </FormField>
+                        ) : (
+                            <FormField label="Status" id="e-status-readonly" hint={base.status === 'archived'
+                                ? 'This base is archived. Use "Restore" to bring it back before changing its status here.'
+                                : 'This status is set automatically based on its sources and cannot be edited directly.'}
+                            >
+                                <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm capitalize text-slate-700">{base.status.replaceAll('_', ' ')}</p>
+                            </FormField>
+                        )}
                     </div>
                 </SectionCard>
 

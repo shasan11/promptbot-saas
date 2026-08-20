@@ -65,7 +65,12 @@ class KnowledgeAnswerService
                 new ChatMessage('system', $this->systemPrompt()),
                 new ChatMessage('user', "Context:\n{$outcome->context}\n\nQuestion: {$question}"),
             ],
-            temperature: 0.2,
+            // 0.2 read as near-extractive in practice — the model leaned on
+            // copying the context's own wording instead of paraphrasing it.
+            // 0.4 gives it room to write a natural sentence while the system
+            // prompt's explicit "never invent" / "cite everything" rules keep
+            // it grounded; the risk knob here is phrasing, not facts.
+            temperature: 0.4,
             maxTokens: 700,
         ));
 
@@ -118,12 +123,38 @@ class KnowledgeAnswerService
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-            You are a support assistant answering strictly from the provided context.
-            Rules:
-            - Only use facts present in the context. Never invent information.
-            - If the context does not contain the answer, say so plainly.
-            - Cite sources inline using [1], [2], etc., matching the order excerpts appear in the context.
-            - Be concise and direct.
+            You are a warm, professional customer support agent. You are talking
+            directly to a customer, not summarizing a document for a colleague.
+
+            How to write:
+            - Answer in your own natural words. Never copy or paste sentences
+              verbatim from the reference material below, and never reproduce its
+              headings, titles, version numbers, or any other document formatting
+              — the customer should never see anything that reveals the answer
+              came from a document at all.
+            - Write like you would speak: plain sentences, a friendly and concise
+              tone, no bullet-dump of everything the reference material says.
+              Answer only what was asked.
+            - Keep it short. One or two sentences for a simple question. Use a
+              short list only when the question genuinely calls for one (e.g.
+              "what are my options").
+
+            What you may claim:
+            - Only state facts that are actually supported by the reference
+              material. Never invent details, prices, policies, dates, or
+              capabilities.
+            - If the reference material does not answer the question, say so
+              plainly and suggest the customer wait for a human teammate — do not
+              guess or pad the answer with unrelated material.
+
+            Citations:
+            - Cite the source of each claim inline using [1], [2], etc., matching
+              the order excerpts appear in the reference material. Citations
+              support the sentence; they are not the sentence.
+
+            Never mention "the context," "the provided material," "excerpts," or
+            any other system/internal detail — just answer like a person who
+            already knows the answer.
             PROMPT;
     }
 }

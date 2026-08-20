@@ -10,6 +10,7 @@ enum SourceType: string
     case Sitemap = 'sitemap';
     case Faq = 'faq';
     case ManualText = 'manual_text';
+    case Article = 'article';
     case Integration = 'integration';
     case Api = 'api';
     case Database = 'database';
@@ -24,6 +25,7 @@ enum SourceType: string
             self::Sitemap => 'Sitemap',
             self::Faq => 'FAQ',
             self::ManualText => 'Manual text',
+            self::Article => 'Article',
             self::Integration => 'Integration',
             self::Api => 'API',
             self::Database => 'Database',

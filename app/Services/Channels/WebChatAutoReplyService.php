@@ -78,8 +78,66 @@ class WebChatAutoReplyService
             ->exists();
     }
 
+    /**
+     * Matches a message that is *entirely* a greeting/thanks/farewell —
+     * "hi", "thanks!", "good morning" — but not "hi, what is promptbot",
+     * which is a real question and must still go through retrieval. Kept
+     * deliberately narrow: a false positive here (treating a real question
+     * as smalltalk) would silently deny the customer an answer, which is a
+     * worse failure than occasionally sending retrieval a "thanks".
+     */
+    private const SMALLTALK_PATTERN = '/^(hi+|hello+|hey+|hiya|yo|howdy|'
+        .'good\s?(morning|afternoon|evening|day)|greetings|'
+        .'thanks?( you)?( so much| a lot)?|thank\s?you|cheers|'
+        .'bye|goodbye|see\s?ya|take\s?care)[\s!.,]*$/i';
+
+    /**
+     * Runs before any retrieval call. Forcing every "hey" or "thanks" through
+     * knowledge retrieval + generation is what produced replies that read
+     * like a document dump — there is no knowledge to synthesize for a
+     * greeting, so the model had nothing to work with but the raw context.
+     * A message that is purely smalltalk gets a fast, correct, zero-cost
+     * reply instead of being coerced into an answer it can't give.
+     */
+    private function smalltalkReply(string $message): ?string
+    {
+        if (! preg_match(self::SMALLTALK_PATTERN, trim($message))) {
+            return null;
+        }
+
+        return match (true) {
+            (bool) preg_match('/^(bye|goodbye|see\s?ya|take\s?care)/i', trim($message)) => 'Take care! Reach out anytime if you have more questions.',
+            (bool) preg_match('/^(thanks?|thank\s?you|cheers)/i', trim($message)) => "You're welcome! Is there anything else I can help with?",
+            default => 'Hi! How can I help you today?',
+        };
+    }
+
+    /**
+     * `KnowledgeAnswerService` writes inline citation markers like "[1]" or
+     * "[1, 2]" into the answer text — genuinely useful in a UI built to
+     * render them as clickable footnotes (the Knowledge Playground), but the
+     * widget renders plain text with no way to look up what "[1]" refers to.
+     * Left in, they read as broken/dead references to a customer. The
+     * citation data itself isn't discarded — it's passed through separately
+     * as `sources_used` metadata — this only cleans up what the customer sees.
+     */
+    private function stripCitationMarkers(string $text): string
+    {
+        $text = preg_replace('/\s*\[\d+(?:\s*,\s*\d+)*\]/', '', $text) ?? $text;
+        $text = preg_replace('/\s+([.,!?;:])/', '$1', $text) ?? $text;
+        $text = preg_replace('/\s{2,}/', ' ', $text) ?? $text;
+
+        return trim($text);
+    }
+
     private function reply(WebChatWidget $widget, Conversation $conversation, string $question): void
     {
+        if ($smalltalk = $this->smalltalkReply($question)) {
+            $this->post($conversation, $smalltalk, ['ai_generated' => true, 'generated_by' => 'smalltalk']);
+
+            return;
+        }
+
         $base = $widget->knowledgeBase;
 
         if (! $base) {
@@ -108,22 +166,32 @@ class WebChatAutoReplyService
             return;
         }
 
-        DB::transaction(function () use ($conversation, $answer): void {
+        $this->post($conversation, $this->stripCitationMarkers($answer['answer']), [
+            'ai_generated' => true,
+            'generated_by' => $answer['generated_by'] ?? null,
+            'model' => $answer['model'] ?? null,
+            // The citations themselves are not lost — sources_used carries
+            // them structured, for whatever surface (analytics, a future
+            // "sources" affordance) actually knows how to present them.
+            'sources_used' => $answer['sources_used'] ?? [],
+            'confidence' => $answer['confidence'] ?? null,
+        ]);
+    }
+
+    /** @param  array<string, mixed>  $metadata */
+    private function post(Conversation $conversation, string $body, array $metadata): void
+    {
+        DB::transaction(function () use ($conversation, $body, $metadata): void {
             $conversation->messages()->create([
                 'sender_type' => 'ai',
                 'sender_id' => null,
                 'sender_name' => 'AI Assistant',
                 'direction' => 'outbound',
                 'message_type' => 'text',
-                'body' => $answer['answer'],
+                'body' => $body,
                 'status' => 'delivered',
                 'sent_at' => now(),
-                'metadata' => [
-                    'ai_generated' => true,
-                    'generated_by' => $answer['generated_by'] ?? null,
-                    'model' => $answer['model'] ?? null,
-                    'confidence' => $answer['confidence'] ?? null,
-                ],
+                'metadata' => $metadata,
             ]);
 
             $conversation->update([

@@ -16,7 +16,18 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WebChatController extends Controller
 {
-    public function script(): BinaryFileResponse { return response()->file(public_path('promptbot-widget.js'), ['Content-Type' => 'application/javascript; charset=UTF-8', 'Cache-Control' => 'public, max-age=3600']); }
+    // Revalidate-on-every-load rather than a flat max-age: an hour-long cache
+    // with no ETag/Last-Modified check is exactly what let a fixed bug's old,
+    // broken copy keep running in already-open visitor tabs. Conditional
+    // GETs from Symfony's file response still avoid re-transferring the body
+    // when nothing changed, so this costs a 304 round trip, not a full refetch.
+    public function script(Request $request): BinaryFileResponse
+    {
+        $response = response()->file(public_path('promptbot-widget.js'), ['Content-Type' => 'application/javascript; charset=UTF-8', 'Cache-Control' => 'no-cache, must-revalidate']);
+        $response->isNotModified($request);
+
+        return $response;
+    }
 
     public function config(Request $request, string $key): JsonResponse
     {
@@ -37,13 +48,23 @@ class WebChatController extends Controller
         $widget=$this->widget($request,$key); $visitor=$this->visitor($request,$widget); $data=$request->validate(['body'=>['required','string','max:10000'],'client_id'=>['required','string','max:120']]);
         $message=$service->receive($widget->channel,$visitor->contact,['body'=>$data['body'],'external_id'=>'widget:'.$data['client_id'],'message_type'=>'text']); $visitor->update(['last_seen_at'=>now()]);
         $autoReply->maybeReply($widget, $message->conversation, $data['body']);
-        return $this->cors($request,response()->json(['message'=>['id'=>$message->public_uuid,'body'=>$message->body,'direction'=>$message->direction,'sentAt'=>$message->sent_at]],201));
+        // 'id' must stay the numeric DB id, matching poll()'s shape: the widget
+        // tracks the highest id it has rendered to ask for only newer messages
+        // next time. Sending public_uuid here previously made that Math.max()
+        // computation NaN, which silently disabled the poll filter and made
+        // every subsequent poll re-send (and re-render) the full history.
+        return $this->cors($request,response()->json(['message'=>['id'=>$message->id,'uuid'=>$message->public_uuid,'body'=>$message->body,'direction'=>$message->direction,'sentAt'=>$message->sent_at]],201));
     }
 
     public function poll(Request $request, string $key): JsonResponse
     {
         $widget=$this->widget($request,$key); $visitor=$this->visitor($request,$widget); $conversation=Conversation::query()->where('channel_id',$widget->channel_id)->where('contact_id',$visitor->contact_id)->latest('last_message_at')->first();
-        $messages=$conversation?->messages()->where('direction','!=','internal')->when($request->integer('after'),fn($q,$after)=>$q->where('id','>',$after))->orderBy('id')->limit(100)->get(['id','public_uuid','body','direction','status','sent_at'])??collect();
+        // Always apply the id filter, never conditionally: when() skipped it
+        // whenever $after was falsy (0, or an unparseable value cast to 0 by
+        // ->integer()), which is exactly what let a malformed `after` value
+        // silently turn every poll into "return the entire history."
+        $after=max(0,$request->integer('after'));
+        $messages=$conversation?->messages()->where('direction','!=','internal')->where('id','>',$after)->orderBy('id')->limit(100)->get(['id','public_uuid','body','direction','status','sent_at'])??collect();
         return $this->cors($request,response()->json(['messages'=>$messages]));
     }
 

@@ -4,8 +4,13 @@ namespace App\Services\Channels;
 
 use App\Contracts\Channels\ChannelAdapter;
 use App\Services\Channels\Adapters\EmailChannelAdapter;
+use App\Services\Channels\Adapters\InstagramChannelAdapter;
+use App\Services\Channels\Adapters\MessengerChannelAdapter;
+use App\Services\Channels\Adapters\SmsChannelAdapter;
+use App\Services\Channels\Adapters\TelegramChannelAdapter;
 use App\Services\Channels\Adapters\UnavailableChannelAdapter;
 use App\Services\Channels\Adapters\WebChatChannelAdapter;
+use App\Services\Channels\Adapters\WhatsappChannelAdapter;
 use InvalidArgumentException;
 
 class ChannelManager
@@ -15,7 +20,12 @@ class ChannelManager
         return match ($type) {
             'email' => app(EmailChannelAdapter::class),
             'web_chat' => app(WebChatChannelAdapter::class),
-            'whatsapp', 'sms', 'messenger', 'instagram', 'telegram', 'voice' => new UnavailableChannelAdapter($type),
+            'whatsapp' => app(WhatsappChannelAdapter::class),
+            'messenger' => app(MessengerChannelAdapter::class),
+            'instagram' => app(InstagramChannelAdapter::class),
+            'telegram' => app(TelegramChannelAdapter::class),
+            'sms' => app(SmsChannelAdapter::class),
+            'voice' => new UnavailableChannelAdapter($type),
             default => throw new InvalidArgumentException("Unknown channel type [{$type}]."),
         };
     }

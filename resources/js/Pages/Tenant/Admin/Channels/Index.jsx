@@ -5,9 +5,14 @@ import Button from '@/Components/UI/Button';
 import EmptyState from '@/Components/UI/EmptyState';
 import Select from '@/Components/UI/Select';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronRight, Mail, MessageCircle, MessagesSquare, Plus, SlidersHorizontal } from 'lucide-react';
+import {
+    Camera, ChevronRight, Mail, MessageCircle, MessageSquareText, MessagesSquare, Phone, Plus, Send, SlidersHorizontal,
+} from 'lucide-react';
 
-const typeIcon = { email: Mail, web_chat: MessageCircle };
+const typeIcon = {
+    email: Mail, web_chat: MessageCircle, whatsapp: Phone, messenger: MessageCircle, instagram: Camera,
+    telegram: Send, sms: MessageSquareText,
+};
 
 export default function Index({ channels, catalog = [], filters = {} }) {
     const permissions = usePage().props.auth?.permissions || [];

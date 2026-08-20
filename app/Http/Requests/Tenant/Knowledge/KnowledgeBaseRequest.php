@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Tenant\Knowledge;
 
 use App\Enums\Knowledge\ChunkingStrategy;
+use App\Enums\Knowledge\KnowledgeBaseStatus;
 use App\Enums\Knowledge\KnowledgeVisibility;
 use App\Enums\Knowledge\RetrievalMode;
 use Illuminate\Foundation\Http\FormRequest;
@@ -26,6 +27,13 @@ class KnowledgeBaseRequest extends FormRequest
             'supported_languages' => ['nullable', 'array', 'max:20'],
             'supported_languages.*' => ['string', Rule::in(array_keys((array) config('knowledge.languages')))],
             'visibility' => ['required', Rule::enum(KnowledgeVisibility::class)],
+            // Processing/Warning are computed by the statistics reconciler and
+            // Archived has its own dedicated action (it withdraws chunks and
+            // is logged distinctly) — this field only ever moves a base
+            // between the states an admin may set directly by hand.
+            'status' => ['sometimes', Rule::in([
+                KnowledgeBaseStatus::Draft->value, KnowledgeBaseStatus::Active->value, KnowledgeBaseStatus::Disabled->value,
+            ])],
             'icon' => ['nullable', 'string', 'max:64'],
             'color' => ['nullable', 'string', 'max:32'],
 

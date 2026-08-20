@@ -85,9 +85,31 @@ class KnowledgeBaseService
             $requiresReindex = true;
         }
 
+        // A manual status change (Draft/Active/Disabled — Archived has its own
+        // dedicated action) must keep chunk retrievability in lock-step, the
+        // same way archive()/restore() already do. Without this, disabling a
+        // base here would change its label but leave its content answering
+        // questions, and re-enabling it would leave chunks stuck withdrawn.
+        $statusChanging = isset($attributes['status']) && $attributes['status'] !== $base->status->value;
+        $wasRetrievable = $base->status->isRetrievable();
+        $willBeRetrievable = $statusChanging ? KnowledgeBaseStatus::from($attributes['status'])->isRetrievable() : $wasRetrievable;
+
         $attributes['updated_by'] = $actor?->id;
 
-        $base->update($attributes);
+        DB::transaction(function () use ($base, $attributes, $statusChanging, $wasRetrievable, $willBeRetrievable): void {
+            $base->update($attributes);
+
+            if ($statusChanging && $wasRetrievable && ! $willBeRetrievable) {
+                KnowledgeChunk::query()->where('knowledge_base_id', $base->id)->update(['is_retrievable' => false]);
+            }
+
+            if ($statusChanging && ! $wasRetrievable && $willBeRetrievable) {
+                KnowledgeChunk::query()
+                    ->where('knowledge_base_id', $base->id)
+                    ->where('embedding_status', KnowledgeChunk::EMBEDDING_READY)
+                    ->update(['is_retrievable' => true]);
+            }
+        });
 
         if ($requiresReindex) {
             $this->index->markBaseForReindex($base->id);

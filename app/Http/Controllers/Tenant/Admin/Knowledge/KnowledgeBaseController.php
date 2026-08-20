@@ -204,6 +204,12 @@ class KnowledgeBaseController extends Controller
         return [
             'languages' => config('knowledge.languages'),
             'visibilities' => $this->enumOptions(KnowledgeVisibility::cases()),
+            // Processing/Warning/Archived are excluded: the first two are
+            // computed by the statistics reconciler, and Archived has its own
+            // dedicated action — none of them belong in a plain dropdown.
+            'statuses' => $this->enumOptions([
+                KnowledgeBaseStatus::Draft, KnowledgeBaseStatus::Active, KnowledgeBaseStatus::Disabled,
+            ]),
             'chunkingStrategies' => array_map(fn (ChunkingStrategy $c) => [
                 'value' => $c->value, 'label' => $c->label(), 'description' => $c->description(),
             ], ChunkingStrategy::cases()),

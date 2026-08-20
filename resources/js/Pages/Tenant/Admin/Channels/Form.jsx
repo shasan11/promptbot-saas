@@ -31,6 +31,10 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
     const editing = Boolean(channel);
     const email = channel?.email_settings || {};
     const widget = channel?.web_chat_widget || {};
+    const whatsapp = channel?.whatsapp_settings || {};
+    const messenger = channel?.messenger_settings || {};
+    const instagram = channel?.instagram_settings || {};
+    const sms = channel?.sms_settings || {};
     const form = useForm({
         type: channel?.type || selectedType,
         name: channel?.name || '',
@@ -47,7 +51,28 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
             from_name: email.from_name || '',
             reply_to_address: email.reply_to_address || '',
         },
-        credentials: { host: '', port: 587, username: '', password: '', encryption: 'tls' },
+        credentials: {
+            host: '', port: 587, username: '', password: '', encryption: 'tls',
+            access_token: '', page_access_token: '', app_secret: '', verify_token: '',
+            bot_token: '', webhook_secret: '', account_sid: '', auth_token: '',
+        },
+        whatsapp: {
+            phone_number_id: whatsapp.phone_number_id || '',
+            whatsapp_business_account_id: whatsapp.whatsapp_business_account_id || '',
+            display_phone_number: whatsapp.display_phone_number || '',
+        },
+        messenger: {
+            page_id: messenger.page_id || '',
+            page_name: messenger.page_name || '',
+        },
+        instagram: {
+            instagram_business_account_id: instagram.instagram_business_account_id || '',
+            page_id: instagram.page_id || '',
+            username: instagram.username || '',
+        },
+        sms: {
+            from_number: sms.from_number || '',
+        },
         widget: {
             widget_name: widget.widget_name || '',
             primary_color: widget.primary_color || '#2563eb',
@@ -187,6 +212,101 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
                                 {knowledgeBases.map((base) => <option key={base.id} value={base.id}>{base.name}</option>)}
                             </Select>
                         </FormField>
+                    </section>
+                )}
+
+                {form.data.type === 'whatsapp' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">WhatsApp configuration</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Create a Meta App with the WhatsApp product in{' '}
+                                <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="underline">Meta for Developers</a>,
+                                then copy the phone number ID, WhatsApp Business Account ID, and a permanent access token from its API Setup page.
+                                The app secret is under App Settings → Basic. The verify token is one you choose yourself — reuse the same value when you subscribe the webhook below.
+                            </p>
+                        </div>
+                        <FormField label="Phone number ID" required error={form.errors['whatsapp.phone_number_id']}><Input value={form.data.whatsapp.phone_number_id} onChange={(event) => setNested('whatsapp', 'phone_number_id', event.target.value)} /></FormField>
+                        <FormField label="WhatsApp Business Account ID" error={form.errors['whatsapp.whatsapp_business_account_id']}><Input value={form.data.whatsapp.whatsapp_business_account_id} onChange={(event) => setNested('whatsapp', 'whatsapp_business_account_id', event.target.value)} /></FormField>
+                        <FormField label="Display phone number" optional error={form.errors['whatsapp.display_phone_number']}><Input value={form.data.whatsapp.display_phone_number} onChange={(event) => setNested('whatsapp', 'display_phone_number', event.target.value)} /></FormField>
+
+                        <p className="md:col-span-2 text-xs text-slate-500">{hasCredentials ? 'Leave these blank to keep the current encrypted credentials.' : 'All three fields are required for a new WhatsApp channel.'}</p>
+                        <FormField label="Access token" required={!hasCredentials} error={form.errors['credentials.access_token']}><Input autoComplete="off" value={form.data.credentials.access_token} onChange={(event) => setNested('credentials', 'access_token', event.target.value)} /></FormField>
+                        <FormField label="App secret" required={!hasCredentials} error={form.errors['credentials.app_secret']}><Input type="password" autoComplete="new-password" value={form.data.credentials.app_secret} onChange={(event) => setNested('credentials', 'app_secret', event.target.value)} /></FormField>
+                        <FormField label="Verify token" required={!hasCredentials} error={form.errors['credentials.verify_token']} hint="Any value you choose — enter it again in Meta when you subscribe the webhook."><Input value={form.data.credentials.verify_token} onChange={(event) => setNested('credentials', 'verify_token', event.target.value)} /></FormField>
+                    </section>
+                )}
+
+                {form.data.type === 'messenger' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">Messenger configuration</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Add the Messenger product to your Meta App, generate a Page access token for the Facebook Page you want connected, and find your Page ID under the Page's About section.
+                                The app secret is under App Settings → Basic. The verify token is one you choose yourself.
+                            </p>
+                        </div>
+                        <FormField label="Page ID" required error={form.errors['messenger.page_id']}><Input value={form.data.messenger.page_id} onChange={(event) => setNested('messenger', 'page_id', event.target.value)} /></FormField>
+                        <FormField label="Page name" optional error={form.errors['messenger.page_name']}><Input value={form.data.messenger.page_name} onChange={(event) => setNested('messenger', 'page_name', event.target.value)} /></FormField>
+
+                        <p className="md:col-span-2 text-xs text-slate-500">{hasCredentials ? 'Leave these blank to keep the current encrypted credentials.' : 'All three fields are required for a new Messenger channel.'}</p>
+                        <FormField label="Page access token" required={!hasCredentials} error={form.errors['credentials.page_access_token']}><Input autoComplete="off" value={form.data.credentials.page_access_token} onChange={(event) => setNested('credentials', 'page_access_token', event.target.value)} /></FormField>
+                        <FormField label="App secret" required={!hasCredentials} error={form.errors['credentials.app_secret']}><Input type="password" autoComplete="new-password" value={form.data.credentials.app_secret} onChange={(event) => setNested('credentials', 'app_secret', event.target.value)} /></FormField>
+                        <FormField label="Verify token" required={!hasCredentials} error={form.errors['credentials.verify_token']} hint="Any value you choose — enter it again in Meta when you subscribe the webhook."><Input value={form.data.credentials.verify_token} onChange={(event) => setNested('credentials', 'verify_token', event.target.value)} /></FormField>
+                    </section>
+                )}
+
+                {form.data.type === 'instagram' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">Instagram configuration</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Your Instagram professional account must be linked to a Facebook Page. Add the Instagram product to your Meta App, then find the Instagram Business Account ID and its linked Page ID in the Page's Instagram settings, and generate a Page access token.
+                                The app secret is under App Settings → Basic. The verify token is one you choose yourself.
+                            </p>
+                        </div>
+                        <FormField label="Instagram Business Account ID" required error={form.errors['instagram.instagram_business_account_id']}><Input value={form.data.instagram.instagram_business_account_id} onChange={(event) => setNested('instagram', 'instagram_business_account_id', event.target.value)} /></FormField>
+                        <FormField label="Linked Page ID" required error={form.errors['instagram.page_id']}><Input value={form.data.instagram.page_id} onChange={(event) => setNested('instagram', 'page_id', event.target.value)} /></FormField>
+                        <FormField label="Instagram username" optional error={form.errors['instagram.username']}><Input value={form.data.instagram.username} onChange={(event) => setNested('instagram', 'username', event.target.value)} /></FormField>
+
+                        <p className="md:col-span-2 text-xs text-slate-500">{hasCredentials ? 'Leave these blank to keep the current encrypted credentials.' : 'All three fields are required for a new Instagram channel.'}</p>
+                        <FormField label="Page access token" required={!hasCredentials} error={form.errors['credentials.page_access_token']}><Input autoComplete="off" value={form.data.credentials.page_access_token} onChange={(event) => setNested('credentials', 'page_access_token', event.target.value)} /></FormField>
+                        <FormField label="App secret" required={!hasCredentials} error={form.errors['credentials.app_secret']}><Input type="password" autoComplete="new-password" value={form.data.credentials.app_secret} onChange={(event) => setNested('credentials', 'app_secret', event.target.value)} /></FormField>
+                        <FormField label="Verify token" required={!hasCredentials} error={form.errors['credentials.verify_token']} hint="Any value you choose — enter it again in Meta when you subscribe the webhook."><Input value={form.data.credentials.verify_token} onChange={(event) => setNested('credentials', 'verify_token', event.target.value)} /></FormField>
+                    </section>
+                )}
+
+                {form.data.type === 'telegram' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">Telegram configuration</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Create a bot by messaging <span className="font-semibold">@BotFather</span> on Telegram and copy the token it gives you.
+                                The webhook secret is any value you choose. PromptBot registers the webhook with Telegram automatically when you save — there is nothing to paste into Telegram's own settings.
+                            </p>
+                        </div>
+                        <p className="md:col-span-2 text-xs text-slate-500">{hasCredentials ? 'Leave these blank to keep the current encrypted credentials.' : 'Both fields are required for a new Telegram channel.'}</p>
+                        <FormField label="Bot token" required={!hasCredentials} error={form.errors['credentials.bot_token']}><Input autoComplete="off" value={form.data.credentials.bot_token} onChange={(event) => setNested('credentials', 'bot_token', event.target.value)} /></FormField>
+                        <FormField label="Webhook secret" required={!hasCredentials} error={form.errors['credentials.webhook_secret']} hint="Any value you choose."><Input value={form.data.credentials.webhook_secret} onChange={(event) => setNested('credentials', 'webhook_secret', event.target.value)} /></FormField>
+                        {channel?.telegram_settings?.bot_username && <p className="md:col-span-2 text-sm text-emerald-700">Connected as @{channel.telegram_settings.bot_username}</p>}
+                    </section>
+                )}
+
+                {form.data.type === 'sms' && (
+                    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:grid-cols-2">
+                        <div className="md:col-span-2">
+                            <h2 className="text-sm font-bold text-slate-900">SMS configuration</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Find your Account SID and Auth Token on the{' '}
+                                <a href="https://console.twilio.com" target="_blank" rel="noreferrer" className="underline">Twilio Console</a> dashboard, and use one of your Twilio phone numbers as the From number.
+                                After saving, paste the webhook URL shown on this channel's page into that number's "A Message Comes In" setting.
+                            </p>
+                        </div>
+                        <FormField label="From number" required error={form.errors['sms.from_number']} hint="E.164 format, e.g. +15551234567"><Input value={form.data.sms.from_number} onChange={(event) => setNested('sms', 'from_number', event.target.value)} /></FormField>
+                        <div />
+                        <p className="md:col-span-2 text-xs text-slate-500">{hasCredentials ? 'Leave these blank to keep the current encrypted credentials.' : 'Both fields are required for a new SMS channel.'}</p>
+                        <FormField label="Account SID" required={!hasCredentials} error={form.errors['credentials.account_sid']}><Input autoComplete="off" value={form.data.credentials.account_sid} onChange={(event) => setNested('credentials', 'account_sid', event.target.value)} /></FormField>
+                        <FormField label="Auth token" required={!hasCredentials} error={form.errors['credentials.auth_token']}><Input type="password" autoComplete="new-password" value={form.data.credentials.auth_token} onChange={(event) => setNested('credentials', 'auth_token', event.target.value)} /></FormField>
                     </section>
                 )}
 

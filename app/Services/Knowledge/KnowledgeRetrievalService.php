@@ -95,7 +95,7 @@ class KnowledgeRetrievalService
 
         // One query for the whole pool, with the parents needed for citations.
         $chunks = KnowledgeChunk::query()
-            ->with(['document:id,uuid,title,knowledge_collection_id', 'websitePage:id,url,canonical_url,page_title', 'faq:id,question', 'collection:id,name'])
+            ->with(['document:id,uuid,title,knowledge_collection_id', 'websitePage:id,url,canonical_url,page_title', 'faq:id,question', 'article:id,uuid,title', 'collection:id,name'])
             ->whereIn('id', array_keys($fused))
             ->get()
             ->keyBy('id');

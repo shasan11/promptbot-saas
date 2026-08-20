@@ -10,6 +10,8 @@ use App\Models\Knowledge\KnowledgeBase;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Channels\ChannelManager;
+use App\Services\Channels\Support\ChannelProviderApiException;
+use App\Services\Channels\Support\TelegramClient;
 use App\Services\Tenant\TenantAuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ use Inertia\Response;
 
 class ChannelController extends Controller
 {
-    public function __construct(private readonly ChannelManager $manager, private readonly TenantAuditLogService $audit) {}
+    public function __construct(private readonly ChannelManager $manager, private readonly TenantAuditLogService $audit, private readonly TelegramClient $telegram) {}
 
     public function index(Request $request): Response
     {
@@ -51,13 +53,20 @@ class ChannelController extends Controller
 
     public function show(Channel $channel): Response
     {
-        Gate::authorize('view', $channel); $channel->load(['team:id,name', 'defaultAssignee:id,name', 'businessHours:id,name', 'emailSettings', 'webChatWidget', 'credential:id,channel_id,provider,status,last_rotated_at']);
-        return Inertia::render('Tenant/Admin/Channels/Show', ['channel' => $channel, 'adapter' => ['available' => $this->manager->adapter($channel->type)->available(), 'capabilities' => $this->manager->adapter($channel->type)->capabilities(), 'configurationErrors' => $this->manager->adapter($channel->type)->validateConfiguration($channel)], 'embedUrl' => $channel->type === 'web_chat' && $channel->status === 'active' && $channel->webChatWidget?->active ? url('/widget/promptbot.js').'?key='.$channel->webChatWidget->public_key : null, 'inboundWebhookUrl' => $channel->type === 'email' ? route('tenant.channels.email.inbound', $channel) : null]);
+        Gate::authorize('view', $channel); $channel->load(['team:id,name', 'defaultAssignee:id,name', 'businessHours:id,name', 'emailSettings', 'webChatWidget', 'whatsappSettings', 'messengerSettings', 'instagramSettings', 'telegramSettings', 'smsSettings', 'credential:id,channel_id,provider,status,last_rotated_at']);
+        return Inertia::render('Tenant/Admin/Channels/Show', ['channel' => $channel, 'adapter' => ['available' => $this->manager->adapter($channel->type)->available(), 'capabilities' => $this->manager->adapter($channel->type)->capabilities(), 'configurationErrors' => $this->manager->adapter($channel->type)->validateConfiguration($channel)], 'embedUrl' => $channel->type === 'web_chat' && $channel->status === 'active' && $channel->webChatWidget?->active ? url('/widget/promptbot.js').'?key='.$channel->webChatWidget->public_key : null, 'inboundWebhookUrl' => match ($channel->type) {
+            'email' => route('tenant.channels.email.inbound', $channel),
+            'whatsapp' => route('tenant.channels.whatsapp.webhook', $channel),
+            'messenger' => route('tenant.channels.messenger.webhook', $channel),
+            'instagram' => route('tenant.channels.instagram.webhook', $channel),
+            'sms' => route('tenant.channels.sms.webhook', $channel),
+            default => null,
+        }]);
     }
 
     public function edit(Channel $channel): Response
     {
-        Gate::authorize('update', $channel); $channel->load(['emailSettings', 'webChatWidget', 'credential']);
+        Gate::authorize('update', $channel); $channel->load(['emailSettings', 'webChatWidget', 'whatsappSettings', 'messengerSettings', 'instagramSettings', 'telegramSettings', 'smsSettings', 'credential']);
         return Inertia::render('Tenant/Admin/Channels/Form', array_merge($this->formData(), ['channel' => $channel->makeHidden('credential'), 'selectedType' => $channel->type, 'hasCredentials' => (bool) $channel->credential]));
     }
 
@@ -104,10 +113,116 @@ class ChannelController extends Controller
         if ($channel->type === 'web_chat') {
             $channel->webChatWidget()->updateOrCreate([], array_merge(['public_key' => $channel->webChatWidget?->public_key ?? Str::random(48)], $data['widget']));
         }
-        $errors = $this->manager->adapter($channel->type)->validateConfiguration($channel->fresh(['emailSettings', 'webChatWidget', 'credential']));
+        if (in_array($channel->type, ['whatsapp', 'messenger', 'instagram', 'telegram', 'sms'], true)) {
+            $this->persistExternalChannel($channel, $data, $request->user('tenant')->id);
+        }
+        $errors = $this->manager->adapter($channel->type)->validateConfiguration($channel->fresh(['emailSettings', 'webChatWidget', 'whatsappSettings', 'messengerSettings', 'instagramSettings', 'telegramSettings', 'smsSettings', 'credential']));
         if ($channel->status === 'active' && $errors !== []) throw \Illuminate\Validation\ValidationException::withMessages(['status' => $errors]);
         $this->audit->record($channel->wasRecentlyCreated ? 'channel.created' : 'channel.updated', description: ($channel->wasRecentlyCreated ? 'Created' : 'Updated')." channel \"{$channel->name}\"", subject: $channel, newValues: Arr::except($data, ['credentials']));
         return $channel;
+    }
+
+    /**
+     * Persists the settings + credential for every non-email/web_chat
+     * channel type that connects to an external provider. They all share the
+     * same shape — a non-secret settings row plus a credential holding
+     * whatever secret fields that provider needs — so one method covers
+     * WhatsApp/Messenger/Instagram/Telegram/SMS instead of five near-identical
+     * blocks. The only per-type differences are which settings relation
+     * applies, the credential's `provider` label, and which field names its
+     * required-secret error should point at.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function persistExternalChannel(Channel $channel, array $data, int $actorId): void
+    {
+        $settingsRelation = match ($channel->type) {
+            'whatsapp' => 'whatsappSettings',
+            'messenger' => 'messengerSettings',
+            'instagram' => 'instagramSettings',
+            'telegram' => 'telegramSettings',
+            'sms' => 'smsSettings',
+        };
+
+        $channel->{$settingsRelation}()->updateOrCreate([], $data[$channel->type] ?? []);
+
+        $credentials = $data['credentials'] ?? [];
+        $submitted = array_filter($credentials, fn ($value) => $value !== null && $value !== '');
+
+        // Editing unrelated fields (e.g. renaming the channel) must not wipe
+        // a previously-saved token just because the form resubmits blank
+        // credential fields — same guard the email/SMTP branch above uses.
+        if ($submitted === [] && $channel->credential) {
+            return;
+        }
+
+        if ($submitted === [] && ! $channel->credential) {
+            $tokenField = match ($channel->type) {
+                'whatsapp' => 'access_token',
+                'messenger', 'instagram' => 'page_access_token',
+                'telegram' => 'bot_token',
+                'sms' => 'account_sid',
+            };
+
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                "credentials.{$tokenField}" => 'The required credential fields for this channel are missing.',
+            ]);
+        }
+
+        $provider = match ($channel->type) {
+            'whatsapp' => 'whatsapp_cloud_api',
+            'messenger' => 'meta_messenger',
+            'instagram' => 'meta_instagram',
+            'telegram' => 'telegram_bot_api',
+            'sms' => 'twilio',
+        };
+
+        $channel->credential()->updateOrCreate([], [
+            'provider' => $provider,
+            'encrypted_payload' => array_merge($channel->credential?->encrypted_payload ?? [], $credentials),
+            'status' => 'active',
+            'last_rotated_at' => now(),
+            'rotated_by' => $actorId,
+        ]);
+
+        if ($channel->type === 'telegram') {
+            $this->registerTelegramWebhook($channel);
+        }
+    }
+
+    /**
+     * Telegram is the one provider here that lets us finish setup ourselves:
+     * `setWebhook` just needs the bot token, no OAuth console flow. A bad
+     * token must not block saving the channel — it should read the same as
+     * any other "not configured yet" state, discoverable via the adapter's
+     * validateConfiguration errors on the Show page rather than a hard save
+     * failure.
+     */
+    private function registerTelegramWebhook(Channel $channel): void
+    {
+        $secret = $channel->credential?->encrypted_payload ?? [];
+        $token = $secret['bot_token'] ?? null;
+        $webhookSecret = $secret['webhook_secret'] ?? null;
+
+        if (! $token || ! $webhookSecret) {
+            return;
+        }
+
+        try {
+            $this->telegram->call($token, 'setWebhook', [
+                'url' => route('tenant.channels.telegram.webhook', $channel),
+                'secret_token' => $webhookSecret,
+            ]);
+
+            $me = $this->telegram->call($token, 'getMe');
+
+            $channel->telegramSettings()->updateOrCreate([], [
+                'bot_username' => $me['result']['username'] ?? null,
+                'bot_id' => isset($me['result']['id']) ? (string) $me['result']['id'] : null,
+            ]);
+        } catch (ChannelProviderApiException $exception) {
+            report($exception);
+        }
     }
 
     private function formData(): array

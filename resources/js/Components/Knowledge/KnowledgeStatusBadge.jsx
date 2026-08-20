@@ -38,6 +38,7 @@ const STATES = {
     failed: { label: 'Failed', icon: XCircle, className: 'border-rose-200 bg-rose-50 text-rose-700' },
 
     draft: { label: 'Draft', icon: CircleDashed, className: 'border-slate-200 bg-slate-100 text-slate-600' },
+    in_review: { label: 'In review', icon: Clock, className: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
     disabled: { label: 'Disabled', icon: Ban, className: 'border-slate-200 bg-slate-100 text-slate-600' },
     cancelled: { label: 'Cancelled', icon: Ban, className: 'border-slate-200 bg-slate-100 text-slate-600' },
     excluded: { label: 'Excluded', icon: Ban, className: 'border-slate-200 bg-slate-100 text-slate-600' },

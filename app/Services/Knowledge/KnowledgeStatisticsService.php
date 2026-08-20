@@ -125,10 +125,18 @@ class KnowledgeStatisticsService
         }
     }
 
-    /** A base is healthy, busy, or degraded depending on its sources. */
+    /**
+     * A base is healthy, busy, or degraded depending on its sources.
+     *
+     * Draft is deliberately not in the exclusion list below: it is the
+     * default a base starts in, not a state an admin chose, so it must be
+     * able to leave automatically once the base has a source. Disabled and
+     * Archived are excluded because those ARE deliberate choices — this
+     * reconciler must never overwrite one behind the admin's back.
+     */
     public function reconcileBaseStatus(KnowledgeBase $base): void
     {
-        if (in_array($base->status, [KnowledgeBaseStatus::Disabled, KnowledgeBaseStatus::Archived, KnowledgeBaseStatus::Draft], true)) {
+        if (in_array($base->status, [KnowledgeBaseStatus::Disabled, KnowledgeBaseStatus::Archived], true)) {
             return;
         }
 

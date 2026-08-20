@@ -25,5 +25,10 @@ class Channel extends Model
     public function credential(): HasOne { return $this->hasOne(ChannelCredential::class); }
     public function emailSettings(): HasOne { return $this->hasOne(EmailChannelSetting::class); }
     public function webChatWidget(): HasOne { return $this->hasOne(WebChatWidget::class); }
+    public function whatsappSettings(): HasOne { return $this->hasOne(WhatsappChannelSetting::class); }
+    public function messengerSettings(): HasOne { return $this->hasOne(MessengerChannelSetting::class); }
+    public function instagramSettings(): HasOne { return $this->hasOne(InstagramChannelSetting::class); }
+    public function telegramSettings(): HasOne { return $this->hasOne(TelegramChannelSetting::class); }
+    public function smsSettings(): HasOne { return $this->hasOne(SmsChannelSetting::class); }
     public function conversations(): HasMany { return $this->hasMany(Conversation::class); }
 }

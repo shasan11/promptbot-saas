@@ -2,6 +2,8 @@
 
 namespace App\Services\Knowledge;
 
+use App\Models\Knowledge\KnowledgeArticle;
+use App\Models\Knowledge\KnowledgeArticleVersion;
 use App\Models\Knowledge\KnowledgeDocument;
 use App\Models\Knowledge\KnowledgeDocumentVersion;
 use App\Models\Knowledge\KnowledgeFaq;
@@ -142,6 +144,51 @@ class KnowledgeVersionService
         ])->save();
 
         return $faq;
+    }
+
+    public function snapshotArticle(KnowledgeArticle $article, ?string $changeSummary = null, ?User $actor = null): KnowledgeArticleVersion
+    {
+        return DB::transaction(function () use ($article, $changeSummary, $actor) {
+            $latest = (int) KnowledgeArticleVersion::query()
+                ->where('knowledge_article_id', $article->id)
+                ->lockForUpdate()
+                ->max('version_number');
+
+            $version = KnowledgeArticleVersion::create([
+                'knowledge_article_id' => $article->id,
+                'version_number' => $latest + 1,
+                'title' => $article->title,
+                'summary' => $article->summary,
+                'body' => $article->body,
+                'status' => $article->status->value,
+                'change_summary' => $changeSummary,
+                'created_by' => $actor?->id,
+            ]);
+
+            $article->forceFill(['version_number' => $latest + 1])->save();
+
+            return $version;
+        });
+    }
+
+    /**
+     * Restores a version's title/summary/body onto the article, leaving its
+     * status untouched — a restore is an editorial correction of wording, not
+     * an approval, so it must not itself make a draft answerable again.
+     */
+    public function restoreArticle(KnowledgeArticle $article, KnowledgeArticleVersion $version, ?User $actor = null): KnowledgeArticle
+    {
+        $this->snapshotArticle($article, "Superseded by restore of version {$version->version_number}", $actor);
+
+        $article->forceFill([
+            'title' => $version->title,
+            'summary' => $version->summary,
+            'body' => $version->body,
+            'content_hash' => null,
+            'updated_by' => $actor?->id,
+        ])->save();
+
+        return $article;
     }
 
     /**

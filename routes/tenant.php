@@ -54,6 +54,7 @@ use App\Http\Controllers\Tenant\Admin\Inbox\AttachmentController;
 use App\Http\Controllers\Tenant\Admin\Inbox\ConversationController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\CollectionController as KnowledgeCollectionController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\DocumentController as KnowledgeDocumentController;
+use App\Http\Controllers\Tenant\Admin\Knowledge\ArticleController as KnowledgeArticleController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\FaqController as KnowledgeFaqController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\KnowledgeBaseController;
 use App\Http\Controllers\Tenant\Admin\Knowledge\KnowledgeSettingsController;
@@ -74,6 +75,11 @@ use App\Http\Controllers\Tenant\Admin\Ticket\TicketController;
 use App\Http\Controllers\Tenant\Admin\Ticket\TicketSettingsController;
 use App\Http\Controllers\Tenant\Auth\TenantAuthenticatedSessionController;
 use App\Http\Controllers\Tenant\Channel\InboundEmailController;
+use App\Http\Controllers\Tenant\Channel\InboundInstagramController;
+use App\Http\Controllers\Tenant\Channel\InboundMessengerController;
+use App\Http\Controllers\Tenant\Channel\InboundSmsController;
+use App\Http\Controllers\Tenant\Channel\InboundTelegramController;
+use App\Http\Controllers\Tenant\Channel\InboundWhatsappController;
 use App\Http\Controllers\Tenant\Connections\InboundWebhookController;
 use App\Http\Controllers\Tenant\InvitationAcceptController;
 use App\Http\Controllers\Tenant\PublicSupportController;
@@ -125,6 +131,13 @@ Route::middleware([
     Route::post('/widget/api/{key}/messages', [WebChatController::class, 'messages'])->middleware('throttle:60,1')->name('tenant.widget.messages.store');
     Route::options('/widget/api/{key}/{path?}', WidgetCorsController::class)->where('path', '.*');
     Route::post('/channels/email/{channel}/inbound', InboundEmailController::class)->middleware('throttle:120,1')->name('tenant.channels.email.inbound');
+    // GET+POST on one route: Meta calls the same URL for both the webhook
+    // verification handshake and event delivery.
+    Route::match(['get', 'post'], '/channels/whatsapp/{channel}/webhook', InboundWhatsappController::class)->middleware('throttle:120,1')->name('tenant.channels.whatsapp.webhook');
+    Route::match(['get', 'post'], '/channels/messenger/{channel}/webhook', InboundMessengerController::class)->middleware('throttle:120,1')->name('tenant.channels.messenger.webhook');
+    Route::match(['get', 'post'], '/channels/instagram/{channel}/webhook', InboundInstagramController::class)->middleware('throttle:120,1')->name('tenant.channels.instagram.webhook');
+    Route::post('/channels/telegram/{channel}/webhook', InboundTelegramController::class)->middleware('throttle:120,1')->name('tenant.channels.telegram.webhook');
+    Route::post('/channels/sms/{channel}/webhook', InboundSmsController::class)->middleware('throttle:120,1')->name('tenant.channels.sms.webhook');
     Route::get('/help', [PublicSupportController::class, 'help'])->middleware('throttle:120,1')->name('tenant.help');
     Route::get('/forms/{slug}', [PublicSupportController::class, 'form'])->middleware('throttle:120,1')->name('tenant.forms.show');
     Route::post('/forms/{slug}', [PublicSupportController::class, 'submit'])->middleware('throttle:10,1')->name('tenant.forms.submit');
@@ -429,6 +442,21 @@ Route::middleware([
                 Route::put('{faq}', [KnowledgeFaqController::class, 'update'])->name('update');
                 Route::post('{faq}/publish', [KnowledgeFaqController::class, 'publish'])->name('publish');
                 Route::delete('{faq}', [KnowledgeFaqController::class, 'destroy'])->name('destroy');
+            });
+
+            Route::prefix('articles')->name('articles.')->group(function (): void {
+                Route::get('/', [KnowledgeArticleController::class, 'index'])->name('index');
+                Route::get('review-queue', [KnowledgeArticleController::class, 'reviewQueue'])->name('review-queue');
+                Route::post('/', [KnowledgeArticleController::class, 'store'])->name('store');
+                Route::put('{article}', [KnowledgeArticleController::class, 'update'])->name('update');
+                Route::post('{article}/submit-for-review', [KnowledgeArticleController::class, 'submitForReview'])->name('submit-for-review');
+                Route::post('{article}/approve', [KnowledgeArticleController::class, 'approve'])->name('approve');
+                Route::post('{article}/reject', [KnowledgeArticleController::class, 'reject'])->name('reject');
+                Route::post('{article}/archive', [KnowledgeArticleController::class, 'archive'])->name('archive');
+                Route::post('{article}/restore', [KnowledgeArticleController::class, 'restore'])->name('restore');
+                Route::get('{article}/versions', [KnowledgeArticleController::class, 'versions'])->name('versions');
+                Route::post('{article}/versions/{version}/restore', [KnowledgeArticleController::class, 'restoreVersion'])->name('versions.restore');
+                Route::delete('{article}', [KnowledgeArticleController::class, 'destroy'])->name('destroy');
             });
 
             Route::prefix('text-sources')->name('text-sources.')->group(function (): void {
