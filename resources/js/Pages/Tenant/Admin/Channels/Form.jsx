@@ -27,7 +27,7 @@ function ErrorSummary({ errors }) {
     );
 }
 
-export default function Form({ channel, selectedType, catalog, teams, users, businessHours, hasCredentials, knowledgeBases = [] }) {
+export default function Form({ channel, selectedType, catalog, teams, users, businessHours, hasCredentials, knowledgeBases = [], botProfiles = [] }) {
     const editing = Boolean(channel);
     const email = channel?.email_settings || {};
     const widget = channel?.web_chat_widget || {};
@@ -42,6 +42,7 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
         team_id: channel?.team_id || '',
         default_assignee_id: channel?.default_assignee_id || '',
         business_hours_policy_id: channel?.business_hours_policy_id || '',
+        bot_profile_id: channel?.bot_profile_id || '',
         auto_reply_enabled: channel?.auto_reply_enabled || false,
         signature: channel?.signature || '',
         email: {
@@ -79,6 +80,8 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
             launcher_position: widget.launcher_position || 'right',
             welcome_message: widget.welcome_message || 'How can we help?',
             offline_message: widget.offline_message || 'We are currently offline. Leave a message and we will get back to you.',
+            no_answer_message: widget.no_answer_message || '',
+            handoff_on_no_answer: widget.handoff_on_no_answer ?? true,
             supported_languages: widget.supported_languages || ['en'],
             allowed_origins: widget.allowed_origins || [],
             privacy_url: widget.privacy_url || '',
@@ -155,6 +158,12 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
                             <option value="">Always available</option>{businessHours.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </Select>
                     </FormField>
+                    <FormField label="Bot profile" hint="How the bot behaves on this channel — tone, answer length and when it hands over." error={form.errors.bot_profile_id}>
+                        <Select value={form.data.bot_profile_id} onChange={(event) => form.setData('bot_profile_id', event.target.value)}>
+                            <option value="">{botProfiles.some((item) => item.is_default) ? 'Use the workspace default profile' : 'Built-in default behaviour'}</option>
+                            {botProfiles.map((item) => <option key={item.id} value={item.id}>{item.name}{item.is_default ? ' (default)' : ''}</option>)}
+                        </Select>
+                    </FormField>
                     <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium text-slate-700">
                         <input type="checkbox" checked={form.data.auto_reply_enabled} onChange={(event) => form.setData('auto_reply_enabled', event.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                         Enable automatic replies
@@ -212,6 +221,13 @@ export default function Form({ channel, selectedType, catalog, teams, users, bus
                                 {knowledgeBases.map((base) => <option key={base.id} value={base.id}>{base.name}</option>)}
                             </Select>
                         </FormField>
+                        <FormField label="When AI can't answer" className="md:col-span-2" hint="Sent when nothing in the knowledge base confidently answers the question. Leave blank to use the default wording." error={form.errors['widget.no_answer_message']}>
+                            <Input value={form.data.widget.no_answer_message} onChange={(event) => setNested('widget', 'no_answer_message', event.target.value)} placeholder="I couldn't find a confident answer to that…" />
+                        </FormField>
+                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 md:col-span-2">
+                            <input type="checkbox" checked={form.data.widget.handoff_on_no_answer} onChange={(event) => setNested('widget', 'handoff_on_no_answer', event.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                            Flag unanswered questions for a human
+                        </label>
                     </section>
                 )}
 

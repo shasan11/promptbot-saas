@@ -22,7 +22,7 @@ use Illuminate\Support\Str;
 
 class ConversationService
 {
-    public function __construct(private readonly ChannelManager $channels, private readonly CustomerTimelineService $timeline, private readonly RoutingService $routing, private readonly SlaService $sla, private readonly AutomationExecutionService $automation, private readonly OutboundWebhookService $webhooks) {}
+    public function __construct(private readonly ChannelManager $channels, private readonly CustomerTimelineService $timeline, private readonly RoutingService $routing, private readonly SlaService $sla, private readonly AutomationExecutionService $automation, private readonly OutboundWebhookService $webhooks, private readonly ConversationControlService $control) {}
 
     public function receive(Channel $channel, Contact $contact, array $payload): Message
     {
@@ -52,15 +52,16 @@ class ConversationService
             return $message;
         });
         if (! $internal) {
+            // A person answering the customer takes ownership: from here the
+            // AI must not auto-reply on this conversation again. An internal
+            // note is deliberately excluded — jotting a note to a colleague
+            // is not the same as answering, and should not silence the bot.
+            $this->control->humanTookOver($conversation, $actor);
+
             $channel = $conversation->channel;
-            // Messenger/Instagram/Telegram contacts are identified by a
-            // platform-scoped id (PSID/IGSID/chat id), not an email or phone
-            // number — falling through to the email/phone chain for them
-            // would hand the adapter a null recipient and the send would
-            // silently fail.
-            $recipient = in_array($channel->type, ['messenger', 'instagram', 'telegram'], true)
-                ? $conversation->contact->external_id
-                : ($conversation->contact->email ?: $conversation->contact->phone);
+            // Per-channel recipient resolution lives on the model so every
+            // sender (human reply, autonomous agent, widget) agrees on it.
+            $recipient = (string) $conversation->recipientAddress();
             $result = $this->channels->adapter($channel->type)->send($channel, new OutboundMessage($recipient, $conversation->subject ?: 'Support conversation', $message->body, headers: ['X-PromptBot-Conversation' => $conversation->public_uuid]));
             $message->update($result->successful ? ['status' => 'sent', 'delivered_at' => now(), 'channel_message_id' => $result->providerMessageId] : ['status' => 'failed', 'failed_at' => now(), 'failure_reason' => $result->error]);
             if ($result->successful) { $this->timeline->record('message.outgoing', "Reply sent by {$actor->name}.", $conversation->contact, actor: $actor, related: $conversation); $this->sla->fulfillFirstResponse($conversation); $this->automation->dispatch('message.sent', $conversation->fresh()); $this->webhooks->record('message.sent', $conversation, ['message_id' => $message->public_uuid]); }

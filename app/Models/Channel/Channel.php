@@ -17,8 +17,21 @@ class Channel extends Model
 {
     use HasPublicUuid, SoftDeletes;
     public const TYPES = ['email', 'web_chat', 'whatsapp', 'sms', 'messenger', 'instagram', 'telegram', 'voice'];
-    protected $fillable = ['type', 'name', 'status', 'configuration', 'team_id', 'default_assignee_id', 'business_hours_policy_id', 'auto_reply_enabled', 'signature', 'created_by', 'last_activity_at'];
+    protected $fillable = ['type', 'name', 'status', 'configuration', 'team_id', 'default_assignee_id', 'business_hours_policy_id', 'bot_profile_id', 'auto_reply_enabled', 'signature', 'created_by', 'last_activity_at'];
     protected function casts(): array { return ['configuration' => 'array', 'auto_reply_enabled' => 'boolean', 'last_activity_at' => 'datetime']; }
+    public function botProfile(): BelongsTo { return $this->belongsTo(BotProfile::class); }
+
+    /** Never null: a channel without an attached profile behaves on documented defaults. */
+    /**
+     * Resolution order: the profile attached to this channel, then the
+     * workspace default, then the built-in defaults.
+     *
+     * The middle step is what makes the `is_default` flag mean anything —
+     * without it the column was a checkbox nothing read, and a workspace that
+     * wanted one behaviour everywhere had to attach the same profile to every
+     * channel by hand. A workspace with no default profile is unaffected.
+     */
+    public function effectiveBotProfile(): BotProfile { return $this->botProfile ?: (BotProfile::workspaceDefault() ?: BotProfile::defaults()); }
     public function team(): BelongsTo { return $this->belongsTo(Team::class); }
     public function defaultAssignee(): BelongsTo { return $this->belongsTo(User::class, 'default_assignee_id'); }
     public function businessHours(): BelongsTo { return $this->belongsTo(BusinessHourPolicy::class, 'business_hours_policy_id'); }

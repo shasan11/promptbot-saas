@@ -38,6 +38,12 @@ class KnowledgeBaseService
         $base = KnowledgeBase::create(array_merge($attributes, [
             'slug' => $this->uniqueSlug($attributes['name']),
             'status' => KnowledgeBaseStatus::Draft,
+            // Provider-aware: the built-in hash provider's cosine scores sit
+            // an order of magnitude below a real embedding model's, so one
+            // fixed default cannot serve both — applied to `local` it would
+            // reject every result the base ever retrieves.
+            'similarity_threshold' => $attributes['similarity_threshold']
+                ?? $this->defaultThresholdFor($provider->name()),
             // Dimensions are taken from the provider, never from user input:
             // a mismatch here would produce vectors that cannot be compared and
             // a base that silently retrieves nothing.
@@ -57,6 +63,17 @@ class KnowledgeBaseService
         );
 
         return $base;
+    }
+
+    /**
+     * The calibrated admission threshold for a given embedding provider. See
+     * `config/knowledge.php` for the measurements these values come from.
+     */
+    public function defaultThresholdFor(string $provider): float
+    {
+        return $provider === 'local'
+            ? (float) config('knowledge.retrieval.default_similarity_threshold_local', 0.05)
+            : (float) config('knowledge.retrieval.default_similarity_threshold', 0.52);
     }
 
     /**
@@ -83,6 +100,17 @@ class KnowledgeBaseService
             $attributes['embedding_dimensions'] = $provider->dimensions();
             $attributes['embedding_version'] = $base->embedding_version + 1;
             $requiresReindex = true;
+
+            // Different models score on different bands, so a threshold tuned
+            // for the old one is wrong for the new one — and wrong in a
+            // dangerous direction when moving local (0.05) to a real model,
+            // where 0.05 admits essentially anything. Only a threshold still
+            // sitting on the previous provider's default is moved; a value
+            // the operator chose is theirs to keep.
+            if (! array_key_exists('similarity_threshold', $attributes)
+                && abs((float) $base->similarity_threshold - $this->defaultThresholdFor((string) $base->embedding_provider)) < 0.0001) {
+                $attributes['similarity_threshold'] = $this->defaultThresholdFor($provider->name());
+            }
         }
 
         // A manual status change (Draft/Active/Disabled — Archived has its own

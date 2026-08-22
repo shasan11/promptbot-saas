@@ -40,6 +40,28 @@ class AutonomousReplyService
             ->with('providerConfig')->first();
     }
 
+    /**
+     * Generate and send in one call — the entry point the reply orchestrator
+     * uses. This logic previously lived inline in AutoReplyConversationJob,
+     * which meant the only way to trigger an agent reply was to dispatch that
+     * job; the orchestrator needs to make the same decision synchronously
+     * inside its own queued context.
+     *
+     * Returns false when nothing was sent, so the caller can count it as an
+     * AI failure and escalate rather than leaving the customer with silence.
+     */
+    public function replyWithAgent(Conversation $conversation, Agent $agent): bool
+    {
+        $result = app(InboxCopilotService::class)->perform($conversation, 'draft', null, [], $agent);
+        $suggestion = Suggestion::query()->where('public_uuid', $result['suggestion_uuid'] ?? '')->first();
+
+        if (! $suggestion) {
+            return false;
+        }
+
+        return $this->send($conversation->fresh(), $agent, $suggestion);
+    }
+
     public function send(Conversation $conversation, Agent $agent, Suggestion $suggestion): bool
     {
         $conversation->loadMissing(['channel.emailSettings','channel.credential','contact','aiInsight','latestMessage']);
@@ -58,7 +80,12 @@ class AutonomousReplyService
             'provider_healthy' => $agent->providerConfig?->status === ProviderStatus::Healthy,
             'run_successful' => $run?->status === RunStatus::Completed,
             'latest_is_inbound' => $conversation->latestMessage?->direction === 'inbound',
-            'recipient_available' => filled($conversation->contact?->email ?: $conversation->contact?->phone),
+            // Defence in depth. The orchestrator already refuses to generate
+            // for a conversation a human owns, but this is the last gate
+            // before a message actually reaches a customer, and an agent
+            // replying over a human is the failure that damages trust most.
+            'control_allows_ai' => $conversation->control_state->allowsAutomatedReply(),
+            'recipient_available' => filled($conversation->recipientAddress()),
         ];
         try { $this->budget->ensureAvailable(); $checks['budget_available'] = true; }
         catch (\Throwable) { $checks['budget_available'] = false; }
@@ -83,7 +110,7 @@ class AutonomousReplyService
         });
         if (! $message) return false;
 
-        $recipient = $conversation->contact->email ?: $conversation->contact->phone;
+        $recipient = (string) $conversation->recipientAddress();
         $result = $this->channels->adapter($channel->type)->send($channel, new OutboundMessage($recipient,
             $conversation->subject ?: 'Support conversation', $message->body,
             headers: ['X-PromptBot-Conversation' => $conversation->public_uuid, 'X-PromptBot-AI-Run' => $suggestion->run?->public_uuid]));

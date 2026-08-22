@@ -2,10 +2,9 @@
 
 namespace App\Services\Channels;
 
-use App\Enums\AI\AgentStatus;
-use App\Enums\AI\DeploymentMode;
+use App\Enums\AI\RunStatus;
 use App\Enums\Knowledge\RetrievalMode;
-use App\Models\AI\Agent;
+use App\Models\AI\Run;
 use App\Models\Channel\WebChatWidget;
 use App\Models\Inbox\Conversation;
 use App\Models\Knowledge\KnowledgeRetrievalLog;
@@ -13,6 +12,7 @@ use App\Services\AI\AIFeatureManager;
 use App\Services\Knowledge\Data\RetrievalQuery;
 use App\Services\Knowledge\KnowledgeAnswerService;
 use App\Services\Knowledge\KnowledgeRetrievalService;
+use App\Services\Knowledge\QueryRewriteService;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -42,40 +42,37 @@ class WebChatAutoReplyService
         private readonly AIFeatureManager $features,
         private readonly KnowledgeRetrievalService $retrieval,
         private readonly KnowledgeAnswerService $answers,
+        private readonly QueryRewriteService $rewriter,
     ) {}
 
-    public function maybeReply(WebChatWidget $widget, Conversation $conversation, string $question): void
+    /**
+     * Answer using the knowledge-only path.
+     *
+     * Control-state, human-request and risk gating now live in
+     * `ConversationReplyOrchestrator`; the checks kept here are the ones that
+     * are genuinely this engine's own preconditions — is this widget
+     * configured to answer at all, and is the platform feature enabled.
+     *
+     * Returns false when nothing was sent, so the orchestrator can treat it
+     * as an AI failure.
+     */
+    public function reply(WebChatWidget $widget, Conversation $conversation, string $question): bool
     {
         if (! $widget->ai_auto_reply_enabled || ! $widget->knowledge_base_id) {
-            return;
+            return false;
         }
 
         if (! $this->features->isEnabled(self::FEATURE_KEY)) {
-            return;
-        }
-
-        if ($this->hasAutonomousAgent($conversation)) {
-            return;
+            return false;
         }
 
         try {
-            $this->reply($widget, $conversation, $question);
+            return $this->generate($widget, $conversation, $question);
         } catch (Throwable $exception) {
             report($exception);
-        }
-    }
 
-    private function hasAutonomousAgent(Conversation $conversation): bool
-    {
-        return Agent::query()
-            ->where('status', AgentStatus::Active)
-            ->where('deployment_mode', DeploymentMode::Autonomous)
-            ->where('auto_reply_enabled', true)
-            ->whereHas('channels', fn ($query) => $query
-                ->where('channels.id', $conversation->channel_id)
-                ->where('ai_agent_channels.enabled', true)
-                ->where('ai_agent_channels.deployment_mode', DeploymentMode::Autonomous->value))
-            ->exists();
+            return false;
+        }
     }
 
     /**
@@ -130,22 +127,27 @@ class WebChatAutoReplyService
         return trim($text);
     }
 
-    private function reply(WebChatWidget $widget, Conversation $conversation, string $question): void
+    private function generate(WebChatWidget $widget, Conversation $conversation, string $question): bool
     {
         if ($smalltalk = $this->smalltalkReply($question)) {
             $this->post($conversation, $smalltalk, ['ai_generated' => true, 'generated_by' => 'smalltalk']);
 
-            return;
+            return true;
         }
 
         $base = $widget->knowledgeBase;
 
         if (! $base) {
-            return;
+            return false;
         }
 
+        // Retrieval searches for the rewritten text; generation still answers
+        // the customer's actual words. A follow-up like "how much does it
+        // cost?" carries no subject on its own and would retrieve nothing.
+        $searchText = $this->rewriter->rewrite($question, $conversation);
+
         $query = new RetrievalQuery(
-            query: $question,
+            query: $searchText,
             knowledgeBaseIds: [$base->id],
             mode: $base->retrieval_mode ?? RetrievalMode::Hybrid,
             topK: $base->top_k ?? 5,
@@ -157,14 +159,20 @@ class WebChatAutoReplyService
         );
 
         $outcome = $this->retrieval->retrieve($query, $base);
-        $answer = $this->answers->answer($outcome, $question);
+        $answer = $this->answers->answer($outcome, $question, $conversation->channel?->effectiveBotProfile()?->styleInstruction());
 
-        // Never let an unconfigured/failed AI call post a "could not find
-        // enough matching knowledge" bot message with high confidence — only
-        // post when there was something real to say.
+        // Retrieval found nothing usable. Previously this returned silently,
+        // which the visitor experiences as the bot ignoring them — the single
+        // most damaging failure mode the widget had. Say so plainly instead,
+        // and (by default) pull a human in rather than leaving the question
+        // to die in an unattended conversation.
         if ($outcome->isEmpty() || trim((string) ($answer['answer'] ?? '')) === '') {
-            return;
+            $this->postNoAnswer($widget, $conversation);
+
+            return false;
         }
+
+        $this->recordRun($conversation, $answer);
 
         $this->post($conversation, $this->stripCitationMarkers($answer['answer']), [
             'ai_generated' => true,
@@ -175,6 +183,89 @@ class WebChatAutoReplyService
             // "sources" affordance) actually knows how to present them.
             'sources_used' => $answer['sources_used'] ?? [],
             'confidence' => $answer['confidence'] ?? null,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Records what this answer cost against the conversation it answered.
+     *
+     * The widget's generation goes through `AIManager`, which logs to the
+     * *central* platform usage table — operator-scoped, and with no notion of
+     * a conversation. Without this row, per-conversation cost covered only
+     * conversations an Agent answered, so a workspace running web chat alone
+     * saw a cost of zero and a page that looked broken.
+     *
+     * Best-effort by design: an analytics row must never cost the visitor
+     * their answer, which has already been generated by this point.
+     *
+     * @param  array<string, mixed>  $answer
+     */
+    private function recordRun(Conversation $conversation, array $answer): void
+    {
+        $usage = $answer['usage'] ?? null;
+
+        // The extractive fallback makes no provider call, so there is nothing
+        // to bill and no run to record.
+        if (! is_array($usage)) {
+            return;
+        }
+
+        try {
+            Run::create([
+                'feature' => 'widget_answer',
+                'operation' => 'answer',
+                'conversation_id' => $conversation->id,
+                'provider' => $usage['provider'] ?? null,
+                'model' => $usage['model'] ?? null,
+                'status' => RunStatus::Completed,
+                'started_at' => now()->subMilliseconds((int) ($usage['latency_ms'] ?? 0)),
+                'finished_at' => now(),
+                'latency_ms' => (int) ($usage['latency_ms'] ?? 0),
+                'attempt_count' => 1,
+                'input_token_count' => (int) ($usage['prompt_tokens'] ?? 0),
+                'output_token_count' => (int) ($usage['completion_tokens'] ?? 0),
+                'total_token_count' => (int) ($usage['total_tokens'] ?? 0),
+                'estimated_cost' => (float) ($usage['estimated_cost'] ?? 0),
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * The "I don't know" path. Posting a message here rather than nothing is
+     * what stops an unanswerable question from looking like a broken widget,
+     * and flagging for handoff is what stops it from being forgotten: an
+     * AI-only conversation nobody is assigned to would otherwise sit unread.
+     */
+    private function postNoAnswer(WebChatWidget $widget, Conversation $conversation): void
+    {
+        $this->post(
+            $conversation,
+            trim((string) $widget->no_answer_message) ?: WebChatWidget::DEFAULT_NO_ANSWER_MESSAGE,
+            ['ai_generated' => true, 'generated_by' => 'no_answer'],
+        );
+
+        if (! $widget->handoff_on_no_answer) {
+            return;
+        }
+
+        // Reopen and surface it: `unread_count` is what the Inbox badges, so
+        // an unanswered question becomes visible work for a human instead of
+        // a silently-closed thread.
+        //
+        // Written through the query builder rather than the model instance on
+        // purpose: post() above already ran `update(['message_count' =>
+        // DB::raw(...)])` on this same instance, which leaves an Expression
+        // object sitting in its attributes. Saving the model again risks
+        // re-persisting that raw expression, double-incrementing the counter.
+        // A targeted UPDATE touches only the two columns intended here.
+        Conversation::query()->whereKey($conversation->id)->update([
+            'status' => DB::raw("CASE WHEN status IN ('closed','resolved','snoozed') THEN 'open' ELSE status END"),
+            'unread_count' => DB::raw('unread_count + 1'),
+            'updated_at' => now(),
         ]);
     }
 

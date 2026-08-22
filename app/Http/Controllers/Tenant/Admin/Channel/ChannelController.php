@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Tenant\Admin\Channel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Channel\ChannelRequest;
 use App\Models\BusinessHourPolicy;
+use App\Models\Channel\BotProfile;
 use App\Models\Channel\Channel;
 use App\Models\Knowledge\KnowledgeBase;
 use App\Models\Team;
@@ -94,7 +95,7 @@ class ChannelController extends Controller
     private function persist(ChannelRequest $request, ?Channel $channel = null): Channel
     {
         $data = $request->validated(); $channel ??= new Channel(['created_by' => $request->user('tenant')->id]);
-        $channel->fill(Arr::only($data, ['type', 'name', 'status', 'team_id', 'default_assignee_id', 'business_hours_policy_id', 'auto_reply_enabled', 'signature'])); $channel->save();
+        $channel->fill(Arr::only($data, ['type', 'name', 'status', 'team_id', 'default_assignee_id', 'business_hours_policy_id', 'bot_profile_id', 'auto_reply_enabled', 'signature'])); $channel->save();
         if ($channel->type === 'email') {
             $email = $data['email']; $channel->emailSettings()->updateOrCreate([], array_merge(['capture_cc' => true, 'strip_quoted_replies' => true], $email));
             $hadCredential = (bool) $channel->credential;
@@ -227,6 +228,6 @@ class ChannelController extends Controller
 
     private function formData(): array
     {
-        return ['catalog' => $this->manager->catalog(), 'teams' => Team::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'users' => User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'businessHours' => BusinessHourPolicy::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'hasCredentials' => false, 'knowledgeBases' => KnowledgeBase::query()->orderBy('name')->get(['id', 'name'])];
+        return ['catalog' => $this->manager->catalog(), 'teams' => Team::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'users' => User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'businessHours' => BusinessHourPolicy::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'hasCredentials' => false, 'knowledgeBases' => KnowledgeBase::query()->orderBy('name')->get(['id', 'name']), 'botProfiles' => BotProfile::query()->orderByDesc('is_default')->orderBy('name')->get(['id', 'name', 'is_default'])];
     }
 }

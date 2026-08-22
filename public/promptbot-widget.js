@@ -20,6 +20,8 @@
     var typingTimeout = null;
     var pollTimer = null;
     var quickPollTimer = null;
+    /** Counts genuine back-and-forth turns; gates the satisfaction prompt. */
+    var exchangeCount = 0;
 
     // ---- HTTP -----------------------------------------------------------
 
@@ -189,6 +191,21 @@
             + '.pb-body::-webkit-scrollbar{width:6px}.pb-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}'
             + '.pb-welcome{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;font-size:13.5px;'
             + 'line-height:1.5;color:#475569;margin-bottom:10px;box-shadow:0 1px 2px rgba(15,23,42,.04)}'
+            + '.pb-offline{background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:12px 14px;font-size:13px;'
+            + 'line-height:1.5;color:#92400e;margin-bottom:10px}'
+            + '.pb-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}'
+            + '.pb-chip{border:1px solid ' + primary + '55;background:#fff;color:' + primary + ';border-radius:999px;'
+            + 'padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;line-height:1.35;'
+            + 'transition:background .15s ease,transform .12s ease}'
+            + '.pb-chip:hover{background:' + primary + '11}.pb-chip:active{transform:scale(.97)}'
+            + '.pb-rate{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;margin:10px 0;'
+            + 'box-shadow:0 1px 2px rgba(15,23,42,.04)}'
+            + '.pb-rate p{margin:0 0 9px;font-size:13px;color:#475569}'
+            + '.pb-rate-row{display:flex;gap:8px}'
+            + '.pb-rate-btn{flex:1;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:9px;cursor:pointer;'
+            + 'font-size:18px;line-height:1;transition:background .15s ease,border-color .15s ease}'
+            + '.pb-rate-btn:hover{background:#fff;border-color:' + primary + '}'
+            + '.pb-rate-done{font-size:12.5px;color:#059669;font-weight:600}'
             + '.pb-row{display:flex;margin:5px 0}'
             + '.pb-row.out{justify-content:flex-end}.pb-row.in{justify-content:flex-start;align-items:flex-end;gap:8px}'
             + '.pb-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,' + primary + ',' + accent + ');'
@@ -272,6 +289,37 @@
         var body = el('div', { class: 'pb-body' });
         var welcome = text('div', 'pb-welcome', config.welcomeMessage || 'How can we help?');
         body.appendChild(welcome);
+
+        // Out-of-hours notice. Only shown when the server says the workspace
+        // is closed AND no AI is answering — if the bot is on, the visitor
+        // genuinely can get help right now and telling them otherwise would
+        // be wrong.
+        if (config.online === false && !config.aiEnabled) {
+            var offlineText = config.offlineMessage || 'We are currently offline. Leave a message and we will get back to you.';
+            if (config.opensAt) {
+                var opens = new Date(config.opensAt);
+                if (!isNaN(opens.getTime())) {
+                    offlineText += ' We are back ' + opens.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '.';
+                }
+            }
+            body.appendChild(text('div', 'pb-offline', offlineText));
+        }
+
+        // Suggested questions. Rendered once, above the transcript, and
+        // removed as soon as the visitor engages — leaving them in place
+        // while a conversation is underway turns helpful prompts into clutter
+        // that competes with the thread.
+        var chips = null;
+        if ((config.suggestedQuestions || []).length) {
+            chips = el('div', { class: 'pb-chips' });
+            config.suggestedQuestions.slice(0, 6).forEach(function (question) {
+                var chip = el('button', { class: 'pb-chip', type: 'button' });
+                chip.textContent = question;
+                chip.onclick = function () { submitMessage(question); };
+                chips.appendChild(chip);
+            });
+            body.appendChild(chips);
+        }
 
         var typingRow = el('div', { class: 'pb-typing' }, [
             el('div', { class: 'pb-avatar', html: ICONS.bot }),
@@ -382,7 +430,15 @@
             scrollToBottom();
 
             if (typeof message.id === 'number' && isFinite(message.id)) lastSeenId = Math.max(lastSeenId, message.id);
-            if (!isOutbound) hideTyping();
+
+            if (!isOutbound) {
+                hideTyping();
+                // A reply arriving is what completes an exchange; asking for
+                // a rating is deferred a beat so it lands after the answer
+                // rather than on top of it.
+                exchangeCount++;
+                setTimeout(maybeAskForRating, 1500);
+            }
 
             return row;
         }
@@ -439,10 +495,17 @@
         launcher.onclick = function () { panelOpen ? closePanel() : openPanel(); };
         closeBtn.onclick = closePanel;
 
-        form.onsubmit = function (event) {
-            event.preventDefault();
-            var value = input.value.trim();
+        /**
+         * Shared by the composer and the suggested-question chips, so a chip
+         * behaves in every respect like the visitor typing that question —
+         * same optimistic render, same retry, same typing indicator.
+         */
+        function submitMessage(value) {
+            value = (value || '').trim();
             if (!value) return;
+
+            // Prompts have served their purpose the moment one is used.
+            if (chips && chips.parentNode) { chips.parentNode.removeChild(chips); chips = null; }
 
             input.value = '';
             sendBtn.disabled = true;
@@ -474,7 +537,43 @@
                     });
                 })
                 .finally(function () { sendBtn.disabled = false; });
+        }
+
+        form.onsubmit = function (event) {
+            event.preventDefault();
+            submitMessage(input.value);
         };
+
+        /**
+         * Asks for a rating once, after a real exchange has happened. Gated
+         * on the conversation actually having gone somewhere — prompting
+         * after a single unanswered message reads as tone-deaf, and rating a
+         * conversation that never happened produces meaningless CSAT.
+         */
+        var ratingShown = false;
+        function maybeAskForRating() {
+            if (ratingShown || exchangeCount < 2) return;
+            ratingShown = true;
+
+            var card = el('div', { class: 'pb-rate' });
+            card.appendChild(text('p', '', 'Was this helpful?'));
+            var row = el('div', { class: 'pb-rate-row' });
+
+            [['👍', 5], ['👌', 3], ['👎', 1]].forEach(function (pair) {
+                var btn = el('button', { class: 'pb-rate-btn', type: 'button', 'aria-label': 'Rate ' + pair[1] + ' out of 5' });
+                btn.textContent = pair[0];
+                btn.onclick = function () {
+                    api('/rate', { method: 'POST', body: JSON.stringify({ score: pair[1] }) }).catch(function () {});
+                    card.innerHTML = '';
+                    card.appendChild(text('div', 'pb-rate-done', 'Thanks for the feedback!'));
+                };
+                row.appendChild(btn);
+            });
+
+            card.appendChild(row);
+            body.appendChild(card);
+            scrollToBottom();
+        }
 
         // Background polling runs whenever we have a session, open or
         // closed, so a visitor who steps away still sees an unread badge

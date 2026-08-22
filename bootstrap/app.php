@@ -87,7 +87,20 @@ return Application::configure(basePath: dirname(__DIR__))
             return response('', 404);
         });
 
-        $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
-        );
+        // Machine endpoints must fail as JSON, never as an HTML redirect.
+        //
+        // `api/*` alone left the widget's own API and every provider webhook
+        // outside the rule: a validation failure on those became a 302 back to
+        // the site root, so the widget could not read its own error and a
+        // provider read a delivered-but-invalid payload as a failed delivery
+        // and retried it. Listed by path rather than by Accept header because
+        // these callers do not all send one.
+        $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is(
+            'api/*',
+            'widget/api/*',
+            'channels/*/inbound',
+            'channels/*/webhook',
+            'webhooks/inbound/*',
+            'billing/webhooks/*',
+        ));
     })->create();

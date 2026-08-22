@@ -58,14 +58,24 @@ class KeywordSearcher
             return [];
         }
 
-        // MySQL relevance is an unbounded TF-IDF-ish score. Normalising against
-        // the best hit puts it on 0..1 so it can be fused with cosine
-        // similarity, which lives on that scale.
-        $best = max(0.000001, (float) $rows->first()->relevance);
+        // MySQL relevance is an unbounded TF-IDF-ish score and has to be mapped
+        // onto 0..1 to fuse with cosine similarity.
+        //
+        // This previously divided by the best hit *in this query's own result
+        // set*, which meant the top keyword match always scored exactly 1.0 —
+        // whether its absolute relevance was 40 or 0.0001. A question the
+        // corpus knows nothing about still produced a "perfect" top score, so
+        // the similarity threshold could never reject it and the model was
+        // handed irrelevant context with maximum apparent confidence.
+        //
+        // A saturating transform is absolute instead: monotonic, bounded to
+        // 0..1, and identical for the same relevance in any query, so a weak
+        // match reads as weak.
+        $k = max(0.0001, (float) config('knowledge.retrieval.keyword_saturation', 1.0));
 
         return $rows->map(fn ($row) => [
             'chunk_id' => (int) $row->chunk_id,
-            'score' => min(1.0, (float) $row->relevance / $best),
+            'score' => (float) $row->relevance / ((float) $row->relevance + $k),
         ])->all();
     }
 

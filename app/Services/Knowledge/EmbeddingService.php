@@ -10,6 +10,7 @@ use App\Models\Knowledge\KnowledgeDocument;
 use App\Models\Knowledge\KnowledgeUsageRecord;
 use App\Services\Knowledge\Embedding\EmbeddingProviderFactory;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -156,9 +157,50 @@ class EmbeddingService
      * Embeds a search query with the same provider that produced the base's
      * chunk vectors. Using a different one silently yields nonsense similarity.
      *
+     * Cached, because a support knowledge base is asked the same handful of
+     * questions relentlessly ("how do I get a refund") and every one of those
+     * repeats was previously a fresh provider round trip — real latency on the
+     * hot path and a real per-token bill for a deterministic result.
+     *
+     * The cache key carries the base's full embedding signature (provider,
+     * model, dimensions, version), so re-indexing under a different model
+     * cannot serve vectors from the old one — the key simply changes and the
+     * stale entries age out. It is also tenant-scoped: a shared cache store
+     * across tenants must never let one workspace's query vector surface in
+     * another, even though a vector is not itself readable content.
+     *
      * @return array<int, float>
      */
     public function embedQuery(KnowledgeBase $base, string $query): array
+    {
+        $ttl = (int) config('knowledge.embeddings.query_cache_ttl', 3600);
+
+        if ($ttl <= 0) {
+            return $this->computeQueryEmbedding($base, $query);
+        }
+
+        $key = 'knowledge:qvec:'.(tenant('id') ?? 'central').':'.$base->id.':'
+            .hash('sha256', $base->embeddingSignature().'|'.$query);
+
+        $cached = Cache::get($key);
+
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
+
+        $vector = $this->computeQueryEmbedding($base, $query);
+
+        // An empty vector means the provider failed or returned nothing;
+        // caching that would pin the failure in place for the whole TTL.
+        if ($vector !== []) {
+            Cache::put($key, $vector, $ttl);
+        }
+
+        return $vector;
+    }
+
+    /** @return array<int, float> */
+    private function computeQueryEmbedding(KnowledgeBase $base, string $query): array
     {
         $result = $this->providers->forKnowledgeBase($base)->embed($query);
 

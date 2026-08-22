@@ -9,6 +9,7 @@ use App\Models\AI\Suggestion;
 use App\Models\Inbox\Conversation;
 use App\Models\User;
 use App\Neuron\Output\ConversationClassificationOutput;
+use App\Services\Knowledge\QueryRewriteService;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -30,9 +31,23 @@ class InboxCopilotService
             default => throw ValidationException::withMessages(['operation' => 'Unsupported copilot operation.']),
         };
         $ground = $operation === 'draft';
-        $result = $this->runtime->chat($agent, $request."\n\nConversation transcript:\n".$transcript, $actor, 'inbox_copilot', $operation, $ground);
+        $result = $this->runtime->chat(
+            $agent,
+            $request."\n\nConversation transcript:\n".$transcript,
+            $actor,
+            'inbox_copilot',
+            $operation,
+            $ground,
+            // Retrieval searches for the customer's question; the model still
+            // answers the full prompt. Passing the whole prompt to both meant
+            // the search vector was mostly instruction text and transcript
+            // history, and any resulting knowledge gap was filed under the
+            // prompt rather than under what the customer actually asked.
+            retrievalQuery: $ground ? $this->retrievalQuestion($conversation) : null,
+        );
         $suggestion = Suggestion::query()->where('public_uuid', $result['suggestion_uuid'])->firstOrFail();
         $suggestion->forceFill(['resource_type' => Conversation::class, 'resource_id' => $conversation->id, 'conversation_id' => $conversation->id, 'message_id' => $conversation->messages()->latest()->value('id'), 'type' => $operation])->save();
+        $this->attachRunToConversation($result['run_uuid'] ?? null, $conversation);
         if ($operation === 'summary') ConversationInsight::query()->updateOrCreate(['conversation_id' => $conversation->id], ['summary' => $result['text'], 'summary_generated_at' => now(), 'summary_until_message_id' => $conversation->messages()->latest()->value('id'), 'agent_id' => $agent->id, 'ai_run_id' => Run::query()->where('public_uuid', $result['run_uuid'])->value('id')]);
         return $result + ['operation' => $operation];
     }
@@ -52,7 +67,54 @@ class InboxCopilotService
             'last_message_id' => $conversation->messages()->latest()->value('id'), 'classified_at' => now(),
             'agent_id' => $agent->id, 'ai_run_id' => Run::query()->where('public_uuid', $result['run_uuid'])->value('id'),
         ]);
+        $this->attachRunToConversation($result['run_uuid'] ?? null, $conversation);
+
         return $result + ['operation' => 'classify'];
+    }
+
+    /**
+     * The customer's latest question, expanded with the conversation's
+     * established topic when it cannot stand alone ("how much does it cost?").
+     *
+     * Returns null when there is no inbound message to search for, which puts
+     * the runtime back on its default of searching the full prompt rather than
+     * searching nothing.
+     */
+    private function retrievalQuestion(Conversation $conversation): ?string
+    {
+        $question = $conversation->messages()
+            ->where('direction', 'inbound')
+            ->latest('id')
+            ->value('body');
+
+        if (! filled($question)) {
+            return null;
+        }
+
+        return app(QueryRewriteService::class)->rewrite((string) $question, $conversation) ?: null;
+    }
+
+    /**
+     * Links the run to the conversation it was made for.
+     *
+     * `ai_runs.conversation_id` has existed since the AI platform tables were
+     * created and nothing ever wrote to it — the runtime does not know what a
+     * conversation is, and this service, which does, only ever set the id on
+     * the resulting suggestion. That left every per-conversation question
+     * about AI ("what did answering this cost?", "how many model calls did it
+     * take?") unanswerable from the runs table. Backfilling the column here
+     * costs one update per run and is the smallest change that makes it true.
+     */
+    private function attachRunToConversation(?string $runUuid, Conversation $conversation): void
+    {
+        if (! $runUuid) {
+            return;
+        }
+
+        Run::query()->where('public_uuid', $runUuid)->update([
+            'conversation_id' => $conversation->id,
+            'message_id' => $conversation->messages()->latest()->value('id'),
+        ]);
     }
 
     public function agentFor(Conversation $conversation): Agent

@@ -26,6 +26,7 @@ use App\Http\Controllers\Tenant\Admin\AI\CustomerBriefController as AICustomerBr
 use App\Http\Controllers\Tenant\Admin\AI\ProviderController as AIProviderController;
 use App\Http\Controllers\Tenant\Admin\AI\SettingsController as AISettingsController;
 use App\Http\Controllers\Tenant\Admin\Automation\AutomationController;
+use App\Http\Controllers\Tenant\Admin\Channel\BotProfileController;
 use App\Http\Controllers\Tenant\Admin\Channel\ChannelController;
 use App\Http\Controllers\Tenant\Admin\Connections\ApiOperationController;
 use App\Http\Controllers\Tenant\Admin\Connections\ConnectionController;
@@ -68,6 +69,7 @@ use App\Http\Controllers\Tenant\Admin\NotificationController;
 use App\Http\Controllers\Tenant\Admin\Operations\OperationsController as SupportOperationsController;
 use App\Http\Controllers\Tenant\Admin\ProfileController;
 use App\Http\Controllers\Tenant\Admin\Quality\QualityWorkforceController;
+use App\Http\Controllers\Tenant\Admin\Reporting\BotPerformanceController;
 use App\Http\Controllers\Tenant\Admin\Reporting\ReportingController;
 use App\Http\Controllers\Tenant\Admin\SearchController;
 use App\Http\Controllers\Tenant\Admin\Task\TaskController;
@@ -125,24 +127,25 @@ Route::middleware([
         ->name('tenant.webhooks.inbound');
 
     Route::get('/widget/promptbot.js', [WebChatController::class, 'script'])->name('tenant.widget.script');
-    Route::get('/widget/api/{key}/config', [WebChatController::class, 'config'])->middleware('throttle:120,1')->name('tenant.widget.config');
-    Route::post('/widget/api/{key}/session', [WebChatController::class, 'session'])->middleware('throttle:20,1')->name('tenant.widget.session');
-    Route::get('/widget/api/{key}/messages', [WebChatController::class, 'poll'])->middleware('throttle:120,1')->name('tenant.widget.messages.poll');
-    Route::post('/widget/api/{key}/messages', [WebChatController::class, 'messages'])->middleware('throttle:60,1')->name('tenant.widget.messages.store');
+    Route::get('/widget/api/{key}/config', [WebChatController::class, 'config'])->middleware('throttle:120,1,widget-config')->name('tenant.widget.config');
+    Route::post('/widget/api/{key}/session', [WebChatController::class, 'session'])->middleware('throttle:20,1,widget-session')->name('tenant.widget.session');
+    Route::get('/widget/api/{key}/messages', [WebChatController::class, 'poll'])->middleware('throttle:120,1,widget-poll')->name('tenant.widget.messages.poll');
+    Route::post('/widget/api/{key}/messages', [WebChatController::class, 'messages'])->middleware('throttle:60,1,widget-send')->name('tenant.widget.messages.store');
+    Route::post('/widget/api/{key}/rate', [WebChatController::class, 'rate'])->middleware('throttle:10,1,widget-rate')->name('tenant.widget.rate');
     Route::options('/widget/api/{key}/{path?}', WidgetCorsController::class)->where('path', '.*');
-    Route::post('/channels/email/{channel}/inbound', InboundEmailController::class)->middleware('throttle:120,1')->name('tenant.channels.email.inbound');
+    Route::post('/channels/email/{channel}/inbound', InboundEmailController::class)->middleware('throttle:120,1,inbound-email')->name('tenant.channels.email.inbound');
     // GET+POST on one route: Meta calls the same URL for both the webhook
     // verification handshake and event delivery.
-    Route::match(['get', 'post'], '/channels/whatsapp/{channel}/webhook', InboundWhatsappController::class)->middleware('throttle:120,1')->name('tenant.channels.whatsapp.webhook');
-    Route::match(['get', 'post'], '/channels/messenger/{channel}/webhook', InboundMessengerController::class)->middleware('throttle:120,1')->name('tenant.channels.messenger.webhook');
-    Route::match(['get', 'post'], '/channels/instagram/{channel}/webhook', InboundInstagramController::class)->middleware('throttle:120,1')->name('tenant.channels.instagram.webhook');
-    Route::post('/channels/telegram/{channel}/webhook', InboundTelegramController::class)->middleware('throttle:120,1')->name('tenant.channels.telegram.webhook');
-    Route::post('/channels/sms/{channel}/webhook', InboundSmsController::class)->middleware('throttle:120,1')->name('tenant.channels.sms.webhook');
-    Route::get('/help', [PublicSupportController::class, 'help'])->middleware('throttle:120,1')->name('tenant.help');
-    Route::get('/forms/{slug}', [PublicSupportController::class, 'form'])->middleware('throttle:120,1')->name('tenant.forms.show');
-    Route::post('/forms/{slug}', [PublicSupportController::class, 'submit'])->middleware('throttle:10,1')->name('tenant.forms.submit');
-    Route::post('/csat/{survey}/{resourceType}/{resourceId}', [PublicSupportController::class, 'csat'])->middleware(['signed', 'throttle:10,1'])->name('tenant.csat.submit');
-    Route::get('/portal/{token}', [PublicSupportController::class, 'portal'])->middleware('throttle:30,1')->name('tenant.portal');
+    Route::match(['get', 'post'], '/channels/whatsapp/{channel}/webhook', InboundWhatsappController::class)->middleware('throttle:120,1,inbound-whatsapp')->name('tenant.channels.whatsapp.webhook');
+    Route::match(['get', 'post'], '/channels/messenger/{channel}/webhook', InboundMessengerController::class)->middleware('throttle:120,1,inbound-messenger')->name('tenant.channels.messenger.webhook');
+    Route::match(['get', 'post'], '/channels/instagram/{channel}/webhook', InboundInstagramController::class)->middleware('throttle:120,1,inbound-instagram')->name('tenant.channels.instagram.webhook');
+    Route::post('/channels/telegram/{channel}/webhook', InboundTelegramController::class)->middleware('throttle:120,1,inbound-telegram')->name('tenant.channels.telegram.webhook');
+    Route::post('/channels/sms/{channel}/webhook', InboundSmsController::class)->middleware('throttle:120,1,inbound-sms')->name('tenant.channels.sms.webhook');
+    Route::get('/help', [PublicSupportController::class, 'help'])->middleware('throttle:120,1,public-help')->name('tenant.help');
+    Route::get('/forms/{slug}', [PublicSupportController::class, 'form'])->middleware('throttle:120,1,public-form-view')->name('tenant.forms.show');
+    Route::post('/forms/{slug}', [PublicSupportController::class, 'submit'])->middleware('throttle:10,1,public-form-submit')->name('tenant.forms.submit');
+    Route::post('/csat/{survey}/{resourceType}/{resourceId}', [PublicSupportController::class, 'csat'])->middleware(['signed', 'throttle:10,1,public-csat'])->name('tenant.csat.submit');
+    Route::get('/portal/{token}', [PublicSupportController::class, 'portal'])->middleware('throttle:30,1,public-portal')->name('tenant.portal');
 
     Route::middleware('auth:tenant')->name('tenant.admin.')->group(function (): void {
         Route::get('/dashboard', TenantAdminDashboardController::class)->name('dashboard');
@@ -187,6 +190,11 @@ Route::middleware([
 
         Route::resource('channels', ChannelController::class);
         Route::post('channels/{channel}/rotate-inbound-secret', [ChannelController::class, 'rotateInboundSecret'])->name('channels.rotate-inbound-secret');
+
+        // No `show`: a bot profile is a settings record, and a read-only page
+        // of the same fields the edit form already displays would be a second
+        // place to keep in sync for no gain.
+        Route::resource('bot-profiles', BotProfileController::class)->except('show');
 
         Route::prefix('inbox')->name('inbox.')->group(function (): void {
             Route::get('/', [ConversationController::class, 'index'])->name('index');
@@ -235,6 +243,7 @@ Route::middleware([
         Route::post('experience/portal-link', [ExperienceController::class, 'portalLink'])->name('experience.portal-link');
         Route::get('reports', [ReportingController::class, 'index'])->name('reports.index');
         Route::get('reports/export', [ReportingController::class, 'export'])->name('reports.export');
+        Route::get('reports/bot-performance', [BotPerformanceController::class, 'index'])->name('reports.bot-performance');
         Route::post('reports/ai-insight', AIReportInsightController::class)->middleware(['tenant.feature:ai_platform', 'throttle:10,60'])->name('reports.ai-insight');
         Route::get('developer', [GovernanceController::class, 'index'])->name('governance.index');
         Route::post('developer/api-keys', [GovernanceController::class, 'createKey'])->name('governance.api-keys.store');

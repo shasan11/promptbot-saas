@@ -242,10 +242,26 @@ class KnowledgeRetrievalService
         $kept = [];
         $discarded = [];
         $tokens = 0;
+        $seenHashes = [];
 
         foreach ($hits as $hit) {
-            if ($hit->finalScore < $query->similarityThreshold) {
+            if ($this->admissionScore($hit, $query) < $query->similarityThreshold) {
                 $discarded[] = $hit->exclude('below_similarity_threshold');
+
+                continue;
+            }
+
+            // Boilerplate legitimately repeats across documents (the same
+            // policy paragraph in a PDF, a help page and an FAQ), and chunk
+            // overlap means neighbouring chunks share text by design. Passing
+            // the same passage to the model several times spends the context
+            // budget on redundancy and makes a repeated claim look
+            // corroborated by independent sources when it is one source
+            // counted twice.
+            $hash = $hit->chunk->content_hash ?: hash('sha256', (string) $hit->chunk->content);
+
+            if (isset($seenHashes[$hash])) {
+                $discarded[] = $hit->exclude('duplicate_content');
 
                 continue;
             }
@@ -265,6 +281,7 @@ class KnowledgeRetrievalService
             }
 
             $tokens += $chunkTokens;
+            $seenHashes[$hash] = true;
             $kept[] = $hit;
         }
 
@@ -273,6 +290,45 @@ class KnowledgeRetrievalService
         }
 
         return [$kept, $discarded];
+    }
+
+    /**
+     * The score the similarity threshold is judged against.
+     *
+     * Ranking and admission are different jobs and must not share a signal.
+     * RRF is a *relative* method — `fuse()` rescales onto the best hit of the
+     * same query — so the top fused score is near-maximal by construction,
+     * for a perfect match and for a question the corpus knows nothing about
+     * alike. Thresholding that number cannot reject anything: measured
+     * against real 3072-dim embeddings, "what is the best recipe for
+     * sourdough bread?" scored 1.000 against a product manual.
+     *
+     * So fusion keeps deciding *order*, and admission is judged on an
+     * absolute measure — cosine similarity where vectors were used, and the
+     * (now absolute) keyword score otherwise.
+     */
+    private function admissionScore(RetrievalHit $hit, RetrievalQuery $query): float
+    {
+        if (! $query->mode->usesVectors()) {
+            return $hit->keywordScore;
+        }
+
+        // Semantic score only, even in hybrid — measured against this corpus,
+        // the keyword score does not separate relevant from irrelevant at all:
+        //
+        //   relevant   semantic 0.539–0.754   keyword 0.120–0.788
+        //   off-topic  semantic 0.463–0.494   keyword 0.000–0.735
+        //
+        // "Recommend a good hotel in Lisbon" scored keyword 0.735 against a
+        // product manual (common words carry TF-IDF weight), while a plainly
+        // relevant "What is PromptBot?" scored only 0.120. Letting keyword
+        // admit on its own therefore lets nonsense through while adding
+        // nothing that semantic does not already catch.
+        //
+        // Keyword still does its real job — it contributes to RRF, so an
+        // exact token match (an error code, a SKU) still pulls its chunk up
+        // the *ranking*. It just no longer decides admission.
+        return $hit->semanticScore;
     }
 
     /**

@@ -135,6 +135,14 @@ return [
         'batch_size' => (int) env('KNOWLEDGE_EMBEDDING_BATCH', 64),
         'max_retries' => 5,
 
+        // How long a *query* embedding stays cached. Support bases are asked
+        // the same questions constantly, and the vector for a given query is
+        // deterministic under a fixed model, so recomputing it per request is
+        // pure latency and cost. Cache keys include the base's embedding
+        // signature, so a model change invalidates them implicitly rather
+        // than needing a flush. Set to 0 to disable.
+        'query_cache_ttl' => (int) env('KNOWLEDGE_QUERY_CACHE_TTL', 3600),
+
         'providers' => [
             'local' => [
                 'driver' => 'local',
@@ -198,7 +206,24 @@ return [
         'max_top_k' => 50,
         'default_candidate_pool' => 20,
         'max_candidate_pool' => 200,
-        'default_similarity_threshold' => 0.70,
+        // Calibrated, not guessed. Measured against text-embedding-3-large
+        // (3072d) over a real support corpus:
+        //
+        //   genuinely relevant paraphrases  cosine 0.539 – 0.754
+        //   plainly off-topic questions     cosine 0.463 – 0.494
+        //
+        // The previous 0.70 sat above almost the entire relevant band and
+        // discarded 7 of 8 correct answers. 0.52 is the midpoint of the gap,
+        // leaning slightly strict — a false reject produces "I don't know"
+        // and a handoff, while a false accept feeds the model irrelevant
+        // context and invites a confident wrong answer.
+        //
+        // This band is model-specific. Re-measure after changing embedding
+        // model; `default_similarity_threshold_local` exists because the
+        // built-in hash provider's scores live an order of magnitude lower
+        // (relevant 0.08 – 0.29) and would be rejected wholesale by 0.52.
+        'default_similarity_threshold' => (float) env('KNOWLEDGE_SIMILARITY_THRESHOLD', 0.52),
+        'default_similarity_threshold_local' => (float) env('KNOWLEDGE_SIMILARITY_THRESHOLD_LOCAL', 0.05),
         'default_max_context_tokens' => 8000,
         'max_context_tokens' => 32000,
 
@@ -210,9 +235,24 @@ return [
             'rrf_k' => 60,
         ],
 
+        // Saturation constant mapping MySQL's unbounded full-text relevance
+        // onto 0..1 as `r / (r + k)`. Larger k is stricter (a given relevance
+        // maps lower). This must stay an absolute mapping — normalising
+        // against the best hit of each query made every top result score 1.0
+        // and destroyed the threshold's ability to reject anything.
+        'keyword_saturation' => (float) env('KNOWLEDGE_KEYWORD_SATURATION', 1.0),
+
         'reranking' => [
             'enabled_by_default' => true,
+            // 'heuristic' (default, free, lexical signals only) or 'provider'
+            // (a hosted cross-encoder that scores real query/passage
+            // relevance). The provider driver falls back to the heuristic on
+            // any failure, so enabling it cannot take retrieval down.
             'driver' => env('KNOWLEDGE_RERANKER', 'heuristic'),
+            'endpoint' => env('KNOWLEDGE_RERANKER_ENDPOINT', 'https://api.cohere.com/v2/rerank'),
+            'model' => env('KNOWLEDGE_RERANKER_MODEL', 'rerank-v3.5'),
+            'api_key' => env('KNOWLEDGE_RERANKER_API_KEY'),
+            'timeout' => (int) env('KNOWLEDGE_RERANKER_TIMEOUT', 8),
         ],
 
         'log_retention_days' => (int) env('KNOWLEDGE_RETRIEVAL_LOG_RETENTION', 90),

@@ -16,6 +16,7 @@ use App\Services\Knowledge\Extraction\PdfExtractor;
 use App\Services\Knowledge\Extraction\PlainTextExtractor;
 use App\Services\Knowledge\Retrieval\DatabaseVectorStore;
 use App\Services\Knowledge\Retrieval\HeuristicReRanker;
+use App\Services\Knowledge\Retrieval\ProviderReRanker;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -41,9 +42,12 @@ class KnowledgeServiceProvider extends ServiceProvider
             };
         });
 
-        $this->app->singleton(ReRankerInterface::class, function () {
+        $this->app->singleton(ReRankerInterface::class, function ($app) {
             return match ((string) config('knowledge.retrieval.reranking.driver')) {
-                'heuristic' => new HeuristicReRanker,
+                // Takes the heuristic as its fallback rather than replacing
+                // it, so a reranking outage degrades ordering instead of
+                // failing the query.
+                'provider' => new ProviderReRanker($app->make(HeuristicReRanker::class)),
                 default => new HeuristicReRanker,
             };
         });

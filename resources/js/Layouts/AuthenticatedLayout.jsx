@@ -7,6 +7,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     Bell,
+    Bot,
     Cable,
     CalendarClock,
     CheckSquare,
@@ -223,7 +224,8 @@ const workspaceNavigation = [
         items: [
             { label: 'Operations', routeName: 'tenant.admin.operations.index', active: 'tenant.admin.operations.*', permission: 'operations.view', icon: Gauge },
             { label: 'Automation', routeName: 'tenant.admin.automation.index', active: 'tenant.admin.automation.*', permission: 'automation.view', icon: Workflow },
-            { label: 'Reports', routeName: 'tenant.admin.reports.index', active: 'tenant.admin.reports.*', permission: 'reports.view', icon: BarChart3 },
+            { label: 'Reports', routeName: 'tenant.admin.reports.index', active: 'tenant.admin.reports.index', permission: 'reports.view', icon: BarChart3 },
+            { label: 'Bot performance', routeName: 'tenant.admin.reports.bot-performance', active: 'tenant.admin.reports.bot-performance', permission: 'reports.view', icon: Bot },
             { label: 'Quality', routeName: 'tenant.admin.quality.index', active: 'tenant.admin.quality.*', permission: 'quality.view', icon: Star },
             { label: 'Workforce', routeName: 'tenant.admin.workforce.index', active: 'tenant.admin.workforce.*', permission: 'workforce.view', icon: CalendarClock },
         ],

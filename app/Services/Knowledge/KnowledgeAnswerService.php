@@ -30,8 +30,17 @@ class KnowledgeAnswerService
         private readonly AIFeatureManager $features,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function answer(RetrievalOutcome $outcome, string $question): array
+    /**
+     * @param  string|null  $styleInstruction  Tone/length guidance from the
+     *                                         channel's bot profile. Appended
+     *                                         rather than replacing the system
+     *                                         prompt, so a tenant can adjust
+     *                                         voice without being able to
+     *                                         weaken the grounding and
+     *                                         anti-fabrication rules.
+     * @return array<string, mixed>
+     */
+    public function answer(RetrievalOutcome $outcome, string $question, ?string $styleInstruction = null): array
     {
         if ($outcome->isEmpty()) {
             return [
@@ -44,7 +53,7 @@ class KnowledgeAnswerService
 
         if ($this->features->isEnabled(self::FEATURE_KEY)) {
             try {
-                return $this->generate($outcome, $question);
+                return $this->generate($outcome, $question, $styleInstruction);
             } catch (AIException $exception) {
                 report($exception);
                 // Fall through to the extractive preview — a broken provider
@@ -58,11 +67,11 @@ class KnowledgeAnswerService
     }
 
     /** @return array<string, mixed> */
-    private function generate(RetrievalOutcome $outcome, string $question): array
+    private function generate(RetrievalOutcome $outcome, string $question, ?string $styleInstruction = null): array
     {
         $result = $this->ai->forPurpose(AIPurpose::RagAnswer)->chat(new ChatRequest(
             messages: [
-                new ChatMessage('system', $this->systemPrompt()),
+                new ChatMessage('system', trim($this->systemPrompt().($styleInstruction ? "\n\nStyle for this workspace:\n".$styleInstruction : ''))),
                 new ChatMessage('user', "Context:\n{$outcome->context}\n\nQuestion: {$question}"),
             ],
             // 0.2 read as near-extractive in practice — the model leaned on
@@ -80,6 +89,21 @@ class KnowledgeAnswerService
             'sources_used' => $outcome->citations(),
             'generated_by' => 'ai',
             'model' => $result->model,
+            // What this answer cost, handed back so the caller can record it
+            // against the conversation it answered. The provider call itself
+            // is already logged centrally, but that log is operator-scoped and
+            // knows nothing about conversations — so a workspace asking "what
+            // did answering this customer cost?" had no way to find out for
+            // anything the widget answered.
+            'usage' => [
+                'provider' => $result->provider,
+                'model' => $result->model,
+                'prompt_tokens' => $result->promptTokens,
+                'completion_tokens' => $result->completionTokens,
+                'total_tokens' => $result->totalTokens,
+                'estimated_cost' => $result->estimatedCost,
+                'latency_ms' => $result->latencyMs,
+            ],
         ];
     }
 

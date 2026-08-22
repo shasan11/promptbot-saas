@@ -34,8 +34,14 @@ class TenantAgentRuntime
         private readonly AIUsageCostService $costs,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function chat(AgentModel $agent, string $input, ?User $actor = null, string $feature = 'playground', string $operation = 'chat', ?bool $knowledgeGrounding = null, ?string $idempotencyKey = null, array $media = []): array
+    /**
+     * @param  string|null  $retrievalQuery  What to *search* for, when that is
+     *                                       not the same text the model is
+     *                                       asked to respond to. Defaults to
+     *                                       `$input`.
+     * @return array<string, mixed>
+     */
+    public function chat(AgentModel $agent, string $input, ?User $actor = null, string $feature = 'playground', string $operation = 'chat', ?bool $knowledgeGrounding = null, ?string $idempotencyKey = null, array $media = [], ?string $retrievalQuery = null): array
     {
         $this->budget->ensureAvailable();
         if (! $agent->isDeployed() && $feature !== 'playground') {
@@ -63,7 +69,13 @@ class TenantAgentRuntime
         try {
             $ground = $knowledgeGrounding ?? $agent->require_citations;
             if ($ground) {
-                $retrieval = $this->knowledge->retrieve($agent->agent_key, $input, ['max_context_tokens' => $agent->max_context_tokens]);
+                // Search for the question, not for the whole prompt. Callers that
+                // build an instruction plus a conversation transcript were passing
+                // all of it here, so retrieval embedded hundreds of words of
+                // scaffolding alongside the customer's actual words — which buries
+                // the question in the vector and files the entire prompt as the
+                // "question" on any knowledge gap it records.
+                $retrieval = $this->knowledge->retrieve($agent->agent_key, trim((string) $retrievalQuery) ?: $input, ['max_context_tokens' => $agent->max_context_tokens]);
                 $run->retrieval_log_uuid = $retrieval->logUuid;
                 if ($retrieval->isEmpty()) {
                     return $this->complete($run, $agent, 'I do not have enough verified workspace knowledge to answer that reliably.', [], null, $started);

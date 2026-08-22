@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Channel\WebChatWidget;
 use App\Models\Customer\Contact;
 use App\Models\Inbox\Conversation;
+use App\Models\Inbox\ConversationRating;
 use App\Models\Inbox\WebChatVisitor;
-use App\Services\Channels\WebChatAutoReplyService;
 use App\Services\Inbox\ConversationService;
+use App\Services\Operations\BusinessAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -29,10 +30,30 @@ class WebChatController extends Controller
         return $response;
     }
 
-    public function config(Request $request, string $key): JsonResponse
+    public function config(Request $request, string $key, BusinessAvailabilityService $availability): JsonResponse
     {
         $widget = $this->widget($request, $key);
-        return $this->cors($request, response()->json(['name'=>$widget->widget_name,'primaryColor'=>$widget->primary_color,'position'=>$widget->launcher_position,'welcomeMessage'=>$widget->welcome_message,'offlineMessage'=>$widget->offline_message,'requireName'=>$widget->require_name,'requireEmail'=>$widget->require_email,'allowAttachments'=>$widget->allow_attachments,'privacyUrl'=>$widget->privacy_url,'termsUrl'=>$widget->terms_url]));
+        $widget->loadMissing('channel.businessHours.intervals');
+
+        // `offline_message` has been a stored, admin-editable, API-returned
+        // setting that nothing ever evaluated — the widget had no way to know
+        // whether the workspace was open. Resolving it here (rather than in
+        // the widget) keeps the business-hours policy server-side, where it
+        // cannot be spoofed by editing client state.
+        $policy = $widget->channel?->businessHours;
+        $online = $availability->isOpen($policy);
+        $opensAt = $online ? null : $availability->nextOpensAt($policy);
+
+        return $this->cors($request, response()->json(['name'=>$widget->widget_name,'primaryColor'=>$widget->primary_color,'position'=>$widget->launcher_position,'welcomeMessage'=>$widget->welcome_message,'offlineMessage'=>$widget->offline_message,'requireName'=>$widget->require_name,'requireEmail'=>$widget->require_email,'allowAttachments'=>$widget->allow_attachments,'privacyUrl'=>$widget->privacy_url,'termsUrl'=>$widget->terms_url,
+            'online'=>$online,
+            'opensAt'=>$opensAt?->toIso8601String(),
+            // Deflection: the affordance most likely to stop a question being
+            // asked at all, by answering it before the visitor types.
+            'suggestedQuestions'=>array_values(array_filter((array) ($widget->suggested_questions ?? []))),
+            // Drives whether the widget shows a live-chat affordance or an
+            // "leave a message" one; AI can still answer out of hours.
+            'aiEnabled'=>(bool) $widget->ai_auto_reply_enabled,
+        ]));
     }
 
     public function session(Request $request, string $key): JsonResponse
@@ -43,11 +64,50 @@ class WebChatController extends Controller
         return $this->cors($request,response()->json(['token'=>$token,'visitor'=>$contact->public_uuid],201));
     }
 
-    public function messages(Request $request, string $key, ConversationService $service, WebChatAutoReplyService $autoReply): JsonResponse
+    /**
+     * Records a satisfaction rating from the visitor.
+     *
+     * Scoped to the rater's own conversation via their session token — the
+     * conversation is resolved from the visitor, never accepted from the
+     * request, so a visitor cannot rate (or overwrite the rating on) somebody
+     * else's thread by guessing an id.
+     */
+    public function rate(Request $request, string $key): JsonResponse
+    {
+        $widget = $this->widget($request, $key);
+        $visitor = $this->visitor($request, $widget);
+        $data = $request->validate([
+            'score' => ['required', 'integer', 'min:1', 'max:5'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $conversation = Conversation::query()
+            ->where('channel_id', $widget->channel_id)
+            ->where('contact_id', $visitor->contact_id)
+            ->latest('last_message_at')
+            ->first();
+
+        if (! $conversation) {
+            return $this->cors($request, response()->json(['message' => 'No conversation to rate.'], 404));
+        }
+
+        ConversationRating::updateOrCreate(
+            ['conversation_id' => $conversation->id],
+            ['contact_id' => $visitor->contact_id, 'score' => $data['score'], 'comment' => $data['comment'] ?? null, 'rated_at' => now()],
+        );
+
+        return $this->cors($request, response()->json(['message' => 'Thanks for the feedback.'], 201));
+    }
+
+    public function messages(Request $request, string $key, ConversationService $service): JsonResponse
     {
         $widget=$this->widget($request,$key); $visitor=$this->visitor($request,$widget); $data=$request->validate(['body'=>['required','string','max:10000'],'client_id'=>['required','string','max:120']]);
+        // No AI call here any more. Generation used to run inline in this
+        // request, holding a worker for seconds. `receive()` fires
+        // ConversationReceived, and QueueConversationAnalysis dispatches the
+        // reply job for every channel — dispatching again here would answer
+        // the same message twice.
         $message=$service->receive($widget->channel,$visitor->contact,['body'=>$data['body'],'external_id'=>'widget:'.$data['client_id'],'message_type'=>'text']); $visitor->update(['last_seen_at'=>now()]);
-        $autoReply->maybeReply($widget, $message->conversation, $data['body']);
         // 'id' must stay the numeric DB id, matching poll()'s shape: the widget
         // tracks the highest id it has rendered to ask for only newer messages
         // next time. Sending public_uuid here previously made that Math.max()
